@@ -256,7 +256,20 @@ operadora; restrição editar/excluir só pelo criador.
       via .order do PostgREST) com indicador de direção; primitiva
       ui/sortable-head reutilizável.
 
-Fase 2 restante: Asaas billing, IA/voz/mapa.
+18. [FEITO — Pacote 5] Alternativas IA-free para os papéis de IA do legado:
+    - Motor mensal enriquecido (`features/monthlyEvolutions/summary.ts`):
+      gera as 6 seções do legado (síntese / habilidades / progressos /
+      desafios / conclusão / recomendações) por regras condicionais,
+      computa tendências (assessment e prompting comparando 1ª e 2ª metade
+      do mês), agrega top-skills, classifica metas adquiridas e com maior
+      progresso. Sem provedor externo, dado clínico nunca sai do banco.
+    - Ditado por voz com Web Speech API (`useDictation` + `DictatedTextarea`)
+      nos textareas longos da Evolução diária (notas comportamentais,
+      intervenção, incidentes, resumo da sessão). Nativo do navegador
+      (pt-BR), sem chave/custo. Botão "Mic" no canto do textarea com
+      indicador de gravação.
+
+Fase 2 restante: Asaas billing.
 
 ### Agentes por incremento
 backend, frontend, ux, ui, code-review. Cada peça passa por review antes do PR.

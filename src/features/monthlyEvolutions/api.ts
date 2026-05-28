@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useClinic } from "@/providers/ClinicProvider";
-import type { Json, Tables, TablesUpdate } from "@/types/database";
+import type { Enums, Json, Tables, TablesUpdate } from "@/types/database";
+import { buildMonthlySummary } from "./summary";
 
 export type MonthlyEvolution = Tables<"monthly_evolutions">;
 export const MONTHLY_PAGE_SIZE = 12;
@@ -113,15 +114,12 @@ export function useGenerateMonthlyEvolution() {
         .lte("session_date", to);
       if (attErr) throw attErr;
 
-      const total_sessions = attendances?.length ?? 0;
-      const total_present =
-        attendances?.filter((a) => a.status === "presente").length ?? 0;
-      const total_absent = total_sessions - total_present;
-
-      // 2. Evoluções no período (para contar e contextualizar)
+      // 2. Evoluções diárias do período (campos enriquecidos para o motor)
       const { data: evolutions, error: evoErr } = await supabase
         .from("daily_evolutions")
-        .select("evolution_assessment, prompting_level")
+        .select(
+          "session_date, evolution_assessment, prompting_level, skills_worked, incidents",
+        )
         .eq("clinic_id", clinic.id)
         .eq("patient_id", input.patient_id)
         .gte("session_date", from)
@@ -154,38 +152,39 @@ export function useGenerateMonthlyEvolution() {
         }));
       }
 
-      const monthName = MONTH_NAMES_PT[input.reference_month - 1];
-      const summaryLines: string[] = [];
-      summaryLines.push(
-        `Síntese de ${monthName}/${input.reference_year}.`,
-      );
-      summaryLines.push(
-        `Foram registradas ${total_sessions} sessões no período, com ${total_present} ` +
-          `presenças e ${total_absent} ${total_absent === 1 ? "ausência" : "ausências"}.`,
-      );
-      if ((evolutions?.length ?? 0) > 0) {
-        const assessments = new Map<string, number>();
-        for (const e of evolutions!) {
-          assessments.set(
-            e.evolution_assessment,
-            (assessments.get(e.evolution_assessment) ?? 0) + 1,
-          );
-        }
-        const top = [...assessments.entries()].sort((a, b) => b[1] - a[1])[0];
-        if (top) {
-          summaryLines.push(
-            `A avaliação predominante das sessões foi "${top[0].replace(/_/g, " ")}".`,
-          );
-        }
-      }
-      if (goals.length > 0) {
-        const acquired = goals.filter((g) => g.status === "adquirida").length;
-        summaryLines.push(
-          `Acompanhamento de ${goals.length} ${goals.length === 1 ? "meta" : "metas"} ativa(s); ` +
-            `${acquired} já marcada(s) como adquirida(s).`,
-        );
-      }
-      const generated_summary = summaryLines.join(" ");
+      // 4. Identificação do paciente e profissional (para o texto)
+      const [{ data: patient }, { data: professional }] = await Promise.all([
+        supabase
+          .from("patients")
+          .select("name")
+          .eq("id", input.patient_id)
+          .maybeSingle(),
+        supabase
+          .from("professionals")
+          .select("name")
+          .eq("id", input.professional_id)
+          .maybeSingle(),
+      ]);
+
+      const summary = buildMonthlySummary({
+        patientName: patient?.name ?? "Paciente",
+        professionalName: professional?.name ?? "Profissional",
+        month: input.reference_month,
+        year: input.reference_year,
+        attendances: attendances ?? [],
+        evolutions: evolutions ?? [],
+        goals: goals.map((g) => ({
+          description: g.description,
+          category: g.category,
+          status: g.status as Enums<"goal_status">,
+          current_progress: g.current_progress,
+        })),
+      });
+
+      const total_sessions = summary.totals.total;
+      const total_present = summary.totals.present;
+      const total_absent = summary.totals.absent;
+      const generated_summary = summary.text;
 
       const { data, error } = await supabase
         .from("monthly_evolutions")
