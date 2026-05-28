@@ -8,14 +8,24 @@ import type { Tables, TablesInsert, TablesUpdate } from "@/types/database";
 export type Patient = Tables<"patients">;
 export const PATIENTS_PAGE_SIZE = 10;
 
-type ListParams = { search: string; page: number };
+type ListParams = {
+  search: string;
+  page: number;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+};
 
-export function usePatients({ search, page }: ListParams) {
+export function usePatients({
+  search,
+  page,
+  sortBy = "name",
+  sortDir = "asc",
+}: ListParams) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
 
   return useQuery({
-    queryKey: ["patients", clinicId, search, page],
+    queryKey: ["patients", clinicId, search, page, sortBy, sortDir],
     enabled: !!clinicId,
     queryFn: async () => {
       const from = (page - 1) * PATIENTS_PAGE_SIZE;
@@ -26,7 +36,7 @@ export function usePatients({ search, page }: ListParams) {
         .select("*", { count: "exact" })
         .eq("clinic_id", clinicId!)
         .eq("active", true)
-        .order("name", { ascending: true })
+        .order(sortBy, { ascending: sortDir === "asc" })
         .range(from, to);
 
       const term = sanitizeSearch(search);

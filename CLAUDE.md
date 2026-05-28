@@ -241,6 +241,21 @@ operadora; restrição editar/excluir só pelo criador.
     - Hardening: search_path imutável + trigger functions sem EXECUTE pela
       API REST.
 
+17. [FEITO — Pacote 4] UX adicional:
+    - CID-10 autocomplete (`CidCombobox`) com recorte curado (~80 códigos
+      para TEA/desenvolvimento infantil) em cid10_primary e secondary do
+      paciente; aceita código personalizado se fora do recorte.
+    - `useUrlState`/`useUrlNumber` (react-router useSearchParams) — filtros
+      e página persistidos na URL (refresh/back/forward/compartilhar link
+      preservam estado) em DailyEvolutionsList, AttendanceList, MonthlyList
+      e AuditDashboard.
+    - Auto-save de rascunho em DailyEvolutionForm via localStorage por
+      clinic_id (subscribe do RHF, debounce 800ms); restaura ao abrir
+      "Nova evolução" e limpa no submit. Indicador "Rascunho salvo às HH:mm".
+    - Sortable headers em PatientsList e ProfessionalsList (server-side
+      via .order do PostgREST) com indicador de direção; primitiva
+      ui/sortable-head reutilizável.
+
 Fase 2 restante: Asaas billing, IA/voz/mapa.
 
 ### Agentes por incremento

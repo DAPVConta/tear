@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Field } from "@/components/form/Field";
+import { CidCombobox } from "@/components/form/CidCombobox";
 import {
   Select,
   SelectContent,
@@ -358,10 +359,30 @@ export default function PatientForm() {
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="CID-10 principal" error={errors.cid10_primary?.message}>
-              <Input {...register("cid10_primary")} placeholder="Ex.: F84.0" />
+              <Controller
+                control={control}
+                name="cid10_primary"
+                render={({ field }) => (
+                  <CidCombobox
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="Selecione o CID-10"
+                  />
+                )}
+              />
             </Field>
             <Field label="CID-10 secundário (opcional)">
-              <Input {...register("cid10_secondary")} placeholder="Ex.: F80.9" />
+              <Controller
+                control={control}
+                name="cid10_secondary"
+                render={({ field }) => (
+                  <CidCombobox
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="Selecione o CID-10 (opcional)"
+                  />
+                )}
+              />
             </Field>
             <Field label="Observações do diagnóstico" className="sm:col-span-2">
               <textarea

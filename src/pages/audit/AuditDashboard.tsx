@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useUrlState } from "@/hooks/useUrlState";
 import { useNavigate } from "react-router-dom";
 import {
   ShieldCheck,
@@ -43,11 +43,12 @@ import {
 
 export default function AuditDashboard() {
   const navigate = useNavigate();
-  const [patientId, setPatientId] = useState<string>("all");
-  const [from, setFrom] = useState(
+  const [patientId, setPatientId] = useUrlState("patient", "all");
+  const [from, setFrom] = useUrlState(
+    "from",
     format(subDays(new Date(), 30), "yyyy-MM-dd"),
   );
-  const [to, setTo] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [to, setTo] = useUrlState("to", format(new Date(), "yyyy-MM-dd"));
 
   const { data: patients } = usePatientOptions();
   const { data: checklist, isLoading } = useBillingChecklist({

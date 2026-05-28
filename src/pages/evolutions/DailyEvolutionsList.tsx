@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { attendanceTypeLabels } from "@/lib/labels";
 import { usePatientOptions } from "@/features/patients/api";
+import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
 import {
   useDailyEvolutions,
   isLocked,
@@ -62,12 +63,13 @@ function statusBadge(e: EvolutionRow) {
 
 export default function DailyEvolutionsList() {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
-  const [patientId, setPatientId] = useState<string>("all");
-  const [from, setFrom] = useState(
+  const [page, setPage] = useUrlNumber("page", 1);
+  const [patientId, setPatientId] = useUrlState("patient", "all");
+  const [from, setFrom] = useUrlState(
+    "from",
     format(subDays(new Date(), 14), "yyyy-MM-dd"),
   );
-  const [to, setTo] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [to, setTo] = useUrlState("to", format(new Date(), "yyyy-MM-dd"));
 
   const { data: patients } = usePatientOptions();
   const { data, isLoading, isError } = useDailyEvolutions({
@@ -240,7 +242,7 @@ export default function DailyEvolutionsList() {
                 variant="outline"
                 size="sm"
                 disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
+                onClick={() => setPage(page - 1)}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -251,7 +253,7 @@ export default function DailyEvolutionsList() {
                 variant="outline"
                 size="sm"
                 disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => setPage(page + 1)}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>

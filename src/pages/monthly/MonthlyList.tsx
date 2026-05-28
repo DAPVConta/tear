@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -39,9 +40,9 @@ const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
 export default function MonthlyList() {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
-  const [patientId, setPatientId] = useState<string>("all");
-  const [year, setYear] = useState<string>(String(currentYear));
+  const [page, setPage] = useUrlNumber("page", 1);
+  const [patientId, setPatientId] = useUrlState("patient", "all");
+  const [year, setYear] = useUrlState("year", String(currentYear));
 
   const { data: patients } = usePatientOptions();
   const { data, isLoading, isError } = useMonthlyEvolutions({
@@ -199,7 +200,7 @@ export default function MonthlyList() {
                 variant="outline"
                 size="sm"
                 disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
+                onClick={() => setPage(page - 1)}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -210,7 +211,7 @@ export default function MonthlyList() {
                 variant="outline"
                 size="sm"
                 disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => setPage(page + 1)}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>

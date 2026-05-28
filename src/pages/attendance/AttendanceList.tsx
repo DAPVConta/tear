@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -70,12 +71,13 @@ const statusVariant: Record<
 
 export default function AttendanceList() {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
-  const [patientId, setPatientId] = useState<string>("all");
-  const [from, setFrom] = useState(
+  const [page, setPage] = useUrlNumber("page", 1);
+  const [patientId, setPatientId] = useUrlState("patient", "all");
+  const [from, setFrom] = useUrlState(
+    "from",
     format(subDays(new Date(), 30), "yyyy-MM-dd"),
   );
-  const [to, setTo] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [to, setTo] = useUrlState("to", format(new Date(), "yyyy-MM-dd"));
   const [toDelete, setToDelete] = useState<AttendanceRow | null>(null);
 
   const { data: patients } = usePatientOptions();
@@ -275,7 +277,7 @@ export default function AttendanceList() {
                 variant="outline"
                 size="sm"
                 disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
+                onClick={() => setPage(page - 1)}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -286,7 +288,7 @@ export default function AttendanceList() {
                 variant="outline"
                 size="sm"
                 disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => setPage(page + 1)}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>

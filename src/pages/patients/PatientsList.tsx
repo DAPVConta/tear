@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableHead, type SortDir } from "@/components/ui/sortable-head";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,10 +64,25 @@ export default function PatientsList() {
   const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const search = useDebounce(searchInput);
   const [toDelete, setToDelete] = useState<Patient | null>(null);
 
-  const { data, isLoading, isError } = usePatients({ search, page });
+  const { data, isLoading, isError } = usePatients({
+    search,
+    page,
+    sortBy,
+    sortDir,
+  });
+
+  function onSort(key: string) {
+    if (sortBy === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else {
+      setSortBy(key);
+      setSortDir("asc");
+    }
+  }
   const deactivate = useDeactivatePatient();
 
   const totalPages = useMemo(
@@ -128,9 +144,30 @@ export default function PatientsList() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Paciente</TableHead>
-              <TableHead>Responsável</TableHead>
-              <TableHead>Pagamento</TableHead>
+              <SortableHead
+                sortKey="name"
+                currentKey={sortBy}
+                currentDir={sortDir}
+                onSort={onSort}
+              >
+                Paciente
+              </SortableHead>
+              <SortableHead
+                sortKey="guardian_name"
+                currentKey={sortBy}
+                currentDir={sortDir}
+                onSort={onSort}
+              >
+                Responsável
+              </SortableHead>
+              <SortableHead
+                sortKey="payment_type"
+                currentKey={sortBy}
+                currentDir={sortDir}
+                onSort={onSort}
+              >
+                Pagamento
+              </SortableHead>
               <TableHead>Contato</TableHead>
               <TableHead className="w-12" />
             </TableRow>

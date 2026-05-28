@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useClinic } from "@/providers/ClinicProvider";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TagInput } from "@/components/ui/tag-input";
@@ -154,9 +155,13 @@ export default function DailyEvolutionForm() {
   const isEdit = !!id && id !== "nova";
   const evoId = isEdit ? Number(id) : undefined;
 
+  const { clinic } = useClinic();
   const { data: patients } = usePatientOptions();
   const { data: professionals } = useProfessionalOptions();
   const { data: existing, isLoading } = useDailyEvolution(evoId);
+  const draftKey = clinic?.id ? `tear:draft:evolution:${clinic.id}:new` : null;
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+  const draftLoadedRef = useRef(false);
 
   const createEvo = useCreateEvolution();
   const updateEvo = useUpdateEvolution(evoId ?? 0);
@@ -196,6 +201,43 @@ export default function DailyEvolutionForm() {
   }, [plans, planIdStr]);
 
   const duration = minutesBetween(startTime, endTime);
+
+  // Restaura rascunho (apenas em modo novo, uma vez).
+  useEffect(() => {
+    if (isEdit || !draftKey || draftLoadedRef.current) return;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<FormValues>;
+        reset({ ...defaults, ...parsed });
+      }
+    } catch {
+      // ignora rascunho corrompido
+    }
+    draftLoadedRef.current = true;
+  }, [draftKey, isEdit, reset]);
+
+  // Auto-save (debounced) dos valores em modo novo via subscribe do RHF.
+  useEffect(() => {
+    if (isEdit || !draftKey) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const sub = watch((values) => {
+      if (!draftLoadedRef.current) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        try {
+          localStorage.setItem(draftKey, JSON.stringify(values));
+          setDraftSavedAt(new Date());
+        } catch {
+          // localStorage indisponível
+        }
+      }, 800);
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      sub.unsubscribe();
+    };
+  }, [watch, draftKey, isEdit]);
 
   useEffect(() => {
     if (existing) {
@@ -275,6 +317,7 @@ export default function DailyEvolutionForm() {
       } else {
         await createEvo.mutateAsync(payload);
         toast.success("Evolução registrada");
+        if (draftKey) localStorage.removeItem(draftKey);
       }
       navigate("/evolucoes");
     } catch (e) {
@@ -705,10 +748,21 @@ export default function DailyEvolutionForm() {
         </fieldset>
 
         <div className="flex flex-wrap items-center justify-end gap-3">
-          {locked && (
+          {locked ? (
             <p className="mr-auto text-xs text-muted-foreground">
               Sessão bloqueada após 24h. Para corrigir, use um adendo (em breve).
             </p>
+          ) : (
+            !isEdit &&
+            draftSavedAt && (
+              <p className="mr-auto text-xs text-muted-foreground">
+                Rascunho salvo às{" "}
+                {draftSavedAt.toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            )
           )}
           <Button type="button" variant="outline" onClick={() => navigate("/evolucoes")}>
             Cancelar

@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableHead, type SortDir } from "@/components/ui/sortable-head";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,10 +55,25 @@ export default function ProfessionalsList() {
   const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const search = useDebounce(searchInput);
   const [toDelete, setToDelete] = useState<Professional | null>(null);
 
-  const { data, isLoading, isError } = useProfessionals({ search, page });
+  const { data, isLoading, isError } = useProfessionals({
+    search,
+    page,
+    sortBy,
+    sortDir,
+  });
+
+  function onSort(key: string) {
+    if (sortBy === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else {
+      setSortBy(key);
+      setSortDir("asc");
+    }
+  }
   const deactivate = useDeactivateProfessional();
 
   const totalPages = useMemo(
@@ -118,8 +134,22 @@ export default function ProfessionalsList() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Profissional</TableHead>
-              <TableHead>Especialidade</TableHead>
+              <SortableHead
+                sortKey="name"
+                currentKey={sortBy}
+                currentDir={sortDir}
+                onSort={onSort}
+              >
+                Profissional
+              </SortableHead>
+              <SortableHead
+                sortKey="specialty"
+                currentKey={sortBy}
+                currentDir={sortDir}
+                onSort={onSort}
+              >
+                Especialidade
+              </SortableHead>
               <TableHead>Registro</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead className="w-12" />
