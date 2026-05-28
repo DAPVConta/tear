@@ -207,7 +207,10 @@ operadora; restrição editar/excluir só pelo criador.
     - Limitação conhecida: auto-rastreamento de eventos ainda não habilitado
       (precisa de triggers Postgres ou wrappers de mutação para escrever em
       audit_logs); viewer já está pronto para quando ativarmos.
-11. Dashboard (métricas + gráficos).
+11. [FEITO] Dashboard — métricas reais (pacientes ativos, sessões da semana,
+    guias vigentes, taxa de presença 30d), gráficos (sessões últimos 14d em
+    area chart, distribuição de avaliações em bar chart) e lista de guias
+    a vencer (30d) com link direto para correção.
 12. Configurações → Layout (logo/cores por tenant) + ClinicSettings.
 13. Super Admin (gestão de clínicas + métricas globais).
 14. Fase 2: Asaas billing, IA/voz/mapa.
