@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { navSections } from "@/config/nav";
 import { Logo } from "@/components/brand/Logo";
 import { Sidebar } from "./Sidebar";
+import { SidebarNav } from "./SidebarNav";
 import { Topbar } from "./Topbar";
 
 export function AppShell() {
@@ -21,7 +21,7 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onOpenMobile={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-7xl px-4 py-8 lg:px-8 lg:py-10 animate-fade-in">
+          <div className="mx-auto w-full max-w-7xl px-4 py-8 animate-fade-in lg:px-8 lg:py-10">
             <Outlet />
           </div>
         </main>
@@ -67,39 +67,9 @@ function MobileDrawer({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <nav className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-4">
-          {navSections.map((section) => (
-            <div key={section.label}>
-              <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-sidebar-foreground/45">
-                {section.label}
-              </p>
-              <ul className="flex flex-col gap-1">
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <li key={item.href}>
-                      <NavLink
-                        to={item.href}
-                        onClick={onClose}
-                        className={({ isActive }) =>
-                          cn(
-                            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all",
-                            isActive
-                              ? "bg-white/15 text-white"
-                              : "text-sidebar-foreground/70 hover:bg-white/10 hover:text-white",
-                          )
-                        }
-                      >
-                        <Icon className="h-5 w-5 shrink-0" />
-                        <span className="truncate">{item.title}</span>
-                      </NavLink>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </nav>
+        <div className="flex-1 overflow-y-auto px-3 py-4">
+          <SidebarNav onNavigate={onClose} />
+        </div>
       </aside>
     </div>
   );

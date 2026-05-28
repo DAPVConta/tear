@@ -32,7 +32,7 @@ export function Wordmark({
         TEAR
       </span>
       {showTagline && (
-        <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-current/70">
+        <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] opacity-70">
           Prontuário Inteligente
         </span>
       )}

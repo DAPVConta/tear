@@ -9,6 +9,13 @@
       content="TEAR — Prontuário Inteligente para Clínicas de TEA"
     />
     <title>TEAR — Prontuário Inteligente para Clínicas de TEA</title>
+    <script>
+      // Evita flash de tema (FOUC): aplica a classe antes da pintura.
+      try {
+        var t = localStorage.getItem("theme");
+        if (t === "dark") document.documentElement.classList.add("dark");
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
