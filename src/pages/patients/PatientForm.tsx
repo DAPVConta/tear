@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { maskCPF, maskCEP, maskPhone, unmask, isValidCPF } from "@/lib/masks";
 import { fetchCep } from "@/lib/brasilapi";
@@ -222,7 +223,17 @@ export default function PatientForm() {
               <Input {...register("name")} placeholder="Nome do paciente" />
             </Field>
             <Field label="Data de nascimento" error={errors.birth_date?.message}>
-              <Input type="date" {...register("birth_date")} />
+              <Controller
+                control={control}
+                name="birth_date"
+                render={({ field }) => (
+                  <DatePicker
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="dd/mm/aaaa"
+                  />
+                )}
+              />
             </Field>
             <Field label="Sexo" error={errors.gender?.message}>
               <Controller

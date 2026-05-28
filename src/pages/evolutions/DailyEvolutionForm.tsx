@@ -25,6 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { TagInput } from "@/components/ui/tag-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Field } from "@/components/form/Field";
@@ -87,7 +89,7 @@ const schema = z
     authorization_id: z.string(),
     plan_id: z.string(),
     goals_worked: z.array(z.number()),
-    skills_text: z.string(),
+    skills_worked: z.array(z.string()),
     prompting_level: z.enum(promptingLevels),
     behavioral_notes: z.string().optional(),
     behavioral_intervention: z.string().optional(),
@@ -134,7 +136,7 @@ const defaults: FormValues = {
   authorization_id: "",
   plan_id: "",
   goals_worked: [],
-  skills_text: "",
+  skills_worked: [],
   prompting_level: "independente",
   behavioral_notes: "",
   behavioral_intervention: "",
@@ -214,9 +216,11 @@ export default function DailyEvolutionForm() {
               (v): v is number => typeof v === "number",
             )
           : [],
-        skills_text: Array.isArray(existing.skills_worked)
-          ? (existing.skills_worked as string[]).join("\n")
-          : "",
+        skills_worked: Array.isArray(existing.skills_worked)
+          ? (existing.skills_worked as unknown[]).filter(
+              (v): v is string => typeof v === "string",
+            )
+          : [],
         prompting_level: existing.prompting_level,
         behavioral_notes: existing.behavioral_notes ?? "",
         behavioral_intervention: existing.behavioral_intervention ?? "",
@@ -231,11 +235,6 @@ export default function DailyEvolutionForm() {
   }, [existing, reset]);
 
   async function onSubmit(values: FormValues) {
-    const skills = values.skills_text
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
     const payload = {
       patient_id: values.patient_id,
       professional_id: values.professional_id,
@@ -252,7 +251,7 @@ export default function DailyEvolutionForm() {
           : null,
       plan_id: values.plan_id ? Number(values.plan_id) : null,
       goals_worked: values.goals_worked,
-      skills_worked: skills,
+      skills_worked: values.skills_worked,
       prompting_level: values.prompting_level,
       behavioral_notes: values.behavioral_notes || null,
       behavioral_intervention: values.behavioral_intervention || null,
@@ -382,7 +381,18 @@ export default function DailyEvolutionForm() {
                 />
               </Field>
               <Field label="Data" error={errors.session_date?.message}>
-                <Input type="date" {...register("session_date")} />
+                <Controller
+                  control={control}
+                  name="session_date"
+                  render={({ field }) => (
+                    <DatePicker
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="dd/mm/aaaa"
+                      clearable={false}
+                    />
+                  )}
+                />
               </Field>
               <Field label="Tipo de atendimento" error={errors.attendance_type?.message}>
                 <Controller
@@ -537,12 +547,17 @@ export default function DailyEvolutionForm() {
                 </p>
               )}
 
-              <Field label="Habilidades trabalhadas (uma por linha)">
-                <textarea
-                  {...register("skills_text")}
-                  rows={3}
-                  className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder={"Atenção compartilhada\nNomeação de figuras"}
+              <Field label="Habilidades trabalhadas">
+                <Controller
+                  control={control}
+                  name="skills_worked"
+                  render={({ field }) => (
+                    <TagInput
+                      value={field.value ?? []}
+                      onChange={field.onChange}
+                      placeholder="Digite e pressione Enter para adicionar"
+                    />
+                  )}
                 />
               </Field>
 

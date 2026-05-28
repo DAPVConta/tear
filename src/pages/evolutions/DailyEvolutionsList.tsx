@@ -13,7 +13,7 @@ import {
 import { format, parseISO, subDays } from "date-fns";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -125,24 +125,28 @@ export default function DailyEvolutionsList() {
               ))}
             </SelectContent>
           </Select>
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => {
-              setFrom(e.target.value);
-              resetPage();
-            }}
-            className="sm:w-44"
-          />
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => {
-              setTo(e.target.value);
-              resetPage();
-            }}
-            className="sm:w-44"
-          />
+          <div className="sm:w-44">
+            <DatePicker
+              value={from}
+              onChange={(v) => {
+                setFrom(v);
+                resetPage();
+              }}
+              placeholder="De"
+              clearable={false}
+            />
+          </div>
+          <div className="sm:w-44">
+            <DatePicker
+              value={to}
+              onChange={(v) => {
+                setTo(v);
+                resetPage();
+              }}
+              placeholder="Até"
+              clearable={false}
+            />
+          </div>
         </div>
 
         <Table>

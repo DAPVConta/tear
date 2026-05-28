@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -18,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Field } from "@/components/form/Field";
 import { attendanceStatusLabels } from "@/lib/labels";
@@ -214,7 +214,18 @@ export default function AttendanceForm() {
               />
             </Field>
             <Field label="Data" error={errors.session_date?.message}>
-              <Input type="date" {...register("session_date")} />
+              <Controller
+                control={control}
+                name="session_date"
+                render={({ field }) => (
+                  <DatePicker
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="dd/mm/aaaa"
+                    clearable={false}
+                  />
+                )}
+              />
             </Field>
             <Field label="Status" error={errors.status?.message}>
               <Controller

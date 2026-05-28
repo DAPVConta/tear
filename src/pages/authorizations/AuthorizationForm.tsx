@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Field } from "@/components/form/Field";
 import { authorizationStatusLabels, specialtyLabels } from "@/lib/labels";
@@ -183,10 +184,30 @@ export default function AuthorizationForm() {
               <Input {...register("guide_number")} placeholder="Nº da guia" />
             </Field>
             <Field label="Data de autorização" error={errors.authorization_date?.message}>
-              <Input type="date" {...register("authorization_date")} />
+              <Controller
+                control={control}
+                name="authorization_date"
+                render={({ field }) => (
+                  <DatePicker
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="dd/mm/aaaa"
+                  />
+                )}
+              />
             </Field>
             <Field label="Validade" error={errors.expiration_date?.message}>
-              <Input type="date" {...register("expiration_date")} />
+              <Controller
+                control={control}
+                name="expiration_date"
+                render={({ field }) => (
+                  <DatePicker
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="dd/mm/aaaa"
+                  />
+                )}
+              />
             </Field>
           </CardContent>
         </Card>

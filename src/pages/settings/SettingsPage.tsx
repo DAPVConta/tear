@@ -9,11 +9,17 @@ import {
   Palette,
   Trash2,
 } from "lucide-react";
+import { HexColorPicker } from "react-colorful";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Field } from "@/components/form/Field";
 import { Logo } from "@/components/brand/Logo";
 import { useClinic } from "@/providers/ClinicProvider";
@@ -258,20 +264,32 @@ function ColorField({
   return (
     <Field label={label}>
       <div className="flex items-center gap-3">
-        <label className="relative grid h-11 w-14 cursor-pointer place-items-center overflow-hidden rounded-lg border border-input shadow-soft">
-          <input
-            type="color"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            disabled={disabled}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          />
-          <span
-            className="h-full w-full"
-            style={{ backgroundColor: value }}
-            aria-hidden
-          />
-        </label>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              disabled={disabled}
+              className="relative grid h-11 w-14 cursor-pointer place-items-center overflow-hidden rounded-lg border border-input shadow-soft transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={`Escolher ${label.toLowerCase()}`}
+            >
+              <span
+                className="h-full w-full"
+                style={{ backgroundColor: value }}
+                aria-hidden
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-3" align="start">
+            <HexColorPicker color={value} onChange={onChange} />
+            <Input
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder="#001F6B"
+              className="mt-3 font-mono uppercase"
+              maxLength={7}
+            />
+          </PopoverContent>
+        </Popover>
         <Input
           value={value}
           onChange={(e) => onChange(e.target.value)}

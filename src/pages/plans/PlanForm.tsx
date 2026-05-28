@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Field } from "@/components/form/Field";
 import { planStatusLabels, goalStatusLabels } from "@/lib/labels";
@@ -244,10 +245,30 @@ export default function PlanForm() {
               <Input {...register("title")} placeholder="Ex.: PTS — Comunicação e autonomia" />
             </Field>
             <Field label="Início" error={errors.start_date?.message}>
-              <Input type="date" {...register("start_date")} />
+              <Controller
+                control={control}
+                name="start_date"
+                render={({ field }) => (
+                  <DatePicker
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="dd/mm/aaaa"
+                  />
+                )}
+              />
             </Field>
             <Field label="Término (opcional)" error={errors.end_date?.message}>
-              <Input type="date" {...register("end_date")} />
+              <Controller
+                control={control}
+                name="end_date"
+                render={({ field }) => (
+                  <DatePicker
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="dd/mm/aaaa"
+                  />
+                )}
+              />
             </Field>
             <Field label="Frequência" error={errors.frequency?.message}>
               <Input {...register("frequency")} placeholder="Ex.: 2x por semana" />
