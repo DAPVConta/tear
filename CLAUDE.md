@@ -267,6 +267,20 @@ operadora; restrição editar/excluir só pelo criador.
 
 Fase 2 restante: Asaas billing.
 
+## Segurança e LGPD
+
+- **Headers HTTP** (vercel.json): HSTS preload, X-Content-Type-Options, X-Frame-Options DENY, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy bloqueando câmera/microfone/geolocalização, Cross-Origin policies, CSP restritivo (script-src self, conexão só a Supabase + BrasilAPI, frame-ancestors none).
+- **RLS sensível**: `audit_logs` SELECT restrito a clinic_admin/platform_admin (terapeutas/recepcionistas não veem CPFs em logs).
+- **LGPD Art. 18**:
+  - Tabela `data_deletion_requests` + RPC `request_my_data_deletion` (usuário abre solicitação; platform_admin processa em até 15 dias).
+  - RPC `export_my_data` para portabilidade (JSON com perfil, vínculos, solicitações).
+  - Página `/privacidade` com política em PT-BR cobrindo bases legais, retenção (20 anos para prontuário — CFM 1.821/2007), direitos do titular, segurança.
+  - Aba "Privacidade (LGPD)" em Configurações com botões "Exportar JSON" e "Solicitar exclusão".
+- **Pendências no painel Supabase** (não acessíveis via API):
+  - Habilitar **Leaked Password Protection** (HaveIBeenPwned).
+  - Habilitar **Email confirmation** em produção.
+  - Considerar **MFA TOTP** para platform_admin/clinic_admin.
+
 ### Agentes por incremento
 backend, frontend, ux, ui, code-review. Cada peça passa por review antes do PR.
 

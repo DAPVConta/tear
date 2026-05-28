@@ -31,6 +31,7 @@ import {
   AuditDashboard,
   SettingsPage,
   SuperAdmin,
+  PrivacyPolicy,
   NotFound,
 } from "@/routes/pages";
 
@@ -50,6 +51,7 @@ export default function App() {
     <Suspense fallback={<BootLoader />}>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/privacidade" element={<PrivacyPolicy />} />
 
         <Route element={<RedirectIfAuthed />}>
           <Route path="/login" element={<Login />} />

@@ -4,7 +4,16 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, MapPin, Save } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  MapPin,
+  Save,
+  User,
+  Users,
+  CreditCard,
+  Stethoscope,
+} from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,9 +21,9 @@ import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Field } from "@/components/form/Field";
+import { SectionTitle } from "@/components/form/SectionTitle";
 import { CidCombobox } from "@/components/form/CidCombobox";
 import {
   Select,
@@ -217,7 +226,7 @@ export default function PatientForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Dados do paciente</CardTitle>
+            <SectionTitle icon={User}>Dados do paciente</SectionTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="Nome completo" error={errors.name?.message} className="sm:col-span-2">
@@ -275,7 +284,7 @@ export default function PatientForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Responsável</CardTitle>
+            <SectionTitle icon={Users}>Responsável</SectionTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="Nome do responsável" error={errors.guardian_name?.message} className="sm:col-span-2">
@@ -317,7 +326,7 @@ export default function PatientForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Pagamento e plano</CardTitle>
+            <SectionTitle icon={CreditCard}>Pagamento e plano</SectionTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="Tipo de pagamento" error={errors.payment_type?.message}>
@@ -355,7 +364,7 @@ export default function PatientForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Diagnóstico</CardTitle>
+            <SectionTitle icon={Stethoscope}>Diagnóstico</SectionTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="CID-10 principal" error={errors.cid10_primary?.message}>

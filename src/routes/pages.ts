@@ -26,6 +26,7 @@ const factories = {
   "/auditoria": () => import("@/pages/audit/AuditDashboard"),
   "/configuracoes": () => import("@/pages/settings/SettingsPage"),
   "/super-admin": () => import("@/pages/super-admin/SuperAdmin"),
+  "/privacidade": () => import("@/pages/PrivacyPolicy"),
   "/404": () => import("@/pages/NotFound"),
 } as const;
 
@@ -53,6 +54,7 @@ export const AttendanceForm = lazy(factories["/frequencia/form"]);
 export const AuditDashboard = lazy(factories["/auditoria"]);
 export const SettingsPage = lazy(factories["/configuracoes"]);
 export const SuperAdmin = lazy(factories["/super-admin"]);
+export const PrivacyPolicy = lazy(factories["/privacidade"]);
 export const NotFound = lazy(factories["/404"]);
 
 // Dispara o download do chunk antes do clique. Sem-op se o módulo já

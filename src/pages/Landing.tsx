@@ -95,7 +95,12 @@ export default function Landing() {
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-8 text-sm text-muted-foreground sm:flex-row">
           <Logo markClassName="h-8 w-8" />
-          <p>© {new Date().getFullYear()} TEAR. Todos os direitos reservados.</p>
+          <div className="flex items-center gap-4">
+            <Link to="/privacidade" className="hover:text-foreground">
+              Política de Privacidade
+            </Link>
+            <span>© {new Date().getFullYear()} TEAR.</span>
+          </div>
         </div>
       </footer>
     </div>
