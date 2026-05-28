@@ -201,7 +201,12 @@ operadora; restrição editar/excluir só pelo criador.
    aprovação; exportação em PDF (jsPDF + autotable) com cabeçalho da marca.
    - Limitações conhecidas: sem unique constraint paciente+mês+ano (duplicatas
      possíveis); aprovar é idempotente (não checa estado anterior).
-10. Auditoria/Faturamento (checklist dinâmico + audit logs + dashboard).
+10. [FEITO] Auditoria/Faturamento — regras dinâmicas (BILLING_RULES sem
+    hardcode nas páginas), dashboard de conformidade com taxa por regra,
+    lista de sessões pendentes (link para corrigir), viewer de audit_logs.
+    - Limitação conhecida: auto-rastreamento de eventos ainda não habilitado
+      (precisa de triggers Postgres ou wrappers de mutação para escrever em
+      audit_logs); viewer já está pronto para quando ativarmos.
 11. Dashboard (métricas + gráficos).
 12. Configurações → Layout (logo/cores por tenant) + ClinicSettings.
 13. Super Admin (gestão de clínicas + métricas globais).

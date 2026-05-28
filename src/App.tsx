@@ -24,6 +24,7 @@ const AttendanceForm = lazy(() => import("@/pages/attendance/AttendanceForm"));
 const MonthlyList = lazy(() => import("@/pages/monthly/MonthlyList"));
 const MonthlyGenerate = lazy(() => import("@/pages/monthly/MonthlyGenerate"));
 const MonthlyDetail = lazy(() => import("@/pages/monthly/MonthlyDetail"));
+const AuditDashboard = lazy(() => import("@/pages/audit/AuditDashboard"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function PageLoader() {
@@ -73,10 +74,7 @@ export default function App() {
               <Route path="/frequencia" element={<AttendanceList />} />
               <Route path="/frequencia/novo" element={<AttendanceForm />} />
               <Route path="/frequencia/:id" element={<AttendanceForm />} />
-              <Route
-                path="/auditoria"
-                element={<Placeholder title="Auditoria" description="Checklist de faturamento e conformidade." />}
-              />
+              <Route path="/auditoria" element={<AuditDashboard />} />
               <Route
                 path="/configuracoes"
                 element={<Placeholder title="Configurações" description="Preferências da clínica e layout." />}
