@@ -1,0 +1,73 @@
+import { lazy, Suspense } from "react";
+import { Routes, Route } from "react-router-dom";
+import { AppShell } from "@/components/layout/AppShell";
+import { Placeholder } from "@/pages/Placeholder";
+import { LogoMark } from "@/components/brand/Logo";
+
+const Landing = lazy(() => import("@/pages/Landing"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+
+function PageLoader() {
+  return (
+    <div className="grid place-items-center py-24">
+      <LogoMark className="h-12 w-12 animate-pulse" />
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+
+        <Route element={<AppShell />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route
+            path="/pacientes"
+            element={<Placeholder title="Pacientes" description="Cadastro e gestão de pacientes." />}
+          />
+          <Route
+            path="/profissionais"
+            element={<Placeholder title="Profissionais" description="Equipe terapêutica da clínica." />}
+          />
+          <Route
+            path="/guias"
+            element={<Placeholder title="Guias" description="Autorizações e guias das operadoras." />}
+          />
+          <Route
+            path="/planos"
+            element={<Placeholder title="Planos Terapêuticos (PTS)" description="Plano Terapêutico Singular e metas." />}
+          />
+          <Route
+            path="/evolucoes"
+            element={<Placeholder title="Evolução diária" description="Registro estruturado das sessões." />}
+          />
+          <Route
+            path="/evolucao-mensal"
+            element={<Placeholder title="Evolução mensal" description="Síntese mensal automática." />}
+          />
+          <Route
+            path="/frequencia"
+            element={<Placeholder title="Frequência" description="Presenças, faltas e justificativas." />}
+          />
+          <Route
+            path="/auditoria"
+            element={<Placeholder title="Auditoria" description="Checklist de faturamento e conformidade." />}
+          />
+          <Route
+            path="/configuracoes"
+            element={<Placeholder title="Configurações" description="Preferências da clínica e layout." />}
+          />
+          <Route
+            path="/super-admin"
+            element={<Placeholder title="Super Admin" description="Gestão da plataforma e clínicas." />}
+          />
+        </Route>
+
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
+  );
+}
