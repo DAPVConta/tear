@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Allow: /landing
+Disallow: /dashboard
+Disallow: /pacientes
+Disallow: /profissionais
+Disallow: /guias
+Disallow: /planos
+Disallow: /evolucoes
+Disallow: /evolucao-mensal
+Disallow: /frequencia
+Disallow: /auditoria
+Disallow: /settings
+Disallow: /super-admin
+Disallow: /onboarding
+Disallow: /api/
+
+Sitemap: https://prontuar-tea-ztpxefng.manus.space/sitemap.xml

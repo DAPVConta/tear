@@ -1,0 +1,20 @@
+{
+  "query": "SELECT id, title, status_pts FROM therapeutic_plans;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user fPpLjMz7cTwVpCq.402a577e517c --database ZtPXefNGUgtV4fQsKuYU5M --execute SELECT id, title, status_pts FROM therapeutic_plans;",
+  "rows": [
+    {
+      "id": "1",
+      "title": "PTS - ABA - Comunicação Funcional",
+      "status_pts": "ativo"
+    },
+    {
+      "id": "2",
+      "title": "PTS - Psicopedagogia - Habilidades Cognitivas",
+      "status_pts": "ativo"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tstatus_pts\n1\tPTS - ABA - Comunicação Funcional\tativo\n2\tPTS - Psicopedagogia - Habilidades Cognitivas\tativo\n",
+  "stderr": "",
+  "execution_time_ms": 257
+}
