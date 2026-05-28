@@ -9,6 +9,8 @@ const Landing = lazy(() => import("@/pages/Landing"));
 const Login = lazy(() => import("@/pages/auth/Login"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const PatientsList = lazy(() => import("@/pages/patients/PatientsList"));
+const PatientForm = lazy(() => import("@/pages/patients/PatientForm"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function PageLoader() {
@@ -37,10 +39,9 @@ export default function App() {
           <Route element={<RequireClinic />}>
             <Route element={<AppShell />}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route
-                path="/pacientes"
-                element={<Placeholder title="Pacientes" description="Cadastro e gestão de pacientes." />}
-              />
+              <Route path="/pacientes" element={<PatientsList />} />
+              <Route path="/pacientes/novo" element={<PatientForm />} />
+              <Route path="/pacientes/:id" element={<PatientForm />} />
               <Route
                 path="/profissionais"
                 element={<Placeholder title="Profissionais" description="Equipe terapêutica da clínica." />}
