@@ -25,7 +25,7 @@ const factories = {
   "/frequencia/form": () => import("@/pages/attendance/AttendanceForm"),
   "/auditoria": () => import("@/pages/audit/AuditDashboard"),
   "/configuracoes": () => import("@/pages/settings/SettingsPage"),
-  "/super-admin": () => import("@/pages/super-admin/SuperAdmin"),
+  "/super-admin": () => import("@/pages/superAdmin/SuperAdmin"),
   "/privacidade": () => import("@/pages/PrivacyPolicy"),
   "/404": () => import("@/pages/NotFound"),
 } as const;
