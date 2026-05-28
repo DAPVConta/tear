@@ -19,6 +19,8 @@ export type NavItem = {
   icon: LucideIcon;
   // Cor da identidade TEA (paleta da marca) usada no estado ativo/hover.
   accent: string;
+  // Quando true, item visível apenas para platform_admin.
+  platformAdminOnly?: boolean;
 };
 
 export type NavSection = {
@@ -58,7 +60,13 @@ export const navSections: NavSection[] = [
     items: [
       { title: "Auditoria", href: "/auditoria", icon: ShieldCheck, accent: TEA.red },
       { title: "Configurações", href: "/configuracoes", icon: Settings, accent: TEA.cyan },
-      { title: "Super Admin", href: "/super-admin", icon: Building2, accent: TEA.blue },
+      {
+        title: "Super Admin",
+        href: "/super-admin",
+        icon: Building2,
+        accent: TEA.blue,
+        platformAdminOnly: true,
+      },
     ],
   },
 ];

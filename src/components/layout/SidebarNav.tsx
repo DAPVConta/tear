@@ -7,6 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAuth } from "@/providers/AuthProvider";
 
 export function SidebarNav({
   collapsed = false,
@@ -15,28 +16,36 @@ export function SidebarNav({
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
+  const { profile } = useAuth();
+  const isPlatformAdmin = profile?.platform_role === "platform_admin";
   return (
     <nav className="flex flex-col gap-6">
-      {navSections.map((section) => (
-        <div key={section.label}>
-          {!collapsed && (
-            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-sidebar-foreground/55">
-              {section.label}
-            </p>
-          )}
-          <ul className="flex flex-col gap-1">
-            {section.items.map((item) => (
-              <li key={item.href}>
-                <SidebarNavItem
-                  item={item}
-                  collapsed={collapsed}
-                  onNavigate={onNavigate}
-                />
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      {navSections.map((section) => {
+        const items = section.items.filter(
+          (i) => !i.platformAdminOnly || isPlatformAdmin,
+        );
+        if (items.length === 0) return null;
+        return (
+          <div key={section.label}>
+            {!collapsed && (
+              <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-sidebar-foreground/55">
+                {section.label}
+              </p>
+            )}
+            <ul className="flex flex-col gap-1">
+              {items.map((item) => (
+                <li key={item.href}>
+                  <SidebarNavItem
+                    item={item}
+                    collapsed={collapsed}
+                    onNavigate={onNavigate}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
     </nav>
   );
 }

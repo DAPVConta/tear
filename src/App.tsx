@@ -1,9 +1,13 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
-import { Placeholder } from "@/pages/Placeholder";
 import { LogoMark } from "@/components/brand/Logo";
-import { RequireAuth, RequireClinic, RedirectIfAuthed } from "@/routes/guards";
+import {
+  RequireAuth,
+  RequireClinic,
+  RedirectIfAuthed,
+  RequirePlatformAdmin,
+} from "@/routes/guards";
 
 const Landing = lazy(() => import("@/pages/Landing"));
 const Login = lazy(() => import("@/pages/auth/Login"));
@@ -26,6 +30,7 @@ const MonthlyGenerate = lazy(() => import("@/pages/monthly/MonthlyGenerate"));
 const MonthlyDetail = lazy(() => import("@/pages/monthly/MonthlyDetail"));
 const AuditDashboard = lazy(() => import("@/pages/audit/AuditDashboard"));
 const SettingsPage = lazy(() => import("@/pages/settings/SettingsPage"));
+const SuperAdmin = lazy(() => import("@/pages/super-admin/SuperAdmin"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function PageLoader() {
@@ -77,10 +82,9 @@ export default function App() {
               <Route path="/frequencia/:id" element={<AttendanceForm />} />
               <Route path="/auditoria" element={<AuditDashboard />} />
               <Route path="/configuracoes" element={<SettingsPage />} />
-              <Route
-                path="/super-admin"
-                element={<Placeholder title="Super Admin" description="Gestão da plataforma e clínicas." />}
-              />
+              <Route element={<RequirePlatformAdmin />}>
+                <Route path="/super-admin" element={<SuperAdmin />} />
+              </Route>
             </Route>
           </Route>
         </Route>

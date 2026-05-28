@@ -215,7 +215,11 @@ operadora; restrição editar/excluir só pelo criador.
     Storage (bucket `clinic-assets`, RLS por clinic_admin), editor de paleta
     (primary/accent) aplicado em runtime via CSS variables (ThemeApplier),
     pré-visualização e reset para o padrão TEAR. Só clinic_admin edita.
-13. Super Admin (gestão de clínicas + métricas globais).
+13. [FEITO] Super Admin: RPC `platform_clinics_overview` (SECURITY DEFINER
+    gated por is_platform_admin), guard de rota, item de menu visível só
+    para platform_admin, página com métricas globais (clínicas/membros/
+    pacientes/sessões 30d) e tabela com edição inline de plano/status +
+    ativar/desativar clínica.
 14. Fase 2: Asaas billing, IA/voz/mapa.
 
 ### Agentes por incremento

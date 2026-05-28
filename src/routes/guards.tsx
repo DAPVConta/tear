@@ -31,3 +31,11 @@ export function RedirectIfAuthed() {
   if (user) return <Navigate to="/dashboard" replace />;
   return <Outlet />;
 }
+
+export function RequirePlatformAdmin() {
+  const { profile, loading } = useAuth();
+  if (loading) return <FullscreenLoader />;
+  if (profile?.platform_role !== "platform_admin")
+    return <Navigate to="/dashboard" replace />;
+  return <Outlet />;
+}
