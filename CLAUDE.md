@@ -176,7 +176,8 @@ operadora; restrição editar/excluir só pelo criador.
    todas as queries, busca sanitizada contra injeção PostgREST).
 4. [FEITO] Profissionais (CRUD, especialidades, conselho UF/tipo, mesmo padrão
    de Pacientes; Field de formulário extraído para componente compartilhado).
-5. Guias/Autorizações (CRUD, status, alerta vencimento).
+5. [FEITO] Guias/Autorizações (CRUD, seletor de paciente, status efetivo
+   derivado (ativa/vencida/esgotada/cancelada), alerta de vencimento, cancelar).
 6. PTS + metas (CRUD).
 7. Evolução diária (form estruturado + regras de blindagem + assinatura).
 8. Frequência/Presença (registro + justificativa).

@@ -5,72 +5,57 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Tables, TablesInsert, TablesUpdate } from "@/types/database";
 
-export type Patient = Tables<"patients">;
-export const PATIENTS_PAGE_SIZE = 10;
+export type Authorization = Tables<"authorizations">;
+export type AuthorizationRow = Authorization & {
+  patient: { name: string } | null;
+};
+export const AUTHORIZATIONS_PAGE_SIZE = 10;
 
 type ListParams = { search: string; page: number };
 
-export function usePatients({ search, page }: ListParams) {
+export function useAuthorizations({ search, page }: ListParams) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
 
   return useQuery({
-    queryKey: ["patients", clinicId, search, page],
+    queryKey: ["authorizations", clinicId, search, page],
     enabled: !!clinicId,
     queryFn: async () => {
-      const from = (page - 1) * PATIENTS_PAGE_SIZE;
-      const to = from + PATIENTS_PAGE_SIZE - 1;
+      const from = (page - 1) * AUTHORIZATIONS_PAGE_SIZE;
+      const to = from + AUTHORIZATIONS_PAGE_SIZE - 1;
 
       let query = supabase
-        .from("patients")
-        .select("*", { count: "exact" })
+        .from("authorizations")
+        .select("*, patient:patients(name)", { count: "exact" })
         .eq("clinic_id", clinicId!)
-        .eq("active", true)
-        .order("name", { ascending: true })
+        .order("expiration_date", { ascending: true })
         .range(from, to);
 
       const term = sanitizeSearch(search);
       if (term) {
         query = query.or(
-          `name.ilike.%${term}%,guardian_name.ilike.%${term}%,cpf.ilike.%${term}%`,
+          `guide_number.ilike.%${term}%,procedure_name.ilike.%${term}%,procedure_code.ilike.%${term}%`,
         );
       }
 
       const { data, count, error } = await query;
       if (error) throw error;
-      return { rows: data ?? [], total: count ?? 0 };
+      return {
+        rows: (data ?? []) as unknown as AuthorizationRow[],
+        total: count ?? 0,
+      };
     },
   });
 }
 
-// Opções leves (id + nome) para seletores de paciente em outros módulos.
-export function usePatientOptions() {
-  const { clinic } = useClinic();
-  const clinicId = clinic?.id;
-  return useQuery({
-    queryKey: ["patient-options", clinicId],
-    enabled: !!clinicId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("patients")
-        .select("id, name")
-        .eq("clinic_id", clinicId!)
-        .eq("active", true)
-        .order("name", { ascending: true });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-}
-
-export function usePatient(id: number | undefined) {
+export function useAuthorization(id: number | undefined) {
   const { clinic } = useClinic();
   return useQuery({
-    queryKey: ["patient", id],
+    queryKey: ["authorization", id],
     enabled: !!id && !!clinic?.id,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("patients")
+        .from("authorizations")
         .select("*")
         .eq("id", id!)
         .eq("clinic_id", clinic!.id)
@@ -81,18 +66,18 @@ export function usePatient(id: number | undefined) {
   });
 }
 
-export function useCreatePatient() {
+export function useCreateAuthorization() {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (
-      values: Omit<TablesInsert<"patients">, "clinic_id" | "created_by">,
+      values: Omit<TablesInsert<"authorizations">, "clinic_id" | "created_by">,
     ) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
       const { data, error } = await supabase
-        .from("patients")
+        .from("authorizations")
         .insert({ ...values, clinic_id: clinic.id, created_by: user?.id ?? null })
         .select()
         .single();
@@ -100,19 +85,19 @@ export function useCreatePatient() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: ["authorizations"] });
     },
   });
 }
 
-export function useUpdatePatient(id: number) {
+export function useUpdateAuthorization(id: number) {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
-    mutationFn: async (values: TablesUpdate<"patients">) => {
+    mutationFn: async (values: TablesUpdate<"authorizations">) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
       const { data, error } = await supabase
-        .from("patients")
+        .from("authorizations")
         .update(values)
         .eq("id", id)
         .eq("clinic_id", clinic.id)
@@ -122,27 +107,27 @@ export function useUpdatePatient(id: number) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
-      queryClient.invalidateQueries({ queryKey: ["patient", id] });
+      queryClient.invalidateQueries({ queryKey: ["authorizations"] });
+      queryClient.invalidateQueries({ queryKey: ["authorization", id] });
     },
   });
 }
 
-export function useDeactivatePatient() {
+export function useCancelAuthorization() {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
     mutationFn: async (id: number) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
       const { error } = await supabase
-        .from("patients")
-        .update({ active: false })
+        .from("authorizations")
+        .update({ status: "cancelada" })
         .eq("id", id)
         .eq("clinic_id", clinic.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: ["authorizations"] });
     },
   });
 }

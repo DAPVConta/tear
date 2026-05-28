@@ -13,6 +13,8 @@ const PatientsList = lazy(() => import("@/pages/patients/PatientsList"));
 const PatientForm = lazy(() => import("@/pages/patients/PatientForm"));
 const ProfessionalsList = lazy(() => import("@/pages/professionals/ProfessionalsList"));
 const ProfessionalForm = lazy(() => import("@/pages/professionals/ProfessionalForm"));
+const AuthorizationsList = lazy(() => import("@/pages/authorizations/AuthorizationsList"));
+const AuthorizationForm = lazy(() => import("@/pages/authorizations/AuthorizationForm"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function PageLoader() {
@@ -47,10 +49,9 @@ export default function App() {
               <Route path="/profissionais" element={<ProfessionalsList />} />
               <Route path="/profissionais/novo" element={<ProfessionalForm />} />
               <Route path="/profissionais/:id" element={<ProfessionalForm />} />
-              <Route
-                path="/guias"
-                element={<Placeholder title="Guias" description="Autorizações e guias das operadoras." />}
-              />
+              <Route path="/guias" element={<AuthorizationsList />} />
+              <Route path="/guias/nova" element={<AuthorizationForm />} />
+              <Route path="/guias/:id" element={<AuthorizationForm />} />
               <Route
                 path="/planos"
                 element={<Placeholder title="Planos Terapêuticos (PTS)" description="Plano Terapêutico Singular e metas." />}

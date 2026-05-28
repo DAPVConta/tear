@@ -11,6 +11,16 @@ export const paymentTypeLabels: Record<Enums<"payment_type">, string> = {
   particular: "Particular",
 };
 
+export const authorizationStatusLabels: Record<
+  Enums<"authorization_status">,
+  string
+> = {
+  ativa: "Ativa",
+  vencida: "Vencida",
+  cancelada: "Cancelada",
+  esgotada: "Esgotada",
+};
+
 export const specialtyLabels: Record<Enums<"specialty">, string> = {
   psicologia_aba: "Psicologia (ABA)",
   fonoaudiologia: "Fonoaudiologia",
