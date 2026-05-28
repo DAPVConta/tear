@@ -106,6 +106,18 @@ Inclusão · Tecnologia · Humanização · Organização · Ética · Inovaçã
   `dapvconta's projects`.
 - **GitHub:** usuário `DAPVConta`.
 
+## Integrações automáticas (investigar sempre)
+
+A cada campo/componente novo, **investigar se cabe integração com algum serviço**
+para preencher/validar dados automaticamente, em vez de digitação manual. Exemplos:
+- **CEP → endereço** (ViaCEP/BrasilAPI): autopreencher rua, bairro, cidade, UF.
+- **CID-10**: busca/autocomplete por código ou descrição (base CID).
+- **CNPJ → dados da empresa** (BrasilAPI/ReceitaWS): razão social, etc.
+- **CPF/telefone**: validação/formatação (já temos máscaras).
+- Outras APIs públicas pertinentes ao contexto clínico.
+Sempre avaliar custo/benefício, privacidade (dados de saúde) e disponibilidade da
+API antes de implementar; quando houver dúvida de escopo, perguntar.
+
 ## Migração do sistema legado (Prontuário TEA → TEAR)
 
 Sistema legado em `_legacy/` (NÃO versionar no app final; é referência). Origem:
@@ -162,7 +174,8 @@ operadora; restrição editar/excluir só pelo criador.
 3. [FEITO] Pacientes (CRUD, máscaras CPF/telefone, validação Zod PT-BR,
    busca debounce + paginação server-side, arquivamento, RLS + clinic_id em
    todas as queries, busca sanitizada contra injeção PostgREST).
-4. Profissionais (CRUD, especialidades, conselho).
+4. [FEITO] Profissionais (CRUD, especialidades, conselho UF/tipo, mesmo padrão
+   de Pacientes; Field de formulário extraído para componente compartilhado).
 5. Guias/Autorizações (CRUD, status, alerta vencimento).
 6. PTS + metas (CRUD).
 7. Evolução diária (form estruturado + regras de blindagem + assinatura).

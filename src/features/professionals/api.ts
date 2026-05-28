@@ -5,24 +5,24 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Tables, TablesInsert, TablesUpdate } from "@/types/database";
 
-export type Patient = Tables<"patients">;
-export const PATIENTS_PAGE_SIZE = 10;
+export type Professional = Tables<"professionals">;
+export const PROFESSIONALS_PAGE_SIZE = 10;
 
 type ListParams = { search: string; page: number };
 
-export function usePatients({ search, page }: ListParams) {
+export function useProfessionals({ search, page }: ListParams) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
 
   return useQuery({
-    queryKey: ["patients", clinicId, search, page],
+    queryKey: ["professionals", clinicId, search, page],
     enabled: !!clinicId,
     queryFn: async () => {
-      const from = (page - 1) * PATIENTS_PAGE_SIZE;
-      const to = from + PATIENTS_PAGE_SIZE - 1;
+      const from = (page - 1) * PROFESSIONALS_PAGE_SIZE;
+      const to = from + PROFESSIONALS_PAGE_SIZE - 1;
 
       let query = supabase
-        .from("patients")
+        .from("professionals")
         .select("*", { count: "exact" })
         .eq("clinic_id", clinicId!)
         .eq("active", true)
@@ -32,7 +32,7 @@ export function usePatients({ search, page }: ListParams) {
       const term = sanitizeSearch(search);
       if (term) {
         query = query.or(
-          `name.ilike.%${term}%,guardian_name.ilike.%${term}%,cpf.ilike.%${term}%`,
+          `name.ilike.%${term}%,council_number.ilike.%${term}%,cpf.ilike.%${term}%`,
         );
       }
 
@@ -43,14 +43,14 @@ export function usePatients({ search, page }: ListParams) {
   });
 }
 
-export function usePatient(id: number | undefined) {
+export function useProfessional(id: number | undefined) {
   const { clinic } = useClinic();
   return useQuery({
-    queryKey: ["patient", id],
+    queryKey: ["professional", id],
     enabled: !!id && !!clinic?.id,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("patients")
+        .from("professionals")
         .select("*")
         .eq("id", id!)
         .eq("clinic_id", clinic!.id)
@@ -61,18 +61,18 @@ export function usePatient(id: number | undefined) {
   });
 }
 
-export function useCreatePatient() {
+export function useCreateProfessional() {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   const { user } = useAuth();
 
   return useMutation({
     mutationFn: async (
-      values: Omit<TablesInsert<"patients">, "clinic_id" | "created_by">,
+      values: Omit<TablesInsert<"professionals">, "clinic_id" | "created_by">,
     ) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
       const { data, error } = await supabase
-        .from("patients")
+        .from("professionals")
         .insert({ ...values, clinic_id: clinic.id, created_by: user?.id ?? null })
         .select()
         .single();
@@ -80,19 +80,19 @@ export function useCreatePatient() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: ["professionals"] });
     },
   });
 }
 
-export function useUpdatePatient(id: number) {
+export function useUpdateProfessional(id: number) {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
-    mutationFn: async (values: TablesUpdate<"patients">) => {
+    mutationFn: async (values: TablesUpdate<"professionals">) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
       const { data, error } = await supabase
-        .from("patients")
+        .from("professionals")
         .update(values)
         .eq("id", id)
         .eq("clinic_id", clinic.id)
@@ -102,27 +102,27 @@ export function useUpdatePatient(id: number) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
-      queryClient.invalidateQueries({ queryKey: ["patient", id] });
+      queryClient.invalidateQueries({ queryKey: ["professionals"] });
+      queryClient.invalidateQueries({ queryKey: ["professional", id] });
     },
   });
 }
 
-export function useDeactivatePatient() {
+export function useDeactivateProfessional() {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
     mutationFn: async (id: number) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
       const { error } = await supabase
-        .from("patients")
+        .from("professionals")
         .update({ active: false })
         .eq("id", id)
         .eq("clinic_id", clinic.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: ["professionals"] });
     },
   });
 }
