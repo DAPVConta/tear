@@ -6,8 +6,6 @@ import {
   CalendarCheck,
   Pencil,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
   MoreHorizontal,
 } from "lucide-react";
 import { format, parseISO, subDays } from "date-fns";
@@ -16,7 +14,12 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { TablePagination } from "@/components/ui/table-pagination";
+import {
+  TableSkeletonRows,
+  ListErrorBanner,
+  ListEmptyState,
+} from "@/components/ui/list-states";
 import {
   Table,
   TableBody,
@@ -187,17 +190,7 @@ export default function AttendanceList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading &&
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-5 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-
+            {isLoading && <TableSkeletonRows columns={6} />}
             {!isLoading &&
               data?.rows.map((a) => (
                 <TableRow
@@ -246,54 +239,31 @@ export default function AttendanceList() {
         </Table>
 
         {!isLoading && isError && (
-          <div className="p-10 text-center text-sm text-destructive">
-            Não foi possível carregar os registros.
-          </div>
+          <ListErrorBanner message="Não foi possível carregar os registros." />
         )}
         {!isLoading && !isError && (data?.rows.length ?? 0) === 0 && (
-          <div className="flex flex-col items-center gap-3 p-16 text-center">
-            <span className="grid h-12 w-12 place-items-center rounded-xl bg-secondary text-muted-foreground">
-              <CalendarCheck className="h-6 w-6" />
-            </span>
-            <p className="font-semibold">Nenhum registro no período</p>
-            <p className="max-w-xs text-sm text-muted-foreground">
-              Ajuste o filtro ou registre uma presença/falta.
-            </p>
-            <Button asChild variant="brand" className="mt-1">
-              <Link to="/frequencia/novo">
-                <Plus className="h-4 w-4" /> Novo registro
-              </Link>
-            </Button>
-          </div>
+          <ListEmptyState
+            icon={CalendarCheck}
+            title="Nenhum registro no período"
+            description="Ajuste o filtro ou registre uma presença/falta."
+            action={
+              <Button asChild variant="brand" className="mt-1">
+                <Link to="/frequencia/novo">
+                  <Plus className="h-4 w-4" /> Novo registro
+                </Link>
+              </Button>
+            }
+          />
         )}
 
-        {!isLoading && (data?.total ?? 0) > 0 && (
-          <div className="flex items-center justify-between border-t border-border p-4 text-sm text-muted-foreground">
-            <span>
-              {data!.total} registro{data!.total === 1 ? "" : "s"} no período
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="tabular-nums">
-                {page} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+        {!isLoading && (
+          <TablePagination
+            total={data?.total ?? 0}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            itemLabel="registro"
+          />
         )}
       </div>
 

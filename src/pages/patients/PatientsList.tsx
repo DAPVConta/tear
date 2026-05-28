@@ -6,8 +6,6 @@ import {
   Users,
   Pencil,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
   MoreHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -16,7 +14,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -26,6 +23,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SortableHead, type SortDir } from "@/components/ui/sortable-head";
+import { TablePagination } from "@/components/ui/table-pagination";
+import {
+  TableSkeletonRows,
+  ListErrorBanner,
+  ListEmptyState,
+} from "@/components/ui/list-states";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +46,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
 import { maskCPF, maskPhone } from "@/lib/masks";
 import { paymentTypeLabels } from "@/lib/labels";
 import {
@@ -62,12 +66,18 @@ function age(birth: string) {
 
 export default function PatientsList() {
   const navigate = useNavigate();
-  const [searchInput, setSearchInput] = useState("");
-  const [page, setPage] = useState(1);
-  const [sortBy, setSortBy] = useState("name");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [urlSearch, setUrlSearch] = useUrlState("q", "");
+  const [page, setPage] = useUrlNumber("page", 1);
+  const [sortBy, setSortBy] = useUrlState("sortBy", "name");
+  const [sortDirRaw, setSortDirRaw] = useUrlState("sortDir", "asc");
+  const sortDir = (sortDirRaw === "desc" ? "desc" : "asc") as SortDir;
+  const [searchInput, setSearchInput] = useState(urlSearch);
   const search = useDebounce(searchInput);
   const [toDelete, setToDelete] = useState<Patient | null>(null);
+
+  useEffect(() => {
+    setUrlSearch(search);
+  }, [search, setUrlSearch]);
 
   const { data, isLoading, isError } = usePatients({
     search,
@@ -75,25 +85,24 @@ export default function PatientsList() {
     sortBy,
     sortDir,
   });
+  const deactivate = useDeactivatePatient();
 
   function onSort(key: string) {
-    if (sortBy === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    if (sortBy === key) setSortDirRaw(sortDir === "asc" ? "desc" : "asc");
     else {
       setSortBy(key);
-      setSortDir("asc");
+      setSortDirRaw("asc");
     }
   }
-  const deactivate = useDeactivatePatient();
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil((data?.total ?? 0) / PATIENTS_PAGE_SIZE)),
     [data?.total],
   );
 
-  // Evita página órfã após arquivar o último item de uma página.
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  }, [page, totalPages, setPage]);
 
   function onSearchChange(value: string) {
     setSearchInput(value);
@@ -113,6 +122,8 @@ export default function PatientsList() {
       setToDelete(null);
     }
   }
+
+  const isEmpty = !isLoading && !isError && (data?.rows.length ?? 0) === 0;
 
   return (
     <div>
@@ -144,28 +155,13 @@ export default function PatientsList() {
         <Table>
           <TableHeader>
             <TableRow>
-              <SortableHead
-                sortKey="name"
-                currentKey={sortBy}
-                currentDir={sortDir}
-                onSort={onSort}
-              >
+              <SortableHead sortKey="name" currentKey={sortBy} currentDir={sortDir} onSort={onSort}>
                 Paciente
               </SortableHead>
-              <SortableHead
-                sortKey="guardian_name"
-                currentKey={sortBy}
-                currentDir={sortDir}
-                onSort={onSort}
-              >
+              <SortableHead sortKey="guardian_name" currentKey={sortBy} currentDir={sortDir} onSort={onSort}>
                 Responsável
               </SortableHead>
-              <SortableHead
-                sortKey="payment_type"
-                currentKey={sortBy}
-                currentDir={sortDir}
-                onSort={onSort}
-              >
+              <SortableHead sortKey="payment_type" currentKey={sortBy} currentDir={sortDir} onSort={onSort}>
                 Pagamento
               </SortableHead>
               <TableHead>Contato</TableHead>
@@ -173,17 +169,7 @@ export default function PatientsList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading &&
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 5 }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-5 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-
+            {isLoading && <TableSkeletonRows columns={5} />}
             {!isLoading &&
               data?.rows.map((p) => (
                 <TableRow
@@ -205,9 +191,7 @@ export default function PatientsList() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={p.payment_type === "particular" ? "accent" : "muted"}
-                    >
+                    <Badge variant={p.payment_type === "particular" ? "accent" : "muted"}>
                       {paymentTypeLabels[p.payment_type]}
                     </Badge>
                   </TableCell>
@@ -222,9 +206,7 @@ export default function PatientsList() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onSelect={() => navigate(`/pacientes/${p.id}`)}
-                        >
+                        <DropdownMenuItem onSelect={() => navigate(`/pacientes/${p.id}`)}>
                           <Pencil /> Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem
@@ -241,59 +223,33 @@ export default function PatientsList() {
           </TableBody>
         </Table>
 
-        {/* Estados vazios / erro */}
-        {!isLoading && isError && (
-          <div className="p-10 text-center text-sm text-destructive">
-            Não foi possível carregar os pacientes.
-          </div>
-        )}
-        {!isLoading && !isError && (data?.rows.length ?? 0) === 0 && (
-          <div className="flex flex-col items-center gap-3 p-16 text-center">
-            <span className="grid h-12 w-12 place-items-center rounded-xl bg-secondary text-muted-foreground">
-              <Users className="h-6 w-6" />
-            </span>
-            <p className="font-semibold">Nenhum paciente encontrado</p>
-            <p className="max-w-xs text-sm text-muted-foreground">
-              {search
+        {!isLoading && isError && <ListErrorBanner message="Não foi possível carregar os pacientes." />}
+        {isEmpty && (
+          <ListEmptyState
+            icon={Users}
+            title="Nenhum paciente encontrado"
+            description={
+              search
                 ? "Ajuste a busca ou cadastre um novo paciente."
-                : "Cadastre o primeiro paciente da clínica."}
-            </p>
-            <Button asChild variant="brand" className="mt-1">
-              <Link to="/pacientes/novo">
-                <Plus className="h-4 w-4" /> Novo paciente
-              </Link>
-            </Button>
-          </div>
+                : "Cadastre o primeiro paciente da clínica."
+            }
+            action={
+              <Button asChild variant="brand" className="mt-1">
+                <Link to="/pacientes/novo">
+                  <Plus className="h-4 w-4" /> Novo paciente
+                </Link>
+              </Button>
+            }
+          />
         )}
-
-        {/* Paginação */}
-        {!isLoading && (data?.total ?? 0) > 0 && (
-          <div className="flex items-center justify-between border-t border-border p-4 text-sm text-muted-foreground">
-            <span>
-              {data!.total} paciente{data!.total === 1 ? "" : "s"}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="tabular-nums">
-                {page} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+        {!isLoading && (
+          <TablePagination
+            total={data?.total ?? 0}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            itemLabel="paciente"
+          />
         )}
       </div>
 

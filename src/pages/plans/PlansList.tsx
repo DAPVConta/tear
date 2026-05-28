@@ -6,8 +6,6 @@ import {
   Target,
   Pencil,
   Archive,
-  ChevronLeft,
-  ChevronRight,
   MoreHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +13,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -24,6 +21,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
+import {
+  TableSkeletonRows,
+  ListErrorBanner,
+  ListEmptyState,
+} from "@/components/ui/list-states";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
 import { planStatusLabels } from "@/lib/labels";
 import {
   useTherapeuticPlans,
@@ -50,9 +54,14 @@ const statusVariant: Record<
 
 export default function PlansList() {
   const navigate = useNavigate();
-  const [searchInput, setSearchInput] = useState("");
-  const [page, setPage] = useState(1);
+  const [urlSearch, setUrlSearch] = useUrlState("q", "");
+  const [page, setPage] = useUrlNumber("page", 1);
+  const [searchInput, setSearchInput] = useState(urlSearch);
   const search = useDebounce(searchInput);
+
+  useEffect(() => {
+    setUrlSearch(search);
+  }, [search, setUrlSearch]);
 
   const { data, isLoading, isError } = useTherapeuticPlans({ search, page });
   const setStatus = useSetPlanStatus();
@@ -64,7 +73,7 @@ export default function PlansList() {
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  }, [page, totalPages, setPage]);
 
   function onSearchChange(value: string) {
     setSearchInput(value);
@@ -81,6 +90,8 @@ export default function PlansList() {
       });
     }
   }
+
+  const isEmpty = !isLoading && !isError && (data?.rows.length ?? 0) === 0;
 
   return (
     <div>
@@ -121,17 +132,7 @@ export default function PlansList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading &&
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-5 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-
+            {isLoading && <TableSkeletonRows columns={6} />}
             {!isLoading &&
               data?.rows.map((p) => (
                 <TableRow
@@ -176,57 +177,33 @@ export default function PlansList() {
           </TableBody>
         </Table>
 
-        {!isLoading && isError && (
-          <div className="p-10 text-center text-sm text-destructive">
-            Não foi possível carregar os planos.
-          </div>
-        )}
-        {!isLoading && !isError && (data?.rows.length ?? 0) === 0 && (
-          <div className="flex flex-col items-center gap-3 p-16 text-center">
-            <span className="grid h-12 w-12 place-items-center rounded-xl bg-secondary text-muted-foreground">
-              <Target className="h-6 w-6" />
-            </span>
-            <p className="font-semibold">Nenhum plano encontrado</p>
-            <p className="max-w-xs text-sm text-muted-foreground">
-              {search
+        {!isLoading && isError && <ListErrorBanner message="Não foi possível carregar os planos." />}
+        {isEmpty && (
+          <ListEmptyState
+            icon={Target}
+            title="Nenhum plano encontrado"
+            description={
+              search
                 ? "Ajuste a busca ou crie um novo plano."
-                : "Crie o primeiro Plano Terapêutico Singular."}
-            </p>
-            <Button asChild variant="brand" className="mt-1">
-              <Link to="/planos/novo">
-                <Plus className="h-4 w-4" /> Novo plano
-              </Link>
-            </Button>
-          </div>
+                : "Crie o primeiro Plano Terapêutico Singular."
+            }
+            action={
+              <Button asChild variant="brand" className="mt-1">
+                <Link to="/planos/novo">
+                  <Plus className="h-4 w-4" /> Novo plano
+                </Link>
+              </Button>
+            }
+          />
         )}
-
-        {!isLoading && (data?.total ?? 0) > 0 && (
-          <div className="flex items-center justify-between border-t border-border p-4 text-sm text-muted-foreground">
-            <span>
-              {data!.total} plano{data!.total === 1 ? "" : "s"}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="tabular-nums">
-                {page} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+        {!isLoading && (
+          <TablePagination
+            total={data?.total ?? 0}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            itemLabel="plano"
+          />
         )}
       </div>
     </div>

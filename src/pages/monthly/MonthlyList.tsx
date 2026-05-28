@@ -4,15 +4,18 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
   CalendarRange,
-  ChevronLeft,
-  ChevronRight,
   CheckCircle2,
   CircleDashed,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { TablePagination } from "@/components/ui/table-pagination";
+import {
+  TableSkeletonRows,
+  ListErrorBanner,
+  ListEmptyState,
+} from "@/components/ui/list-states";
 import {
   Table,
   TableBody,
@@ -126,17 +129,7 @@ export default function MonthlyList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading &&
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 5 }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-5 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-
+            {isLoading && <TableSkeletonRows columns={5} />}
             {!isLoading &&
               data?.rows.map((m) => (
                 <TableRow
@@ -169,54 +162,31 @@ export default function MonthlyList() {
         </Table>
 
         {!isLoading && isError && (
-          <div className="p-10 text-center text-sm text-destructive">
-            Não foi possível carregar as evoluções mensais.
-          </div>
+          <ListErrorBanner message="Não foi possível carregar as evoluções mensais." />
         )}
         {!isLoading && !isError && (data?.rows.length ?? 0) === 0 && (
-          <div className="flex flex-col items-center gap-3 p-16 text-center">
-            <span className="grid h-12 w-12 place-items-center rounded-xl bg-secondary text-muted-foreground">
-              <CalendarRange className="h-6 w-6" />
-            </span>
-            <p className="font-semibold">Nenhuma evolução mensal</p>
-            <p className="max-w-xs text-sm text-muted-foreground">
-              Gere a primeira síntese mensal a partir dos atendimentos.
-            </p>
-            <Button asChild variant="brand" className="mt-1">
-              <Link to="/evolucao-mensal/gerar">
-                <Plus className="h-4 w-4" /> Gerar nova
-              </Link>
-            </Button>
-          </div>
+          <ListEmptyState
+            icon={CalendarRange}
+            title="Nenhuma evolução mensal"
+            description="Gere a primeira síntese mensal a partir dos atendimentos."
+            action={
+              <Button asChild variant="brand" className="mt-1">
+                <Link to="/evolucao-mensal/gerar">
+                  <Plus className="h-4 w-4" /> Gerar nova
+                </Link>
+              </Button>
+            }
+          />
         )}
 
-        {!isLoading && (data?.total ?? 0) > 0 && (
-          <div className="flex items-center justify-between border-t border-border p-4 text-sm text-muted-foreground">
-            <span>
-              {data!.total} sínteses
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="tabular-nums">
-                {page} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+        {!isLoading && (
+          <TablePagination
+            total={data?.total ?? 0}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            itemLabel="síntese"
+          />
         )}
       </div>
     </div>

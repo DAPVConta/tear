@@ -76,7 +76,7 @@ export default function Dashboard() {
               size="lg"
               className="bg-white text-primary hover:bg-white/90"
             >
-              <Link to="/evolucoes/nova">
+              <Link to="/evolucoes/novo">
                 <Plus className="h-4 w-4" /> Nova evolução
               </Link>
             </Button>

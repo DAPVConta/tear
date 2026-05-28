@@ -70,13 +70,13 @@ export default function App() {
               <Route path="/profissionais/novo" element={<ProfessionalForm />} />
               <Route path="/profissionais/:id" element={<ProfessionalForm />} />
               <Route path="/guias" element={<AuthorizationsList />} />
-              <Route path="/guias/nova" element={<AuthorizationForm />} />
+              <Route path="/guias/novo" element={<AuthorizationForm />} />
               <Route path="/guias/:id" element={<AuthorizationForm />} />
               <Route path="/planos" element={<PlansList />} />
               <Route path="/planos/novo" element={<PlanForm />} />
               <Route path="/planos/:id" element={<PlanForm />} />
               <Route path="/evolucoes" element={<DailyEvolutionsList />} />
-              <Route path="/evolucoes/nova" element={<DailyEvolutionForm />} />
+              <Route path="/evolucoes/novo" element={<DailyEvolutionForm />} />
               <Route path="/evolucoes/:id" element={<DailyEvolutionForm />} />
               <Route path="/evolucao-mensal" element={<MonthlyList />} />
               <Route path="/evolucao-mensal/gerar" element={<MonthlyGenerate />} />

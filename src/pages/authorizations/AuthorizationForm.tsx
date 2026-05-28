@@ -59,7 +59,7 @@ type FormValues = z.infer<typeof schema>;
 export default function AuthorizationForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isEdit = !!id && id !== "nova";
+  const isEdit = !!id && id !== "novo";
   const authId = isEdit ? Number(id) : undefined;
 
   const { data: patients } = usePatientOptions();

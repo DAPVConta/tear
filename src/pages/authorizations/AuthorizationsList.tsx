@@ -6,8 +6,6 @@ import {
   FileCheck2,
   Pencil,
   Ban,
-  ChevronLeft,
-  ChevronRight,
   MoreHorizontal,
   AlertTriangle,
 } from "lucide-react";
@@ -17,7 +15,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -26,6 +23,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TablePagination } from "@/components/ui/table-pagination";
+import {
+  TableSkeletonRows,
+  ListErrorBanner,
+  ListEmptyState,
+} from "@/components/ui/list-states";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +46,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
 import { authorizationStatusLabels, specialtyLabels } from "@/lib/labels";
 import {
   useAuthorizations,
@@ -73,10 +77,15 @@ const statusVariant: Record<
 
 export default function AuthorizationsList() {
   const navigate = useNavigate();
-  const [searchInput, setSearchInput] = useState("");
-  const [page, setPage] = useState(1);
+  const [urlSearch, setUrlSearch] = useUrlState("q", "");
+  const [page, setPage] = useUrlNumber("page", 1);
+  const [searchInput, setSearchInput] = useState(urlSearch);
   const search = useDebounce(searchInput);
   const [toCancel, setToCancel] = useState<AuthorizationRow | null>(null);
+
+  useEffect(() => {
+    setUrlSearch(search);
+  }, [search, setUrlSearch]);
 
   const { data, isLoading, isError } = useAuthorizations({ search, page });
   const cancel = useCancelAuthorization();
@@ -88,7 +97,7 @@ export default function AuthorizationsList() {
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  }, [page, totalPages, setPage]);
 
   function onSearchChange(value: string) {
     setSearchInput(value);
@@ -116,7 +125,7 @@ export default function AuthorizationsList() {
         description="Autorizações e guias das operadoras."
         actions={
           <Button asChild variant="brand">
-            <Link to="/guias/nova">
+            <Link to="/guias/novo">
               <Plus className="h-4 w-4" /> Nova guia
             </Link>
           </Button>
@@ -148,16 +157,7 @@ export default function AuthorizationsList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading &&
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-5 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
+            {isLoading && <TableSkeletonRows columns={6} />}
 
             {!isLoading &&
               data?.rows.map((a) => {
@@ -232,56 +232,35 @@ export default function AuthorizationsList() {
         </Table>
 
         {!isLoading && isError && (
-          <div className="p-10 text-center text-sm text-destructive">
-            Não foi possível carregar as guias.
-          </div>
+          <ListErrorBanner message="Não foi possível carregar as guias." />
         )}
         {!isLoading && !isError && (data?.rows.length ?? 0) === 0 && (
-          <div className="flex flex-col items-center gap-3 p-16 text-center">
-            <span className="grid h-12 w-12 place-items-center rounded-xl bg-secondary text-muted-foreground">
-              <FileCheck2 className="h-6 w-6" />
-            </span>
-            <p className="font-semibold">Nenhuma guia encontrada</p>
-            <p className="max-w-xs text-sm text-muted-foreground">
-              {search
+          <ListEmptyState
+            icon={FileCheck2}
+            title="Nenhuma guia encontrada"
+            description={
+              search
                 ? "Ajuste a busca ou cadastre uma nova guia."
-                : "Cadastre a primeira autorização."}
-            </p>
-            <Button asChild variant="brand" className="mt-1">
-              <Link to="/guias/nova">
-                <Plus className="h-4 w-4" /> Nova guia
-              </Link>
-            </Button>
-          </div>
+                : "Cadastre a primeira autorização."
+            }
+            action={
+              <Button asChild variant="brand" className="mt-1">
+                <Link to="/guias/novo">
+                  <Plus className="h-4 w-4" /> Nova guia
+                </Link>
+              </Button>
+            }
+          />
         )}
 
-        {!isLoading && (data?.total ?? 0) > 0 && (
-          <div className="flex items-center justify-between border-t border-border p-4 text-sm text-muted-foreground">
-            <span>
-              {data!.total} guia{data!.total === 1 ? "" : "s"}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="tabular-nums">
-                {page} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+        {!isLoading && (
+          <TablePagination
+            total={data?.total ?? 0}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            itemLabel="guia"
+          />
         )}
       </div>
 

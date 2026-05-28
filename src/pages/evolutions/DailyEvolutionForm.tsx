@@ -152,7 +152,7 @@ const defaults: FormValues = {
 export default function DailyEvolutionForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isEdit = !!id && id !== "nova";
+  const isEdit = !!id && id !== "novo";
   const evoId = isEdit ? Number(id) : undefined;
 
   const { clinic } = useClinic();

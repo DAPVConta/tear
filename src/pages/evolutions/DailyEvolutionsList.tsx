@@ -4,8 +4,6 @@ import {
   Plus,
   ClipboardList,
   Pencil,
-  ChevronLeft,
-  ChevronRight,
   Lock,
   CheckCircle2,
   CircleDashed,
@@ -15,7 +13,12 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { TablePagination } from "@/components/ui/table-pagination";
+import {
+  TableSkeletonRows,
+  ListErrorBanner,
+  ListEmptyState,
+} from "@/components/ui/list-states";
 import {
   Table,
   TableBody,
@@ -99,7 +102,7 @@ export default function DailyEvolutionsList() {
         description="Registro estruturado das sessões."
         actions={
           <Button asChild variant="brand">
-            <Link to="/evolucoes/nova">
+            <Link to="/evolucoes/novo">
               <Plus className="h-4 w-4" /> Nova evolução
             </Link>
           </Button>
@@ -163,17 +166,7 @@ export default function DailyEvolutionsList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading &&
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-5 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-
+            {isLoading && <TableSkeletonRows columns={6} />}
             {!isLoading &&
               data?.rows.map((e) => (
                 <TableRow
@@ -211,54 +204,32 @@ export default function DailyEvolutionsList() {
         </Table>
 
         {!isLoading && isError && (
-          <div className="p-10 text-center text-sm text-destructive">
-            Não foi possível carregar as evoluções.
-          </div>
+          <ListErrorBanner message="Não foi possível carregar as evoluções." />
         )}
         {!isLoading && !isError && (data?.rows.length ?? 0) === 0 && (
-          <div className="flex flex-col items-center gap-3 p-16 text-center">
-            <span className="grid h-12 w-12 place-items-center rounded-xl bg-secondary text-muted-foreground">
-              <ClipboardList className="h-6 w-6" />
-            </span>
-            <p className="font-semibold">Nenhuma evolução no período</p>
-            <p className="max-w-xs text-sm text-muted-foreground">
-              Ajuste o filtro ou registre uma nova sessão.
-            </p>
-            <Button asChild variant="brand" className="mt-1">
-              <Link to="/evolucoes/nova">
-                <Plus className="h-4 w-4" /> Nova evolução
-              </Link>
-            </Button>
-          </div>
+          <ListEmptyState
+            icon={ClipboardList}
+            title="Nenhuma evolução no período"
+            description="Ajuste o filtro ou registre uma nova sessão."
+            action={
+              <Button asChild variant="brand" className="mt-1">
+                <Link to="/evolucoes/novo">
+                  <Plus className="h-4 w-4" /> Nova evolução
+                </Link>
+              </Button>
+            }
+          />
         )}
 
-        {!isLoading && (data?.total ?? 0) > 0 && (
-          <div className="flex items-center justify-between border-t border-border p-4 text-sm text-muted-foreground">
-            <span>
-              {data!.total} sessã{data!.total === 1 ? "o" : "es"} no período
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="tabular-nums">
-                {page} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+        {!isLoading && (
+          <TablePagination
+            total={data?.total ?? 0}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            itemLabel="sessão"
+            itemLabelPlural="sessões"
+          />
         )}
       </div>
     </div>
