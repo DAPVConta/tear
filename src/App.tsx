@@ -21,6 +21,9 @@ const DailyEvolutionsList = lazy(() => import("@/pages/evolutions/DailyEvolution
 const DailyEvolutionForm = lazy(() => import("@/pages/evolutions/DailyEvolutionForm"));
 const AttendanceList = lazy(() => import("@/pages/attendance/AttendanceList"));
 const AttendanceForm = lazy(() => import("@/pages/attendance/AttendanceForm"));
+const MonthlyList = lazy(() => import("@/pages/monthly/MonthlyList"));
+const MonthlyGenerate = lazy(() => import("@/pages/monthly/MonthlyGenerate"));
+const MonthlyDetail = lazy(() => import("@/pages/monthly/MonthlyDetail"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function PageLoader() {
@@ -64,10 +67,9 @@ export default function App() {
               <Route path="/evolucoes" element={<DailyEvolutionsList />} />
               <Route path="/evolucoes/nova" element={<DailyEvolutionForm />} />
               <Route path="/evolucoes/:id" element={<DailyEvolutionForm />} />
-              <Route
-                path="/evolucao-mensal"
-                element={<Placeholder title="Evolução mensal" description="Síntese mensal automática." />}
-              />
+              <Route path="/evolucao-mensal" element={<MonthlyList />} />
+              <Route path="/evolucao-mensal/gerar" element={<MonthlyGenerate />} />
+              <Route path="/evolucao-mensal/:id" element={<MonthlyDetail />} />
               <Route path="/frequencia" element={<AttendanceList />} />
               <Route path="/frequencia/novo" element={<AttendanceForm />} />
               <Route path="/frequencia/:id" element={<AttendanceForm />} />

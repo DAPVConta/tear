@@ -196,7 +196,11 @@ operadora; restrição editar/excluir só pelo criador.
        trigger ou RPC).
 8. [FEITO] Frequência/Presença (CRUD, filtro por paciente+período, justificativa
    condicional ao status, registro de assinatura do responsável).
-9. Evolução mensal (motor de geração automática + aprovação + PDF).
+9. [FEITO] Evolução mensal — motor de geração automática agrega frequência,
+   evoluções diárias e progresso das metas; análise profissional editável;
+   aprovação; exportação em PDF (jsPDF + autotable) com cabeçalho da marca.
+   - Limitações conhecidas: sem unique constraint paciente+mês+ano (duplicatas
+     possíveis); aprovar é idempotente (não checa estado anterior).
 10. Auditoria/Faturamento (checklist dinâmico + audit logs + dashboard).
 11. Dashboard (métricas + gráficos).
 12. Configurações → Layout (logo/cores por tenant) + ClinicSettings.
