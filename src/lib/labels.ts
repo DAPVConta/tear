@@ -21,6 +21,19 @@ export const authorizationStatusLabels: Record<
   esgotada: "Esgotada",
 };
 
+export const planStatusLabels: Record<Enums<"plan_status">, string> = {
+  ativo: "Ativo",
+  revisao: "Em revisão",
+  encerrado: "Encerrado",
+};
+
+export const goalStatusLabels: Record<Enums<"goal_status">, string> = {
+  em_andamento: "Em andamento",
+  adquirida: "Adquirida",
+  em_manutencao: "Em manutenção",
+  descontinuada: "Descontinuada",
+};
+
 export const specialtyLabels: Record<Enums<"specialty">, string> = {
   psicologia_aba: "Psicologia (ABA)",
   fonoaudiologia: "Fonoaudiologia",

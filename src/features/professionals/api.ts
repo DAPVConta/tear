@@ -43,6 +43,26 @@ export function useProfessionals({ search, page }: ListParams) {
   });
 }
 
+// Opções leves (id + nome + especialidade) para seletores em outros módulos.
+export function useProfessionalOptions() {
+  const { clinic } = useClinic();
+  const clinicId = clinic?.id;
+  return useQuery({
+    queryKey: ["professional-options", clinicId],
+    enabled: !!clinicId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("professionals")
+        .select("id, name, specialty")
+        .eq("clinic_id", clinicId!)
+        .eq("active", true)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
 export function useProfessional(id: number | undefined) {
   const { clinic } = useClinic();
   return useQuery({

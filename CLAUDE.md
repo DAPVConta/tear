@@ -178,7 +178,11 @@ operadora; restrição editar/excluir só pelo criador.
    de Pacientes; Field de formulário extraído para componente compartilhado).
 5. [FEITO] Guias/Autorizações (CRUD, seletor de paciente, status efetivo
    derivado (ativa/vencida/esgotada/cancelada), alerta de vencimento, cancelar).
-6. PTS + metas (CRUD).
+6. [FEITO] PTS + metas (CRUD com sub-entidade): plano + metas dinâmicas
+   (useFieldArray), reconciliação (insert/update/delete) ao salvar, encerrar.
+   - Limitação conhecida (refinar): sem transação no salvar — em falha
+     parcial, plano e metas podem ficar dessincronizados. Mitigar com RPC
+     `save_plan_with_goals` em incremento dedicado se ficar crítico.
 7. Evolução diária (form estruturado + regras de blindagem + assinatura).
 8. Frequência/Presença (registro + justificativa).
 9. Evolução mensal (motor de geração automática + aprovação + PDF).

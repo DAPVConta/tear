@@ -4,6 +4,20 @@ export const BR_STATES = [
   "RS", "RO", "RR", "SC", "SP", "SE", "TO",
 ] as const;
 
+// Categorias de metas terapêuticas (PTS).
+export const GOAL_CATEGORIES = [
+  "Comunicação",
+  "Comportamento",
+  "Interação social",
+  "Cognitivo",
+  "Motor",
+  "AVDs",
+  "Acadêmico",
+  "Sensorial",
+  "Autonomia",
+  "Outro",
+] as const;
+
 // Conselhos profissionais mais comuns nas clínicas de TEA.
 export const COUNCIL_TYPES = [
   "CRP", // Psicologia
