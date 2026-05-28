@@ -35,6 +35,11 @@ Slogan oficial: "Prontuário Inteligente para Clínicas de TEA".
    com profundidade (gradientes sutis da paleta, sombras suaves, glassmorphism com
    parcimônia), tipografia expressiva, generoso uso de espaço, transições fluidas.
    Causar impacto à primeira vista — sem perder a sobriedade clínica.
+9. **RÉGUA DE UI: A MAIS ELEVADA POSSÍVEL** — padrão de produto top de mercado
+   (nível Linear/Vercel/Stripe). Nunca aceitar "bom o suficiente": cada tela deve
+   ter polimento de detalhe (estados hover/focus/loading/empty/error caprichados,
+   skeletons, alinhamento pixel-perfect, consistência total). Em caso de dúvida,
+   escolher sempre a opção visual mais refinada.
 
 ## Identidade visual (Manual da Marca TEAR)
 
