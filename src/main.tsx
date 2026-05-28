@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/theme/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { ClinicProvider } from "@/providers/ClinicProvider";
+import { ThemeApplier } from "@/providers/ThemeApplier";
 import { queryClient } from "@/lib/queryClient";
 import "./index.css";
 
@@ -17,6 +18,7 @@ createRoot(document.getElementById("root")!).render(
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <ClinicProvider>
+            <ThemeApplier />
             <TooltipProvider delayDuration={200}>
               <BrowserRouter>
                 <App />

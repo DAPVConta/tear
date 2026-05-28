@@ -2,7 +2,30 @@ import { cn } from "@/lib/utils";
 
 // Logomark TEAR: barras coloridas (diversidade) sobre fundo da marca,
 // com o ponto central (pessoa no centro do cuidado).
-export function LogoMark({ className }: { className?: string }) {
+// Quando `src` é fornecido, renderiza a logo customizada do tenant.
+export function LogoMark({
+  className,
+  src,
+}: {
+  className?: string;
+  src?: string | null;
+}) {
+  if (src) {
+    return (
+      <span
+        className={cn(
+          "grid place-items-center overflow-hidden rounded-xl bg-white shadow-soft",
+          className,
+        )}
+      >
+        <img
+          src={src}
+          alt="Logo da clínica"
+          className="h-full w-full object-contain p-1"
+        />
+      </span>
+    );
+  }
   return (
     <div
       className={cn(
@@ -44,11 +67,21 @@ export function Logo({
   className,
   markClassName,
   showTagline = false,
+  src,
 }: {
   className?: string;
   markClassName?: string;
   showTagline?: boolean;
+  src?: string | null;
 }) {
+  // Com logo customizada, exibimos só a marca do tenant (sem wordmark TEAR).
+  if (src) {
+    return (
+      <div className={cn("flex items-center gap-3", className)}>
+        <LogoMark className={cn("h-10 w-10", markClassName)} src={src} />
+      </div>
+    );
+  }
   return (
     <div className={cn("flex items-center gap-3", className)}>
       <LogoMark className={cn("h-10 w-10", markClassName)} />

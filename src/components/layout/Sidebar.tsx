@@ -2,6 +2,7 @@ import { ChevronsLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo, LogoMark } from "@/components/brand/Logo";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useClinic } from "@/providers/ClinicProvider";
 import { SidebarNav } from "./SidebarNav";
 
 export function Sidebar({
@@ -11,6 +12,8 @@ export function Sidebar({
   collapsed: boolean;
   onToggle: () => void;
 }) {
+  const { clinic } = useClinic();
+  const logoUrl = clinic?.logo_url ?? null;
   return (
     <aside
       className={cn(
@@ -28,9 +31,9 @@ export function Sidebar({
         )}
       >
         {collapsed ? (
-          <LogoMark className="h-10 w-10" />
+          <LogoMark className="h-10 w-10" src={logoUrl} />
         ) : (
-          <Logo markClassName="h-10 w-10" />
+          <Logo markClassName="h-10 w-10" src={logoUrl} />
         )}
         {!collapsed && (
           <button

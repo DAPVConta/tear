@@ -211,7 +211,10 @@ operadora; restrição editar/excluir só pelo criador.
     guias vigentes, taxa de presença 30d), gráficos (sessões últimos 14d em
     area chart, distribuição de avaliações em bar chart) e lista de guias
     a vencer (30d) com link direto para correção.
-12. Configurações → Layout (logo/cores por tenant) + ClinicSettings.
+12. [FEITO] Configurações → Layout (por tenant): upload de logo no Supabase
+    Storage (bucket `clinic-assets`, RLS por clinic_admin), editor de paleta
+    (primary/accent) aplicado em runtime via CSS variables (ThemeApplier),
+    pré-visualização e reset para o padrão TEAR. Só clinic_admin edita.
 13. Super Admin (gestão de clínicas + métricas globais).
 14. Fase 2: Asaas billing, IA/voz/mapa.
 

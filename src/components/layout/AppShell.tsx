@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/Logo";
+import { useClinic } from "@/providers/ClinicProvider";
 import { Sidebar } from "./Sidebar";
 import { SidebarNav } from "./SidebarNav";
 import { Topbar } from "./Topbar";
@@ -37,6 +38,7 @@ function MobileDrawer({
   open: boolean;
   onClose: () => void;
 }) {
+  const { clinic } = useClinic();
   return (
     <div
       className={cn(
@@ -58,7 +60,7 @@ function MobileDrawer({
         )}
       >
         <div className="flex h-16 items-center justify-between px-4">
-          <Logo />
+          <Logo src={clinic?.logo_url ?? null} />
           <button
             onClick={onClose}
             aria-label="Fechar menu"
