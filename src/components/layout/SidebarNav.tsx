@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { Puzzle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navSections, type NavItem } from "@/config/nav";
 import {
@@ -54,6 +55,7 @@ function SidebarNavItem({
     <NavLink
       to={item.href}
       onClick={onNavigate}
+      style={{ ["--tea" as string]: item.accent }}
       className={({ isActive }) =>
         cn(
           "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all",
@@ -66,11 +68,23 @@ function SidebarNavItem({
     >
       {({ isActive }) => (
         <>
+          <Icon
+            className={cn(
+              "h-5 w-5 shrink-0 transition-colors",
+              isActive
+                ? "text-[color:var(--tea)]"
+                : "group-hover:text-[color:var(--tea)]",
+            )}
+          />
+          {!collapsed && <span className="flex-1 truncate">{item.title}</span>}
+          {/* Indicador ativo: peça de quebra-cabeça na cor TEA do item */}
           {isActive && !collapsed && (
-            <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-sidebar-accent" />
+            <Puzzle
+              className="h-4 w-4 shrink-0"
+              style={{ color: "var(--tea)" }}
+              strokeWidth={2.5}
+            />
           )}
-          <Icon className="h-5 w-5 shrink-0" />
-          {!collapsed && <span className="truncate">{item.title}</span>}
         </>
       )}
     </NavLink>
