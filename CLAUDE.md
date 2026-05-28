@@ -159,7 +159,9 @@ operadora; restrição editar/excluir só pelo criador.
    - INTEGRIDADE (refinar): RLS valida membership por clinic_id, não a coerência
      entre clinic_id e FKs (ex.: goal.clinic_id vs plan.clinic_id). Sem vazamento
      entre tenants; adicionar checks/triggers se necessário.
-3. Pacientes (CRUD, máscaras, validação PT-BR, paginação server-side).
+3. [FEITO] Pacientes (CRUD, máscaras CPF/telefone, validação Zod PT-BR,
+   busca debounce + paginação server-side, arquivamento, RLS + clinic_id em
+   todas as queries, busca sanitizada contra injeção PostgREST).
 4. Profissionais (CRUD, especialidades, conselho).
 5. Guias/Autorizações (CRUD, status, alerta vencimento).
 6. PTS + metas (CRUD).
