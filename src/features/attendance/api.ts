@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { keys } from "@/lib/queryKeys";
+import {
+  deleteRecord,
+  fetchPaginatedList,
+  fetchRecordById,
+  insertRecord,
+  updateRecord,
+} from "@/lib/crud";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Tables, TablesInsert, TablesUpdate } from "@/types/database";
 
@@ -22,32 +29,26 @@ export function useAttendances({ page, patientId, from, to }: ListParams) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
   return useQuery({
-    queryKey: ["attendances", clinicId, page, patientId, from, to],
+    queryKey: keys.attendances.list(clinicId, page, patientId, from, to),
     enabled: !!clinicId,
-    queryFn: async () => {
-      const fromRange = (page - 1) * ATTENDANCE_PAGE_SIZE;
-      const toRange = fromRange + ATTENDANCE_PAGE_SIZE - 1;
-
-      let query = supabase
-        .from("attendance_records")
-        .select(
-          "*, patient:patients(name), professional:professionals(name)",
-          { count: "exact" },
-        )
-        .eq("clinic_id", clinicId!)
-        .order("session_date", { ascending: false })
-        .range(fromRange, toRange);
-
-      if (patientId) query = query.eq("patient_id", patientId);
-      if (from) query = query.gte("session_date", from);
-      if (to) query = query.lte("session_date", to);
-
-      const { data, count, error } = await query;
-      if (error) throw error;
-      return {
-        rows: (data ?? []) as unknown as AttendanceRow[],
-        total: count ?? 0,
-      };
+    queryFn: () => {
+      const filters: Array<{
+        column: string;
+        op: "eq" | "neq" | "gte" | "lte" | "in";
+        value: unknown;
+      }> = [];
+      if (patientId) filters.push({ column: "patient_id", op: "eq", value: patientId });
+      if (from) filters.push({ column: "session_date", op: "gte", value: from });
+      if (to) filters.push({ column: "session_date", op: "lte", value: to });
+      return fetchPaginatedList<AttendanceRow>({
+        table: "attendance_records",
+        clinicId: clinicId!,
+        page,
+        pageSize: ATTENDANCE_PAGE_SIZE,
+        embed: "*, patient:patients(name), professional:professionals(name)",
+        order: { column: "session_date", ascending: false },
+        filters,
+      });
     },
   });
 }
@@ -55,18 +56,14 @@ export function useAttendances({ page, patientId, from, to }: ListParams) {
 export function useAttendance(id: number | undefined) {
   const { clinic } = useClinic();
   return useQuery({
-    queryKey: ["attendance", id],
+    queryKey: keys.attendances.byId(id),
     enabled: !!id && !!clinic?.id,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .select("*")
-        .eq("id", id!)
-        .eq("clinic_id", clinic!.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () =>
+      fetchRecordById<AttendanceRecord>({
+        table: "attendance_records",
+        id: id!,
+        clinicId: clinic!.id,
+      }),
   });
 }
 
@@ -74,20 +71,18 @@ export function useCreateAttendance() {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
-    mutationFn: async (
+    mutationFn: (
       values: Omit<TablesInsert<"attendance_records">, "clinic_id">,
     ) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .insert({ ...values, clinic_id: clinic.id })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      return insertRecord<AttendanceRecord>({
+        table: "attendance_records",
+        values: values as Record<string, unknown>,
+        clinicId: clinic.id,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["attendances"] });
+      queryClient.invalidateQueries({ queryKey: keys.attendances.all });
     },
   });
 }
@@ -96,21 +91,18 @@ export function useUpdateAttendance(id: number) {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
-    mutationFn: async (values: TablesUpdate<"attendance_records">) => {
+    mutationFn: (values: TablesUpdate<"attendance_records">) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .update(values)
-        .eq("id", id)
-        .eq("clinic_id", clinic.id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      return updateRecord<AttendanceRecord>({
+        table: "attendance_records",
+        id,
+        clinicId: clinic.id,
+        values: values as Record<string, unknown>,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["attendances"] });
-      queryClient.invalidateQueries({ queryKey: ["attendance", id] });
+      queryClient.invalidateQueries({ queryKey: keys.attendances.all });
+      queryClient.invalidateQueries({ queryKey: keys.attendances.byId(id) });
     },
   });
 }
@@ -119,17 +111,16 @@ export function useDeleteAttendance() {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: (id: number) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const { error } = await supabase
-        .from("attendance_records")
-        .delete()
-        .eq("id", id)
-        .eq("clinic_id", clinic.id);
-      if (error) throw error;
+      return deleteRecord({
+        table: "attendance_records",
+        id,
+        clinicId: clinic.id,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["attendances"] });
+      queryClient.invalidateQueries({ queryKey: keys.attendances.all });
     },
   });
 }

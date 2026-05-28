@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { keys } from "@/lib/queryKeys";
 import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Tables, TablesInsert, TablesUpdate } from "@/types/database";
@@ -24,7 +25,7 @@ export function useDailyEvolutions({ page, patientId, from, to }: ListParams) {
   const clinicId = clinic?.id;
 
   return useQuery({
-    queryKey: ["daily-evolutions", clinicId, page, patientId, from, to],
+    queryKey: keys.evolutions.list(clinicId, page, patientId, from, to),
     enabled: !!clinicId,
     queryFn: async () => {
       const fromRange = (page - 1) * EVOLUTIONS_PAGE_SIZE;
@@ -55,7 +56,7 @@ export function useDailyEvolutions({ page, patientId, from, to }: ListParams) {
 export function useDailyEvolution(id: number | undefined) {
   const { clinic } = useClinic();
   return useQuery({
-    queryKey: ["daily-evolution", id],
+    queryKey: keys.evolutions.byId(id),
     enabled: !!id && !!clinic?.id,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -144,7 +145,7 @@ export function useCreateEvolution() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["daily-evolutions"] });
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.all });
     },
   });
 }
@@ -200,8 +201,8 @@ export function useUpdateEvolution(id: number) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["daily-evolutions"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-evolution", id] });
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.all });
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.byId(id) });
     },
   });
 }
@@ -223,8 +224,8 @@ export function useSignEvolution() {
       if (error) throw error;
     },
     onSuccess: (_data, id) => {
-      queryClient.invalidateQueries({ queryKey: ["daily-evolutions"] });
-      queryClient.invalidateQueries({ queryKey: ["daily-evolution", id] });
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.all });
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.byId(id) });
     },
   });
 }
@@ -233,7 +234,7 @@ export function useSignEvolution() {
 export function useActiveAuthorizationsByPatient(patientId: number | undefined) {
   const { clinic } = useClinic();
   return useQuery({
-    queryKey: ["active-authorizations", clinic?.id, patientId],
+    queryKey: keys.authorizations.activeByPatient(clinic?.id, patientId),
     enabled: !!patientId && !!clinic?.id,
     queryFn: async () => {
       const today = new Date().toISOString().slice(0, 10);
@@ -255,7 +256,7 @@ export function useActiveAuthorizationsByPatient(patientId: number | undefined) 
 export function usePlansWithGoalsByPatient(patientId: number | undefined) {
   const { clinic } = useClinic();
   return useQuery({
-    queryKey: ["plans-with-goals", clinic?.id, patientId],
+    queryKey: keys.plans.byPatient(clinic?.id, patientId),
     enabled: !!patientId && !!clinic?.id,
     queryFn: async () => {
       const { data: plans, error } = await supabase

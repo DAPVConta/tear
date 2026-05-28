@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { sanitizeSearch } from "@/lib/search";
+import { callRpc, castRows } from "@/lib/typedRpc";
+import { keys } from "@/lib/queryKeys";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Tables, Enums } from "@/types/database";
 
@@ -29,7 +31,7 @@ export function useTherapeuticPlans({ search, page }: ListParams) {
   const clinicId = clinic?.id;
 
   return useQuery({
-    queryKey: ["plans", clinicId, search, page],
+    queryKey: keys.plans.list(clinicId, search, page),
     enabled: !!clinicId,
     queryFn: async () => {
       const from = (page - 1) * PLANS_PAGE_SIZE;
@@ -50,7 +52,7 @@ export function useTherapeuticPlans({ search, page }: ListParams) {
 
       const { data, count, error } = await query;
       if (error) throw error;
-      return { rows: (data ?? []) as unknown as PlanRow[], total: count ?? 0 };
+      return { rows: castRows<PlanRow>(data), total: count ?? 0 };
     },
   });
 }
@@ -58,7 +60,7 @@ export function useTherapeuticPlans({ search, page }: ListParams) {
 export function usePlanWithGoals(id: number | undefined) {
   const { clinic } = useClinic();
   return useQuery({
-    queryKey: ["plan", id],
+    queryKey: keys.plans.byId(id),
     enabled: !!id && !!clinic?.id,
     queryFn: async () => {
       const { data: plan, error } = await supabase
@@ -110,21 +112,17 @@ export function useSavePlan() {
       // RPC atômica (transação no Postgres) — substitui o sequencial
       // create/update + delete + update[] + insert do front, eliminando
       // o risco de estado parcial em falha intermediária.
-      const { data, error } = await supabase.rpc(
-        "save_plan_with_goals" as never,
-        {
-          p_plan_id: planId ?? null,
-          p_plan: { ...plan, clinic_id: clinic.id },
-          p_goals: goals,
-          p_deleted_goal_ids: deletedGoalIds,
-        } as never,
-      );
-      if (error) throw error;
-      return (data as unknown as number) ?? planId ?? null;
+      const data = await callRpc<number>("save_plan_with_goals", {
+        p_plan_id: planId ?? null,
+        p_plan: { ...plan, clinic_id: clinic.id },
+        p_goals: goals,
+        p_deleted_goal_ids: deletedGoalIds,
+      });
+      return data ?? planId ?? null;
     },
     onSuccess: (id) => {
-      queryClient.invalidateQueries({ queryKey: ["plans"] });
-      if (id) queryClient.invalidateQueries({ queryKey: ["plan", id] });
+      queryClient.invalidateQueries({ queryKey: keys.plans.all });
+      if (id) queryClient.invalidateQueries({ queryKey: keys.plans.byId(id) });
     },
   });
 }
@@ -149,7 +147,7 @@ export function useSetPlanStatus() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["plans"] });
+      queryClient.invalidateQueries({ queryKey: keys.plans.all });
     },
   });
 }

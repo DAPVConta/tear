@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { keys } from "@/lib/queryKeys";
 import type { Tables } from "@/types/database";
 import { useAuth } from "./AuthProvider";
 
@@ -21,7 +22,7 @@ export function ClinicProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
 
   const query = useQuery({
-    queryKey: ["current-clinic", user?.id],
+    queryKey: keys.currentClinic(user?.id),
     enabled: !!user,
     queryFn: async () => {
       const { data: member, error } = await supabase

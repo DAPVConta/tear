@@ -1,16 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { callRpc } from "@/lib/typedRpc";
+import { keys } from "@/lib/queryKeys";
 import { useAuth } from "@/providers/AuthProvider";
-
-export function useExportMyData() {
-  return useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.rpc("export_my_data" as never);
-      if (error) throw error;
-      return data as unknown;
-    },
-  });
-}
 
 export type DeletionRequest = {
   id: number;
@@ -22,39 +14,43 @@ export type DeletionRequest = {
   processed_at: string | null;
 };
 
+export function useExportMyData() {
+  return useMutation({
+    mutationFn: () => callRpc<unknown>("export_my_data"),
+  });
+}
+
 export function useMyDeletionRequest() {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ["my-deletion-request", user?.id],
+    queryKey: keys.lgpd.myDeletionRequest(user?.id),
     enabled: !!user,
     queryFn: async (): Promise<DeletionRequest | null> => {
-      // Tabela ainda não está nos tipos gerados — query via fluent API
-      // com casts; quando regenerarmos os tipos isso some.
-      const { data, error } = await (
-        supabase as unknown as {
-          from: (t: string) => {
-            select: (s: string) => {
-              eq: (
-                k: string,
-                v: string,
-              ) => {
-                order: (
-                  k: string,
-                  opts: { ascending: boolean },
-                ) => {
-                  limit: (n: number) => {
-                    maybeSingle: () => Promise<{
-                      data: DeletionRequest | null;
-                      error: Error | null;
-                    }>;
-                  };
-                };
+      // data_deletion_requests ainda não está nos tipos gerados —
+      // single ponto de cast aqui ao invocar o builder.
+      const builder = supabase.from(
+        "data_deletion_requests" as never,
+      ) as unknown as {
+        select: (s: string) => {
+          eq: (
+            k: string,
+            v: string,
+          ) => {
+            order: (
+              k: string,
+              opts: { ascending: boolean },
+            ) => {
+              limit: (n: number) => {
+                maybeSingle: () => Promise<{
+                  data: DeletionRequest | null;
+                  error: Error | null;
+                }>;
               };
             };
           };
-        }
-      )
-        .from("data_deletion_requests")
+        };
+      };
+      const { data, error } = await builder
         .select("*")
         .eq("user_id", user!.id)
         .order("requested_at", { ascending: false })
@@ -67,17 +63,17 @@ export function useMyDeletionRequest() {
 }
 
 export function useRequestDataDeletion() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (reason: string | undefined) => {
-      const { error } = await supabase.rpc(
-        "request_my_data_deletion" as never,
-        { p_reason: reason ?? null } as never,
-      );
-      if (error) throw error;
-    },
+    mutationFn: (reason: string | undefined) =>
+      callRpc<DeletionRequest>("request_my_data_deletion", {
+        p_reason: reason ?? null,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-deletion-request"] });
+      queryClient.invalidateQueries({
+        queryKey: keys.lgpd.myDeletionRequest(user?.id),
+      });
     },
   });
 }

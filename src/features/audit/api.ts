@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { keys } from "@/lib/queryKeys";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Tables } from "@/types/database";
 import { auditEvolution, summarize, type EvolutionAudit } from "./checklist";
@@ -15,7 +16,7 @@ export function useBillingChecklist({ from, to, patientId }: Range) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
   return useQuery({
-    queryKey: ["billing-checklist", clinicId, from, to, patientId],
+    queryKey: keys.audit.checklist(clinicId, from, to, patientId),
     enabled: !!clinicId,
     queryFn: async () => {
       let q = supabase
@@ -59,7 +60,7 @@ export function useAuditLogs({
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
   return useQuery({
-    queryKey: ["audit-logs", clinicId, from, to, limit],
+    queryKey: keys.audit.logs(clinicId, from, to, limit),
     enabled: !!clinicId,
     queryFn: async () => {
       const { data, error } = await supabase

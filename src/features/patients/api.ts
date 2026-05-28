@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { sanitizeSearch } from "@/lib/search";
+import { keys } from "@/lib/queryKeys";
+import {
+  fetchPaginatedList,
+  fetchRecordById,
+  insertRecord,
+  setActive,
+  updateRecord,
+} from "@/lib/crud";
 import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Tables, TablesInsert, TablesUpdate } from "@/types/database";
@@ -23,33 +30,20 @@ export function usePatients({
 }: ListParams) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
-
   return useQuery({
-    queryKey: ["patients", clinicId, search, page, sortBy, sortDir],
+    queryKey: keys.patients.list(clinicId, search, page, sortBy, sortDir),
     enabled: !!clinicId,
-    queryFn: async () => {
-      const from = (page - 1) * PATIENTS_PAGE_SIZE;
-      const to = from + PATIENTS_PAGE_SIZE - 1;
-
-      let query = supabase
-        .from("patients")
-        .select("*", { count: "exact" })
-        .eq("clinic_id", clinicId!)
-        .eq("active", true)
-        .order(sortBy, { ascending: sortDir === "asc" })
-        .range(from, to);
-
-      const term = sanitizeSearch(search);
-      if (term) {
-        query = query.or(
-          `name.ilike.%${term}%,guardian_name.ilike.%${term}%,cpf.ilike.%${term}%`,
-        );
-      }
-
-      const { data, count, error } = await query;
-      if (error) throw error;
-      return { rows: data ?? [], total: count ?? 0 };
-    },
+    queryFn: () =>
+      fetchPaginatedList<Patient>({
+        table: "patients",
+        clinicId: clinicId!,
+        page,
+        pageSize: PATIENTS_PAGE_SIZE,
+        search,
+        searchColumns: ["name", "guardian_name", "cpf"],
+        order: { column: sortBy, ascending: sortDir === "asc" },
+        filters: [{ column: "active", op: "eq", value: true }],
+      }),
   });
 }
 
@@ -58,7 +52,7 @@ export function usePatientOptions() {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
   return useQuery({
-    queryKey: ["patient-options", clinicId],
+    queryKey: keys.patients.options(clinicId),
     enabled: !!clinicId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -76,18 +70,14 @@ export function usePatientOptions() {
 export function usePatient(id: number | undefined) {
   const { clinic } = useClinic();
   return useQuery({
-    queryKey: ["patient", id],
+    queryKey: keys.patients.byId(id),
     enabled: !!id && !!clinic?.id,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("patients")
-        .select("*")
-        .eq("id", id!)
-        .eq("clinic_id", clinic!.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () =>
+      fetchRecordById<Patient>({
+        table: "patients",
+        id: id!,
+        clinicId: clinic!.id,
+      }),
   });
 }
 
@@ -97,20 +87,19 @@ export function useCreatePatient() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (
+    mutationFn: (
       values: Omit<TablesInsert<"patients">, "clinic_id" | "created_by">,
     ) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const { data, error } = await supabase
-        .from("patients")
-        .insert({ ...values, clinic_id: clinic.id, created_by: user?.id ?? null })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      return insertRecord<Patient>({
+        table: "patients",
+        values: values as Record<string, unknown>,
+        clinicId: clinic.id,
+        createdBy: user?.id ?? null,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: keys.patients.all });
     },
   });
 }
@@ -119,21 +108,18 @@ export function useUpdatePatient(id: number) {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
-    mutationFn: async (values: TablesUpdate<"patients">) => {
+    mutationFn: (values: TablesUpdate<"patients">) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const { data, error } = await supabase
-        .from("patients")
-        .update(values)
-        .eq("id", id)
-        .eq("clinic_id", clinic.id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      return updateRecord<Patient>({
+        table: "patients",
+        id,
+        clinicId: clinic.id,
+        values: values as Record<string, unknown>,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
-      queryClient.invalidateQueries({ queryKey: ["patient", id] });
+      queryClient.invalidateQueries({ queryKey: keys.patients.all });
+      queryClient.invalidateQueries({ queryKey: keys.patients.byId(id) });
     },
   });
 }
@@ -142,17 +128,18 @@ export function useDeactivatePatient() {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: (id: number) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const { error } = await supabase
-        .from("patients")
-        .update({ active: false })
-        .eq("id", id)
-        .eq("clinic_id", clinic.id);
-      if (error) throw error;
+      return setActive({
+        table: "patients",
+        id,
+        clinicId: clinic.id,
+        active: false,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: keys.patients.all });
     },
   });
 }
+

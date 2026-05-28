@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { keys } from "@/lib/queryKeys";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Enums, Json, Tables, TablesUpdate } from "@/types/database";
 import { buildMonthlySummary } from "./summary";
@@ -42,7 +43,7 @@ export function useMonthlyEvolutions({ page, patientId, year }: ListParams) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
   return useQuery({
-    queryKey: ["monthly-evolutions", clinicId, page, patientId, year],
+    queryKey: keys.monthly.list(clinicId, page, patientId, year),
     enabled: !!clinicId,
     queryFn: async () => {
       const fromRange = (page - 1) * MONTHLY_PAGE_SIZE;
@@ -69,7 +70,7 @@ export function useMonthlyEvolutions({ page, patientId, year }: ListParams) {
 export function useMonthlyEvolution(id: number | undefined) {
   const { clinic } = useClinic();
   return useQuery({
-    queryKey: ["monthly-evolution", id],
+    queryKey: keys.monthly.byId(id),
     enabled: !!id && !!clinic?.id,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -206,7 +207,7 @@ export function useGenerateMonthlyEvolution() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["monthly-evolutions"] });
+      queryClient.invalidateQueries({ queryKey: keys.monthly.all });
     },
   });
 }
@@ -228,8 +229,8 @@ export function useUpdateMonthlyEvolution(id: number) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["monthly-evolutions"] });
-      queryClient.invalidateQueries({ queryKey: ["monthly-evolution", id] });
+      queryClient.invalidateQueries({ queryKey: keys.monthly.all });
+      queryClient.invalidateQueries({ queryKey: keys.monthly.byId(id) });
     },
   });
 }
@@ -248,8 +249,8 @@ export function useApproveMonthlyEvolution() {
       if (error) throw error;
     },
     onSuccess: (_data, id) => {
-      queryClient.invalidateQueries({ queryKey: ["monthly-evolutions"] });
-      queryClient.invalidateQueries({ queryKey: ["monthly-evolution", id] });
+      queryClient.invalidateQueries({ queryKey: keys.monthly.all });
+      queryClient.invalidateQueries({ queryKey: keys.monthly.byId(id) });
     },
   });
 }

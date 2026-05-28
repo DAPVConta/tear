@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { callRpc } from "@/lib/typedRpc";
+import { keys } from "@/lib/queryKeys";
 import type { Enums } from "@/types/database";
 
 export type PlatformClinicRow = {
@@ -17,16 +19,13 @@ export type PlatformClinicRow = {
 
 export function usePlatformOverview() {
   return useQuery({
-    queryKey: ["platform-overview"],
+    queryKey: keys.platform.overview,
     queryFn: async () => {
-      // RPC com types ainda não regenerados — cast manual.
-      const { data, error } = await supabase.rpc(
-        "platform_clinics_overview" as never,
+      const rows = await callRpc<PlatformClinicRow[]>(
+        "platform_clinics_overview",
       );
-      if (error) throw error;
-      const rows = (data ?? []) as unknown as PlatformClinicRow[];
       // Normaliza counts (bigint → number-string em JS pelos clients PostgREST).
-      return rows.map((r) => ({
+      return (rows ?? []).map((r) => ({
         ...r,
         member_count: Number(r.member_count),
         patient_count: Number(r.patient_count),
@@ -47,7 +46,7 @@ export function useToggleClinicActive() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform-overview"] });
+      queryClient.invalidateQueries({ queryKey: keys.platform.overview });
     },
   });
 }
@@ -71,7 +70,7 @@ export function useUpdateClinicPlan() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platform-overview"] });
+      queryClient.invalidateQueries({ queryKey: keys.platform.overview });
     },
   });
 }

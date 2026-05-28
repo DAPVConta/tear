@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { keys } from "@/lib/queryKeys";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { ClinicTheme } from "@/lib/colors";
 
@@ -16,7 +17,7 @@ export function useUpdateClinicTheme() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["current-clinic"] });
+      queryClient.invalidateQueries({ queryKey: keys.currentClinic.all });
     },
   });
 }
@@ -43,7 +44,7 @@ export function useUploadClinicLogo() {
       return publicUrl;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["current-clinic"] });
+      queryClient.invalidateQueries({ queryKey: keys.currentClinic.all });
     },
   });
 }
@@ -61,7 +62,7 @@ export function useRemoveClinicLogo() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["current-clinic"] });
+      queryClient.invalidateQueries({ queryKey: keys.currentClinic.all });
     },
   });
 }

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO, startOfWeek, subDays } from "date-fns";
 import { supabase } from "@/lib/supabase";
+import { keys } from "@/lib/queryKeys";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Enums } from "@/types/database";
 
@@ -13,7 +14,7 @@ export function useDashboardMetrics() {
   const clinicId = clinic?.id;
 
   return useQuery({
-    queryKey: ["dashboard-metrics", clinicId],
+    queryKey: keys.dashboard.metrics(clinicId),
     enabled: !!clinicId,
     queryFn: async () => {
       const now = new Date();
@@ -91,7 +92,7 @@ export function useSessionsByDay({ days = 14 } = {}) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
   return useQuery({
-    queryKey: ["dashboard-sessions-by-day", clinicId, days],
+    queryKey: keys.dashboard.sessionsByDay(clinicId, days),
     enabled: !!clinicId,
     queryFn: async () => {
       const from = format(subDays(new Date(), days - 1), "yyyy-MM-dd");
@@ -130,7 +131,7 @@ export function useExpiringAuthorizations({ withinDays = 30 } = {}) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
   return useQuery({
-    queryKey: ["dashboard-expiring-guides", clinicId, withinDays],
+    queryKey: keys.dashboard.expiringGuides(clinicId, withinDays),
     enabled: !!clinicId,
     queryFn: async () => {
       const t = today();
@@ -165,7 +166,7 @@ export function useAssessmentDistribution({ days = 30 } = {}) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
   return useQuery({
-    queryKey: ["dashboard-assessments", clinicId, days],
+    queryKey: keys.dashboard.assessmentDistribution(clinicId, days),
     enabled: !!clinicId,
     queryFn: async () => {
       const from = format(subDays(new Date(), days - 1), "yyyy-MM-dd");
