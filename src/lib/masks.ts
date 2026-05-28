@@ -18,6 +18,12 @@ export function maskCNPJ(value: string): string {
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
 }
 
+export function maskCEP(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 8);
+  if (d.length <= 5) return d;
+  return `${d.slice(0, 5)}-${d.slice(5)}`;
+}
+
 export function maskPhone(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 11);
   if (d.length === 0) return "";

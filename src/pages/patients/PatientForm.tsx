@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Loader2, MapPin, Save } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { maskCPF, maskPhone, unmask, isValidCPF } from "@/lib/masks";
+import { maskCPF, maskCEP, maskPhone, unmask, isValidCPF } from "@/lib/masks";
+import { fetchCep } from "@/lib/brasilapi";
 import { genderLabels, paymentTypeLabels } from "@/lib/labels";
 import {
   usePatient,
@@ -90,6 +91,7 @@ export default function PatientForm() {
     handleSubmit,
     control,
     reset,
+    setValue,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaults });
@@ -117,6 +119,40 @@ export default function PatientForm() {
   }, [existing, reset]);
 
   const paymentType = watch("payment_type");
+  const [cep, setCep] = useState("");
+  const [cepLoading, setCepLoading] = useState(false);
+
+  async function lookupCep() {
+    const digits = unmask(cep);
+    if (digits.length !== 8) {
+      toast.error("Digite os 8 dígitos do CEP");
+      return;
+    }
+    setCepLoading(true);
+    try {
+      const info = await fetchCep(digits);
+      if (!info) {
+        toast.error("CEP não encontrado");
+        return;
+      }
+      const formatted = [
+        info.street,
+        info.neighborhood,
+        info.city && info.state ? `${info.city} - ${info.state}` : info.city,
+        maskCEP(info.cep),
+      ]
+        .filter(Boolean)
+        .join(", ");
+      setValue("address", formatted, { shouldDirty: true });
+      toast.success("Endereço preenchido");
+    } catch (e) {
+      toast.error("Falha ao consultar CEP", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setCepLoading(false);
+    }
+  }
 
   async function onSubmit(values: FormValues) {
     const payload = {
@@ -324,8 +360,35 @@ export default function PatientForm() {
                 placeholder="Detalhes relevantes do diagnóstico"
               />
             </Field>
-            <Field label="Endereço (opcional)" className="sm:col-span-2">
-              <Input {...register("address")} placeholder="Rua, número, bairro, cidade" />
+            <Field label="CEP (opcional)">
+              <div className="flex gap-2">
+                <Input
+                  value={cep}
+                  onChange={(e) => setCep(maskCEP(e.target.value))}
+                  placeholder="00000-000"
+                  inputMode="numeric"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={lookupCep}
+                  disabled={cepLoading || unmask(cep).length !== 8}
+                >
+                  {cepLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <MapPin className="h-4 w-4" /> Buscar
+                    </>
+                  )}
+                </Button>
+              </div>
+            </Field>
+            <Field label="Endereço (opcional)">
+              <Input
+                {...register("address")}
+                placeholder="Rua, número, bairro, cidade"
+              />
             </Field>
           </CardContent>
         </Card>

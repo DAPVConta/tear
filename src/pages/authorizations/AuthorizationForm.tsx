@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Field } from "@/components/form/Field";
 import { authorizationStatusLabels, specialtyLabels } from "@/lib/labels";
@@ -165,21 +166,16 @@ export default function AuthorizationForm() {
                 control={control}
                 name="patient_id"
                 render={({ field }) => (
-                  <Select
+                  <Combobox
                     value={field.value ? String(field.value) : ""}
                     onValueChange={(v) => field.onChange(Number(v))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o paciente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {patients?.map((p) => (
-                        <SelectItem key={p.id} value={String(p.id)}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={(patients ?? []).map((p) => ({
+                      value: String(p.id),
+                      label: p.name,
+                    }))}
+                    placeholder="Selecione o paciente"
+                    searchPlaceholder="Buscar paciente..."
+                  />
                 )}
               />
             </Field>
