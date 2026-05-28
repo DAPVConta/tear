@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,10 +23,29 @@ export function AppShell() {
         <Topbar onOpenMobile={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-7xl px-4 py-8 animate-fade-in lg:px-8 lg:py-10">
-            <Outlet />
+            <Suspense fallback={<RouteLoader />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+// Loader não-intrusivo: barra fina no topo da área de conteúdo.
+// A sidebar/topbar permanecem visíveis durante a troca de chunk.
+function RouteLoader() {
+  return (
+    <div className="fixed inset-x-0 top-16 z-30 h-0.5 overflow-hidden lg:left-72">
+      <div className="h-full w-1/3 animate-[route_1.1s_ease-in-out_infinite] bg-brand-gradient" />
+      <style>{`
+        @keyframes route {
+          0%   { transform: translateX(-100%); }
+          50%  { transform: translateX(180%); }
+          100% { transform: translateX(380%); }
+        }
+      `}</style>
     </div>
   );
 }

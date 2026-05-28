@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/providers/AuthProvider";
+import { prefetchPage } from "@/routes/pages";
 
 export function SidebarNav({
   collapsed = false,
@@ -60,10 +61,14 @@ function SidebarNavItem({
   onNavigate?: () => void;
 }) {
   const Icon = item.icon;
+  const prefetch = () => prefetchPage(item.href);
   const link = (
     <NavLink
       to={item.href}
       onClick={onNavigate}
+      onMouseEnter={prefetch}
+      onFocus={prefetch}
+      onTouchStart={prefetch}
       style={{ ["--tea" as string]: item.accent }}
       className={({ isActive }) =>
         cn(

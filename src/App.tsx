@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { LogoMark } from "@/components/brand/Logo";
@@ -8,34 +8,38 @@ import {
   RedirectIfAuthed,
   RequirePlatformAdmin,
 } from "@/routes/guards";
+import {
+  Landing,
+  Login,
+  Onboarding,
+  Dashboard,
+  PatientsList,
+  PatientForm,
+  ProfessionalsList,
+  ProfessionalForm,
+  AuthorizationsList,
+  AuthorizationForm,
+  PlansList,
+  PlanForm,
+  DailyEvolutionsList,
+  DailyEvolutionForm,
+  MonthlyList,
+  MonthlyGenerate,
+  MonthlyDetail,
+  AttendanceList,
+  AttendanceForm,
+  AuditDashboard,
+  SettingsPage,
+  SuperAdmin,
+  NotFound,
+} from "@/routes/pages";
 
-const Landing = lazy(() => import("@/pages/Landing"));
-const Login = lazy(() => import("@/pages/auth/Login"));
-const Onboarding = lazy(() => import("@/pages/Onboarding"));
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const PatientsList = lazy(() => import("@/pages/patients/PatientsList"));
-const PatientForm = lazy(() => import("@/pages/patients/PatientForm"));
-const ProfessionalsList = lazy(() => import("@/pages/professionals/ProfessionalsList"));
-const ProfessionalForm = lazy(() => import("@/pages/professionals/ProfessionalForm"));
-const AuthorizationsList = lazy(() => import("@/pages/authorizations/AuthorizationsList"));
-const AuthorizationForm = lazy(() => import("@/pages/authorizations/AuthorizationForm"));
-const PlansList = lazy(() => import("@/pages/plans/PlansList"));
-const PlanForm = lazy(() => import("@/pages/plans/PlanForm"));
-const DailyEvolutionsList = lazy(() => import("@/pages/evolutions/DailyEvolutionsList"));
-const DailyEvolutionForm = lazy(() => import("@/pages/evolutions/DailyEvolutionForm"));
-const AttendanceList = lazy(() => import("@/pages/attendance/AttendanceList"));
-const AttendanceForm = lazy(() => import("@/pages/attendance/AttendanceForm"));
-const MonthlyList = lazy(() => import("@/pages/monthly/MonthlyList"));
-const MonthlyGenerate = lazy(() => import("@/pages/monthly/MonthlyGenerate"));
-const MonthlyDetail = lazy(() => import("@/pages/monthly/MonthlyDetail"));
-const AuditDashboard = lazy(() => import("@/pages/audit/AuditDashboard"));
-const SettingsPage = lazy(() => import("@/pages/settings/SettingsPage"));
-const SuperAdmin = lazy(() => import("@/pages/super-admin/SuperAdmin"));
-const NotFound = lazy(() => import("@/pages/NotFound"));
-
-function PageLoader() {
+// Fallback do Suspense usado APENAS no boot inicial / rotas fora do shell.
+// Quando o usuário já está no shell, o fallback é uma barra fina dentro
+// da própria área de conteúdo (ver AppShell).
+function BootLoader() {
   return (
-    <div className="grid place-items-center py-24">
+    <div className="grid min-h-screen place-items-center bg-background">
       <LogoMark className="h-12 w-12 animate-pulse" />
     </div>
   );
@@ -43,7 +47,7 @@ function PageLoader() {
 
 export default function App() {
   return (
-    <Suspense fallback={<PageLoader />}>
+    <Suspense fallback={<BootLoader />}>
       <Routes>
         <Route path="/" element={<Landing />} />
 
@@ -51,11 +55,9 @@ export default function App() {
           <Route path="/login" element={<Login />} />
         </Route>
 
-        {/* Autenticado */}
         <Route element={<RequireAuth />}>
           <Route path="/onboarding" element={<Onboarding />} />
 
-          {/* Autenticado + com clínica */}
           <Route element={<RequireClinic />}>
             <Route element={<AppShell />}>
               <Route path="/dashboard" element={<Dashboard />} />
@@ -82,6 +84,7 @@ export default function App() {
               <Route path="/frequencia/:id" element={<AttendanceForm />} />
               <Route path="/auditoria" element={<AuditDashboard />} />
               <Route path="/configuracoes" element={<SettingsPage />} />
+
               <Route element={<RequirePlatformAdmin />}>
                 <Route path="/super-admin" element={<SuperAdmin />} />
               </Route>
