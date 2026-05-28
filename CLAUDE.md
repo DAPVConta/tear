@@ -220,7 +220,28 @@ operadora; restrição editar/excluir só pelo criador.
     para platform_admin, página com métricas globais (clínicas/membros/
     pacientes/sessões 30d) e tabela com edição inline de plano/status +
     ativar/desativar clínica.
-14. Fase 2: Asaas billing, IA/voz/mapa.
+14. [FEITO — Pacote 1] Automações BrasilAPI (CEP→endereço em PatientForm
+    e Onboarding, CNPJ→empresa em Onboarding) e Combobox buscável (cmdk
+    + Popover) substituindo Selects de paciente/profissional em todos os
+    formulários.
+15. [FEITO — Pacote 2] DatePicker (react-day-picker 9 + Popover, locale
+    PT-BR) substituindo native date inputs em todos os formulários e
+    filtros; TagInput para skills_worked; color picker react-colorful em
+    Configurações.
+16. [FEITO — Pacote 3] Robustez de dados via triggers e RPCs server-side:
+    - Auto-rastreamento em audit_logs (INSERT/UPDATE/DELETE em todas as
+      tabelas clínicas).
+    - Lock 24h server-side em daily_evolutions (BEFORE UPDATE) — bloqueia
+      alteração de qualquer campo significativo após o prazo.
+    - used_quantity da guia atualizado automaticamente ao criar/remover/
+      realocar evolução.
+    - Unique constraint (patient, year, month) em monthly_evolutions.
+    - RPC atômica `save_plan_with_goals` (transação no Postgres),
+      substituindo o sequencial do front; sem mais estado parcial em falha.
+    - Hardening: search_path imutável + trigger functions sem EXECUTE pela
+      API REST.
+
+Fase 2 restante: Asaas billing, IA/voz/mapa.
 
 ### Agentes por incremento
 backend, frontend, ux, ui, code-review. Cada peça passa por review antes do PR.

@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { sanitizeSearch } from "@/lib/search";
-import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Tables, Enums } from "@/types/database";
 
@@ -103,83 +102,25 @@ type SaveInput = {
 export function useSavePlan() {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
-  const { user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ planId, plan, goals, deletedGoalIds }: SaveInput) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const clinicId = clinic.id;
 
-      // 1. Cria ou atualiza o plano.
-      let id = planId;
-      if (id) {
-        const { error } = await supabase
-          .from("therapeutic_plans")
-          .update(plan)
-          .eq("id", id)
-          .eq("clinic_id", clinicId);
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from("therapeutic_plans")
-          .insert({ ...plan, clinic_id: clinicId, created_by: user?.id ?? null })
-          .select("id")
-          .single();
-        if (error) throw error;
-        id = data.id;
-      }
-
-      // 2. Remove metas excluídas.
-      if (deletedGoalIds.length > 0) {
-        const { error } = await supabase
-          .from("therapeutic_goals")
-          .delete()
-          .in("id", deletedGoalIds)
-          .eq("clinic_id", clinicId);
-        if (error) throw error;
-      }
-
-      // 3. Atualiza metas existentes e insere novas.
-      const toUpdate = goals.filter((g) => g.id);
-      const toInsert = goals.filter((g) => !g.id);
-
-      // Atualizações de metas em paralelo (sem N round-trips sequenciais).
-      // Nota: não há transação; falha parcial pode deixar plano salvo com
-      // metas parcialmente atualizadas. Mitigar com RPC dedicada quando crítico.
-      const updates = await Promise.all(
-        toUpdate.map((g) =>
-          supabase
-            .from("therapeutic_goals")
-            .update({
-              description: g.description,
-              category: g.category,
-              target_criteria: g.target_criteria,
-              current_progress: g.current_progress,
-              status: g.status,
-            })
-            .eq("id", g.id!)
-            .eq("clinic_id", clinicId),
-        ),
+      // RPC atômica (transação no Postgres) — substitui o sequencial
+      // create/update + delete + update[] + insert do front, eliminando
+      // o risco de estado parcial em falha intermediária.
+      const { data, error } = await supabase.rpc(
+        "save_plan_with_goals" as never,
+        {
+          p_plan_id: planId ?? null,
+          p_plan: { ...plan, clinic_id: clinic.id },
+          p_goals: goals,
+          p_deleted_goal_ids: deletedGoalIds,
+        } as never,
       );
-      const updateError = updates.find((r) => r.error)?.error;
-      if (updateError) throw updateError;
-
-      if (toInsert.length > 0) {
-        const { error } = await supabase.from("therapeutic_goals").insert(
-          toInsert.map((g) => ({
-            clinic_id: clinicId,
-            plan_id: id!,
-            description: g.description,
-            category: g.category,
-            target_criteria: g.target_criteria,
-            current_progress: g.current_progress,
-            status: g.status,
-          })),
-        );
-        if (error) throw error;
-      }
-
-      return id;
+      if (error) throw error;
+      return (data as unknown as number) ?? planId ?? null;
     },
     onSuccess: (id) => {
       queryClient.invalidateQueries({ queryKey: ["plans"] });
