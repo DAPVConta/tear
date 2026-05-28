@@ -34,6 +34,17 @@ export const goalStatusLabels: Record<Enums<"goal_status">, string> = {
   descontinuada: "Descontinuada",
 };
 
+export const attendanceStatusLabels: Record<
+  Enums<"attendance_status">,
+  string
+> = {
+  presente: "Presente",
+  falta_justificada: "Falta justificada",
+  falta_injustificada: "Falta injustificada",
+  cancelado_clinica: "Cancelado (clínica)",
+  cancelado_paciente: "Cancelado (paciente)",
+};
+
 export const attendanceTypeLabels: Record<Enums<"attendance_type">, string> = {
   individual_presencial: "Individual — presencial",
   individual_domiciliar: "Individual — domiciliar",

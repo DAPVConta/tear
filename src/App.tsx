@@ -19,6 +19,8 @@ const PlansList = lazy(() => import("@/pages/plans/PlansList"));
 const PlanForm = lazy(() => import("@/pages/plans/PlanForm"));
 const DailyEvolutionsList = lazy(() => import("@/pages/evolutions/DailyEvolutionsList"));
 const DailyEvolutionForm = lazy(() => import("@/pages/evolutions/DailyEvolutionForm"));
+const AttendanceList = lazy(() => import("@/pages/attendance/AttendanceList"));
+const AttendanceForm = lazy(() => import("@/pages/attendance/AttendanceForm"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function PageLoader() {
@@ -66,10 +68,9 @@ export default function App() {
                 path="/evolucao-mensal"
                 element={<Placeholder title="Evolução mensal" description="Síntese mensal automática." />}
               />
-              <Route
-                path="/frequencia"
-                element={<Placeholder title="Frequência" description="Presenças, faltas e justificativas." />}
-              />
+              <Route path="/frequencia" element={<AttendanceList />} />
+              <Route path="/frequencia/novo" element={<AttendanceForm />} />
+              <Route path="/frequencia/:id" element={<AttendanceForm />} />
               <Route
                 path="/auditoria"
                 element={<Placeholder title="Auditoria" description="Checklist de faturamento e conformidade." />}

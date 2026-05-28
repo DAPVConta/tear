@@ -1,0 +1,315 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  Plus,
+  CalendarCheck,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+} from "lucide-react";
+import { format, parseISO, subDays } from "date-fns";
+import { toast } from "sonner";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { attendanceStatusLabels } from "@/lib/labels";
+import { usePatientOptions } from "@/features/patients/api";
+import {
+  useAttendances,
+  useDeleteAttendance,
+  ATTENDANCE_PAGE_SIZE,
+  type AttendanceRow,
+} from "@/features/attendance/api";
+import type { Enums } from "@/types/database";
+
+const statusVariant: Record<
+  Enums<"attendance_status">,
+  "success" | "warning" | "destructive" | "muted"
+> = {
+  presente: "success",
+  falta_justificada: "warning",
+  falta_injustificada: "destructive",
+  cancelado_clinica: "muted",
+  cancelado_paciente: "muted",
+};
+
+export default function AttendanceList() {
+  const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+  const [patientId, setPatientId] = useState<string>("all");
+  const [from, setFrom] = useState(
+    format(subDays(new Date(), 30), "yyyy-MM-dd"),
+  );
+  const [to, setTo] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [toDelete, setToDelete] = useState<AttendanceRow | null>(null);
+
+  const { data: patients } = usePatientOptions();
+  const { data, isLoading, isError } = useAttendances({
+    page,
+    patientId: patientId === "all" ? undefined : Number(patientId),
+    from,
+    to,
+  });
+  const deleteAttendance = useDeleteAttendance();
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil((data?.total ?? 0) / ATTENDANCE_PAGE_SIZE)),
+    [data?.total],
+  );
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  function resetPage() {
+    setPage(1);
+  }
+
+  async function confirmDelete() {
+    if (!toDelete) return;
+    try {
+      await deleteAttendance.mutateAsync(toDelete.id);
+      toast.success("Registro removido");
+    } catch (e) {
+      toast.error("Falha ao remover", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setToDelete(null);
+    }
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Frequência"
+        description="Presenças, faltas e justificativas."
+        actions={
+          <Button asChild variant="brand">
+            <Link to="/frequencia/novo">
+              <Plus className="h-4 w-4" /> Novo registro
+            </Link>
+          </Button>
+        }
+      />
+
+      <div className="rounded-2xl border border-border bg-card shadow-soft">
+        <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-[1fr_auto_auto]">
+          <Select
+            value={patientId}
+            onValueChange={(v) => {
+              setPatientId(v);
+              resetPage();
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Todos os pacientes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os pacientes</SelectItem>
+              {patients?.map((p) => (
+                <SelectItem key={p.id} value={String(p.id)}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            type="date"
+            value={from}
+            onChange={(e) => {
+              setFrom(e.target.value);
+              resetPage();
+            }}
+            className="sm:w-44"
+          />
+          <Input
+            type="date"
+            value={to}
+            onChange={(e) => {
+              setTo(e.target.value);
+              resetPage();
+            }}
+            className="sm:w-44"
+          />
+        </div>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Data</TableHead>
+              <TableHead>Paciente</TableHead>
+              <TableHead>Profissional</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Justificativa</TableHead>
+              <TableHead className="w-12" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading &&
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 6 }).map((__, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-5 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+
+            {!isLoading &&
+              data?.rows.map((a) => (
+                <TableRow
+                  key={a.id}
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/frequencia/${a.id}`)}
+                >
+                  <TableCell className="font-semibold">
+                    {format(parseISO(a.session_date), "dd/MM/yyyy")}
+                  </TableCell>
+                  <TableCell>{a.patient?.name ?? "—"}</TableCell>
+                  <TableCell>{a.professional?.name ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge variant={statusVariant[a.status]}>
+                      {attendanceStatusLabels[a.status]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
+                    {a.justification || "—"}
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" aria-label="Ações">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onSelect={() => navigate(`/frequencia/${a.id}`)}
+                        >
+                          <Pencil /> Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onSelect={() => setToDelete(a)}
+                        >
+                          <Trash2 /> Remover
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+          </TableBody>
+        </Table>
+
+        {!isLoading && isError && (
+          <div className="p-10 text-center text-sm text-destructive">
+            Não foi possível carregar os registros.
+          </div>
+        )}
+        {!isLoading && !isError && (data?.rows.length ?? 0) === 0 && (
+          <div className="flex flex-col items-center gap-3 p-16 text-center">
+            <span className="grid h-12 w-12 place-items-center rounded-xl bg-secondary text-muted-foreground">
+              <CalendarCheck className="h-6 w-6" />
+            </span>
+            <p className="font-semibold">Nenhum registro no período</p>
+            <p className="max-w-xs text-sm text-muted-foreground">
+              Ajuste o filtro ou registre uma presença/falta.
+            </p>
+            <Button asChild variant="brand" className="mt-1">
+              <Link to="/frequencia/novo">
+                <Plus className="h-4 w-4" /> Novo registro
+              </Link>
+            </Button>
+          </div>
+        )}
+
+        {!isLoading && (data?.total ?? 0) > 0 && (
+          <div className="flex items-center justify-between border-t border-border p-4 text-sm text-muted-foreground">
+            <span>
+              {data!.total} registro{data!.total === 1 ? "" : "s"} no período
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="tabular-nums">
+                {page} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover registro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O registro de frequência será excluído permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteAttendance.isPending}
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

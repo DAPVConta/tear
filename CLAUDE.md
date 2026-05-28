@@ -194,7 +194,8 @@ operadora; restrição editar/excluir só pelo criador.
      * Validação CID×procedimento (legado): exige base de CID; defer.
      * Atualização automática de used_quantity da guia: defer (precisa
        trigger ou RPC).
-8. Frequência/Presença (registro + justificativa).
+8. [FEITO] Frequência/Presença (CRUD, filtro por paciente+período, justificativa
+   condicional ao status, registro de assinatura do responsável).
 9. Evolução mensal (motor de geração automática + aprovação + PDF).
 10. Auditoria/Faturamento (checklist dinâmico + audit logs + dashboard).
 11. Dashboard (métricas + gráficos).
