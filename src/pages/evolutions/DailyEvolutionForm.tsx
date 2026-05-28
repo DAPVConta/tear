@@ -31,7 +31,6 @@ import { TagInput } from "@/components/ui/tag-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Field } from "@/components/form/Field";
-import { DictatedTextarea } from "@/components/form/DictatedTextarea";
 import {
   attendanceTypeLabels,
   promptingLevelLabels,
@@ -634,45 +633,27 @@ export default function DailyEvolutionForm() {
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <Field label="Notas comportamentais">
-                <Controller
-                  control={control}
-                  name="behavioral_notes"
-                  render={({ field }) => (
-                    <DictatedTextarea
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      rows={3}
-                      placeholder="Comportamentos observados"
-                    />
-                  )}
+                <textarea
+                  {...register("behavioral_notes")}
+                  rows={3}
+                  className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Comportamentos observados"
                 />
               </Field>
               <Field label="Intervenção realizada">
-                <Controller
-                  control={control}
-                  name="behavioral_intervention"
-                  render={({ field }) => (
-                    <DictatedTextarea
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      rows={3}
-                      placeholder="Estratégia aplicada"
-                    />
-                  )}
+                <textarea
+                  {...register("behavioral_intervention")}
+                  rows={3}
+                  className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Estratégia aplicada"
                 />
               </Field>
               <Field label="Incidentes (opcional)" className="sm:col-span-2">
-                <Controller
-                  control={control}
-                  name="incidents"
-                  render={({ field }) => (
-                    <DictatedTextarea
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      rows={2}
-                      placeholder="Qualquer ocorrência relevante"
-                    />
-                  )}
+                <textarea
+                  {...register("incidents")}
+                  rows={2}
+                  className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Qualquer ocorrência relevante"
                 />
               </Field>
             </CardContent>
@@ -684,17 +665,11 @@ export default function DailyEvolutionForm() {
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <Field label="Resumo da sessão" error={errors.session_summary?.message} className="sm:col-span-2">
-                <Controller
-                  control={control}
-                  name="session_summary"
-                  render={({ field }) => (
-                    <DictatedTextarea
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      rows={4}
-                      placeholder="Síntese do que foi trabalhado e como o paciente respondeu"
-                    />
-                  )}
+                <textarea
+                  {...register("session_summary")}
+                  rows={4}
+                  className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Síntese do que foi trabalhado e como o paciente respondeu"
                 />
               </Field>
               <Field label="Avaliação de evolução" error={errors.evolution_assessment?.message}>
