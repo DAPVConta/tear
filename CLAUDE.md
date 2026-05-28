@@ -183,7 +183,17 @@ operadora; restrição editar/excluir só pelo criador.
    - Limitação conhecida (refinar): sem transação no salvar — em falha
      parcial, plano e metas podem ficar dessincronizados. Mitigar com RPC
      `save_plan_with_goals` em incremento dedicado se ficar crítico.
-7. Evolução diária (form estruturado + regras de blindagem + assinatura).
+7. [FEITO] Evolução diária (form estruturado em 5 seções, validação Zod
+   completa, regras de blindagem: anti-duplicidade por sobreposição de
+   horário, duração mínima de 30min, bloqueio automático após 24h,
+   validação do responsável, assinatura). Operadora vs particular.
+   - Limitações conhecidas (refinar):
+     * Bloqueio 24h é client-side; uma trigger/RPC no Postgres daria
+       garantia server-side.
+     * UX do "adendo" (corrigir evolução bloqueada) ainda não implementada.
+     * Validação CID×procedimento (legado): exige base de CID; defer.
+     * Atualização automática de used_quantity da guia: defer (precisa
+       trigger ou RPC).
 8. Frequência/Presença (registro + justificativa).
 9. Evolução mensal (motor de geração automática + aprovação + PDF).
 10. Auditoria/Faturamento (checklist dinâmico + audit logs + dashboard).

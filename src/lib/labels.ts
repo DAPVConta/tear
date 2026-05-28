@@ -34,6 +34,41 @@ export const goalStatusLabels: Record<Enums<"goal_status">, string> = {
   descontinuada: "Descontinuada",
 };
 
+export const attendanceTypeLabels: Record<Enums<"attendance_type">, string> = {
+  individual_presencial: "Individual — presencial",
+  individual_domiciliar: "Individual — domiciliar",
+  individual_escolar: "Individual — escolar",
+  grupo_presencial: "Grupo — presencial",
+};
+
+export const promptingLevelLabels: Record<Enums<"prompting_level">, string> = {
+  fisica_total: "Ajuda física total",
+  fisica_parcial: "Ajuda física parcial",
+  gestual: "Ajuda gestual",
+  verbal: "Ajuda verbal",
+  independente: "Independente",
+};
+
+export const evolutionAssessmentLabels: Record<
+  Enums<"evolution_assessment">,
+  string
+> = {
+  evolucao_significativa: "Evolução significativa",
+  evolucao_leve: "Evolução leve",
+  estavel: "Estável",
+  retrocesso_leve: "Retrocesso leve",
+  retrocesso_significativo: "Retrocesso significativo",
+};
+
+export const guardianValidationMethodLabels: Record<
+  Enums<"guardian_validation_method">,
+  string
+> = {
+  assinatura_digital: "Assinatura digital",
+  token: "Token",
+  presencial: "Presencial",
+};
+
 export const specialtyLabels: Record<Enums<"specialty">, string> = {
   psicologia_aba: "Psicologia (ABA)",
   fonoaudiologia: "Fonoaudiologia",

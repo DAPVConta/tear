@@ -17,6 +17,8 @@ const AuthorizationsList = lazy(() => import("@/pages/authorizations/Authorizati
 const AuthorizationForm = lazy(() => import("@/pages/authorizations/AuthorizationForm"));
 const PlansList = lazy(() => import("@/pages/plans/PlansList"));
 const PlanForm = lazy(() => import("@/pages/plans/PlanForm"));
+const DailyEvolutionsList = lazy(() => import("@/pages/evolutions/DailyEvolutionsList"));
+const DailyEvolutionForm = lazy(() => import("@/pages/evolutions/DailyEvolutionForm"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 function PageLoader() {
@@ -57,10 +59,9 @@ export default function App() {
               <Route path="/planos" element={<PlansList />} />
               <Route path="/planos/novo" element={<PlanForm />} />
               <Route path="/planos/:id" element={<PlanForm />} />
-              <Route
-                path="/evolucoes"
-                element={<Placeholder title="Evolução diária" description="Registro estruturado das sessões." />}
-              />
+              <Route path="/evolucoes" element={<DailyEvolutionsList />} />
+              <Route path="/evolucoes/nova" element={<DailyEvolutionForm />} />
+              <Route path="/evolucoes/:id" element={<DailyEvolutionForm />} />
               <Route
                 path="/evolucao-mensal"
                 element={<Placeholder title="Evolução mensal" description="Síntese mensal automática." />}
