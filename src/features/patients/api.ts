@@ -7,6 +7,12 @@ import type { Tables, TablesInsert, TablesUpdate } from "@/types/database";
 export type Patient = Tables<"patients">;
 export const PATIENTS_PAGE_SIZE = 10;
 
+// Remove caracteres reservados do PostgREST para impedir que o termo de busca
+// quebre/reescreva a árvore de filtros do `.or()` (vírgula, parênteses, %, * etc.).
+function sanitizeSearch(term: string): string {
+  return term.replace(/[,()%*:\\"]/g, " ").trim();
+}
+
 type ListParams = { search: string; page: number };
 
 export function usePatients({ search, page }: ListParams) {
@@ -28,7 +34,7 @@ export function usePatients({ search, page }: ListParams) {
         .order("name", { ascending: true })
         .range(from, to);
 
-      const term = search.trim();
+      const term = sanitizeSearch(search);
       if (term) {
         query = query.or(
           `name.ilike.%${term}%,guardian_name.ilike.%${term}%,cpf.ilike.%${term}%`,
@@ -52,6 +58,7 @@ export function usePatient(id: number | undefined) {
         .from("patients")
         .select("*")
         .eq("id", id!)
+        .eq("clinic_id", clinic!.id)
         .maybeSingle();
       if (error) throw error;
       return data;
@@ -85,12 +92,15 @@ export function useCreatePatient() {
 
 export function useUpdatePatient(id: number) {
   const queryClient = useQueryClient();
+  const { clinic } = useClinic();
   return useMutation({
     mutationFn: async (values: TablesUpdate<"patients">) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
       const { data, error } = await supabase
         .from("patients")
         .update(values)
         .eq("id", id)
+        .eq("clinic_id", clinic.id)
         .select()
         .single();
       if (error) throw error;
@@ -105,12 +115,15 @@ export function useUpdatePatient(id: number) {
 
 export function useDeactivatePatient() {
   const queryClient = useQueryClient();
+  const { clinic } = useClinic();
   return useMutation({
     mutationFn: async (id: number) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
       const { error } = await supabase
         .from("patients")
         .update({ active: false })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("clinic_id", clinic.id);
       if (error) throw error;
     },
     onSuccess: () => {

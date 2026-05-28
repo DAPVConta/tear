@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -73,6 +73,11 @@ export default function PatientsList() {
     () => Math.max(1, Math.ceil((data?.total ?? 0) / PATIENTS_PAGE_SIZE)),
     [data?.total],
   );
+
+  // Evita página órfã após arquivar o último item de uma página.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   function onSearchChange(value: string) {
     setSearchInput(value);
