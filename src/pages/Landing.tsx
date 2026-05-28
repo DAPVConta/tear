@@ -30,7 +30,7 @@ export default function Landing() {
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Button asChild variant="brand" size="lg">
-            <Link to="/dashboard">
+            <Link to="/login">
               Entrar <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
@@ -59,7 +59,7 @@ export default function Landing() {
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button asChild variant="brand" size="lg">
-                <Link to="/dashboard">
+                <Link to="/login">
                   Começar agora <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>

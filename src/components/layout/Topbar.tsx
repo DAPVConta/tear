@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { Search, Menu, ChevronDown, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
@@ -10,8 +11,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/providers/AuthProvider";
+import { useClinic } from "@/providers/ClinicProvider";
+
+function initials(value: string | null | undefined, fallback: string) {
+  if (!value) return fallback;
+  const parts = value.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase() || fallback;
+}
 
 export function Topbar({ onOpenMobile }: { onOpenMobile: () => void }) {
+  const navigate = useNavigate();
+  const { profile, user, signOut } = useAuth();
+  const { clinic } = useClinic();
+
+  const displayName = profile?.name || user?.email || "Usuário";
+
+  async function handleLogout() {
+    await signOut();
+    navigate("/login", { replace: true });
+  }
+
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-lg lg:px-6">
       <Button
@@ -24,16 +46,17 @@ export function Topbar({ onOpenMobile }: { onOpenMobile: () => void }) {
         <Menu className="h-5 w-5" />
       </Button>
 
-      {/* Seletor de clínica (multi-tenant) — placeholder no Inc. 1 */}
-      <button className="hidden items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-semibold shadow-soft transition-colors hover:bg-secondary sm:flex">
+      {/* Clínica atual (multi-tenant) */}
+      <div className="hidden items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-semibold shadow-soft sm:flex">
         <span className="grid h-6 w-6 place-items-center rounded-md bg-brand-gradient text-[10px] font-bold text-white">
-          C
+          {initials(clinic?.name, "C")}
         </span>
-        <span className="max-w-[12rem] truncate">Minha Clínica</span>
+        <span className="max-w-[12rem] truncate">
+          {clinic?.name ?? "Minha Clínica"}
+        </span>
         <ChevronDown className="h-4 w-4 text-muted-foreground" />
-      </button>
+      </div>
 
-      {/* Busca */}
       <button className="group ml-auto flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground shadow-soft transition-colors hover:bg-secondary md:ml-0">
         <Search className="h-4 w-4" />
         <span className="flex-1 text-left">Buscar...</span>
@@ -48,17 +71,24 @@ export function Topbar({ onOpenMobile }: { onOpenMobile: () => void }) {
           <DropdownMenuTrigger asChild>
             <button className="ml-1 flex items-center gap-2 rounded-full outline-none ring-ring focus-visible:ring-2">
               <Avatar className="h-9 w-9 ring-2 ring-border">
-                <AvatarFallback>TR</AvatarFallback>
+                <AvatarFallback>{initials(displayName, "TR")}</AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Minha conta</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              <span className="block truncate font-semibold normal-case text-foreground">
+                {displayName}
+              </span>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate("/configuracoes")}>
               <User /> Perfil
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              onSelect={handleLogout}
+              className="text-destructive focus:text-destructive"
+            >
               <LogOut /> Sair
             </DropdownMenuItem>
           </DropdownMenuContent>

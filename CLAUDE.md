@@ -145,10 +145,20 @@ papéis: platform_admin, clinic_admin, therapist, receptionist; particular vs
 operadora; restrição editar/excluir só pelo criador.
 
 ### Plano de incrementos (um PR pequeno por peça)
-1. Fundação: Vite6+React18+TS, Tailwind3+shadcn, tokens/fontes TEAR, Router,
-   React Query, Supabase client, layout base + Landing.
-2. Banco + Auth + Multi-tenant: migrações (enums, tabelas c/ tenant_id), RLS,
-   Supabase Auth, onboarding/criação de clínica, papéis.
+1. [FEITO] Fundação: Vite6+React18+TS, Tailwind3+shadcn, tokens/fontes TEAR,
+   Router, React Query, Supabase client, layout base + Landing.
+2. [FEITO] Banco + Auth + Multi-tenant: migrações Supabase (enums, 12 tabelas
+   c/ clinic_id), RLS por clínica (funções is_clinic_member/admin/platform_admin),
+   RPC create_clinic, Supabase Auth (login/cadastro), onboarding, guards de rota,
+   AuthProvider + ClinicProvider. Tipos em src/types/database.ts.
+   - NOTA env: app exige VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY em runtime
+     (local .env + Vercel Settings → Environment Variables); senão tela branca.
+   - LIMITAÇÃO conhecida (refinar depois): profiles_select só expõe o próprio
+     perfil; membros da mesma clínica ainda não veem nome um do outro. Ajustar
+     ao implementar gestão de membros.
+   - INTEGRIDADE (refinar): RLS valida membership por clinic_id, não a coerência
+     entre clinic_id e FKs (ex.: goal.clinic_id vs plan.clinic_id). Sem vazamento
+     entre tenants; adicionar checks/triggers se necessário.
 3. Pacientes (CRUD, máscaras, validação PT-BR, paginação server-side).
 4. Profissionais (CRUD, especialidades, conselho).
 5. Guias/Autorizações (CRUD, status, alerta vencimento).
