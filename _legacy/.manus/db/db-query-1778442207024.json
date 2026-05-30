@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE therapeutic_plans SET title = 'PTS - ABA - Comunicação Funcional' WHERE id = 1; UPDATE therapeutic_plans SET title = 'PTS - Psicopedagogia - Habilidades Cognitivas' WHERE id = 2;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user fPpLjMz7cTwVpCq.402a577e517c --database ZtPXefNGUgtV4fQsKuYU5M --execute UPDATE therapeutic_plans SET title = 'PTS - ABA - Comunicação Funcional' WHERE id = 1; UPDATE therapeutic_plans SET title = 'PTS - Psicopedagogia - Habilidades Cognitivas' WHERE id = 2;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 278
+}

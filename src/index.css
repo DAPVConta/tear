@@ -1,0 +1,125 @@
+@import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700;6..12,800&family=Outfit:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 99%;
+    --foreground: 223 64% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 223 64% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 223 64% 12%;
+
+    /* Azul Escuro #001F6B */
+    --primary: 223 100% 21%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 214 32% 95%;
+    --secondary-foreground: 223 47% 20%;
+
+    --muted: 214 32% 95%;
+    --muted-foreground: 215 18% 45%;
+
+    /* Azul Claro #1E88FF */
+    --accent: 212 100% 56%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Ciano #45C7FF */
+    --info: 198 100% 64%;
+    --info-foreground: 223 64% 12%;
+
+    /* Amarelo #FFC400 */
+    --warning: 46 100% 50%;
+    --warning-foreground: 223 64% 12%;
+
+    /* Vermelho #FF2D2D */
+    --destructive: 0 100% 59%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 212 100% 56%;
+
+    --radius: 0.875rem;
+
+    /* Sidebar imponente — azul escuro da marca */
+    --sidebar: 223 100% 21%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-accent: 212 100% 56%;
+    --sidebar-border: 223 55% 30%;
+  }
+
+  .dark {
+    --background: 224 47% 8%;
+    --foreground: 210 40% 96%;
+
+    --card: 224 40% 11%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 224 40% 11%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 212 100% 56%;
+    --primary-foreground: 224 47% 8%;
+
+    --secondary: 223 30% 18%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 223 30% 18%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 212 100% 56%;
+    --accent-foreground: 224 47% 8%;
+
+    --info: 198 100% 64%;
+    --info-foreground: 224 47% 8%;
+
+    --warning: 46 100% 50%;
+    --warning-foreground: 224 47% 8%;
+
+    --destructive: 0 100% 59%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 223 30% 20%;
+    --input: 223 30% 20%;
+    --ring: 212 100% 56%;
+
+    --sidebar: 224 60% 6%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-accent: 212 100% 56%;
+    --sidebar-border: 223 40% 16%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "ss01", "cv01";
+  }
+  h1, h2, h3, h4, h5 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .bg-grid {
+    background-image: linear-gradient(
+        to right,
+        hsl(var(--border) / 0.5) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+}

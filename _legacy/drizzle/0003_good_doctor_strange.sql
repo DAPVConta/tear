@@ -1,0 +1,1 @@
+ALTER TABLE `patients` MODIFY COLUMN `diagnosis` text;
