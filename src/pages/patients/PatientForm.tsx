@@ -226,7 +226,7 @@ export default function PatientForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
-            <SectionTitle icon={User}>Dados do paciente</SectionTitle>
+            <SectionTitle icon={User}>Dados do Paciente</SectionTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="Nome completo" error={errors.name?.message} className="sm:col-span-2">
@@ -245,7 +245,7 @@ export default function PatientForm() {
                 )}
               />
             </Field>
-            <Field label="Sexo" error={errors.gender?.message}>
+            <Field label="Gênero" error={errors.gender?.message}>
               <Controller
                 control={control}
                 name="gender"
@@ -284,7 +284,7 @@ export default function PatientForm() {
 
         <Card>
           <CardHeader>
-            <SectionTitle icon={Users}>Responsável</SectionTitle>
+            <SectionTitle icon={Users}>Responsável Legal</SectionTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="Nome do responsável" error={errors.guardian_name?.message} className="sm:col-span-2">
@@ -326,7 +326,7 @@ export default function PatientForm() {
 
         <Card>
           <CardHeader>
-            <SectionTitle icon={CreditCard}>Pagamento e plano</SectionTitle>
+            <SectionTitle icon={CreditCard}>Tipo de Atendimento</SectionTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="Tipo de pagamento" error={errors.payment_type?.message}>
@@ -351,10 +351,10 @@ export default function PatientForm() {
             </Field>
             {paymentType === "operadora" && (
               <>
-                <Field label="Operadora / plano">
-                  <Input {...register("health_plan_name")} placeholder="Nome da operadora" />
+                <Field label="Nome do plano de saúde">
+                  <Input {...register("health_plan_name")} placeholder="Ex: Unimed, Bradesco Saúde" />
                 </Field>
-                <Field label="Carteirinha">
+                <Field label="Número da carteirinha">
                   <Input {...register("health_plan_card")} placeholder="Número da carteirinha" />
                 </Field>
               </>
@@ -364,7 +364,7 @@ export default function PatientForm() {
 
         <Card>
           <CardHeader>
-            <SectionTitle icon={Stethoscope}>Diagnóstico</SectionTitle>
+            <SectionTitle icon={Stethoscope}>Diagnóstico TEA</SectionTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="CID-10 principal" error={errors.cid10_primary?.message}>
@@ -393,7 +393,7 @@ export default function PatientForm() {
                 )}
               />
             </Field>
-            <Field label="Observações do diagnóstico" className="sm:col-span-2">
+            <Field label="Diagnóstico complementar" className="sm:col-span-2">
               <textarea
                 {...register("diagnosis")}
                 rows={3}
