@@ -126,7 +126,8 @@ export function buildMonthlySummary({
 }: SummaryInput): SummaryOutput {
   const monthName = MONTH_NAMES_PT[month - 1] ?? "";
 
-  const total = attendances.length;
+  // Frequência (controle de presença) — base das presenças/ausências.
+  const attendanceTotal = attendances.length;
   const present = attendances.filter((a) => a.status === "presente").length;
   const justified = attendances.filter(
     (a) => a.status === "falta_justificada",
@@ -138,8 +139,11 @@ export function buildMonthlySummary({
     (a) =>
       a.status === "cancelado_clinica" || a.status === "cancelado_paciente",
   ).length;
-  const absent = total - present;
-  const presenceRate = pct(present, total);
+  const absent = attendanceTotal - present;
+  const presenceRate = pct(present, attendanceTotal);
+
+  // Total de sessões = nº de evoluções diárias registradas (igual ao legado).
+  const sessions = evolutions.length;
 
   // Ordena evoluções por data para tendências.
   const ordered = [...evolutions].sort((a, b) =>
@@ -186,9 +190,9 @@ export function buildMonthlySummary({
 
   // 1. Síntese
   lines.push("SÍNTESE DO PERÍODO");
-  if (total === 0) {
+  if (sessions === 0 && attendanceTotal === 0) {
     lines.push(
-      `Em ${monthName}/${year}, não houve sessões registradas no controle de frequência para ${patientName}.`,
+      `Em ${monthName}/${year}, não houve sessões nem registros de frequência para ${patientName}.`,
     );
   } else {
     const justifiedNote =
@@ -200,8 +204,8 @@ export function buildMonthlySummary({
         ? ` Houve ${canceled} cancelamento${canceled === 1 ? "" : "s"} no período.`
         : "";
     lines.push(
-      `Em ${monthName}/${year}, ${patientName} teve ${total} sessões agendadas com ${professionalName}, ` +
-        `com ${present} presenças (${presenceRate}%) e ${absent} ausência${absent === 1 ? "" : "s"}${justifiedNote}.${canceledNote}`,
+      `Em ${monthName}/${year}, ${patientName} teve ${sessions} ${sessions === 1 ? "sessão registrada" : "sessões registradas"} com ${professionalName}. ` +
+        `No controle de frequência: ${present} presença${present === 1 ? "" : "s"} (${presenceRate}%) e ${absent} ausência${absent === 1 ? "" : "s"} em ${attendanceTotal} agendamento${attendanceTotal === 1 ? "" : "s"}${justifiedNote}.${canceledNote}`,
     );
   }
   if (assessmentDominant) {
@@ -266,7 +270,7 @@ export function buildMonthlySummary({
       `${unjustified} ausência${unjustified === 1 ? "" : "s"} sem justificativa — recomenda-se acompanhamento com o responsável.`,
     );
   }
-  if (total > 0 && presenceRate < 70) {
+  if (attendanceTotal > 0 && presenceRate < 70) {
     challenges.push(
       `Taxa de presença de ${presenceRate}% está abaixo de 70% e pode comprometer a progressão terapêutica.`,
     );
@@ -293,12 +297,12 @@ export function buildMonthlySummary({
     (assessmentTrend === "positive" ? 1 : 0) +
     (promptingTrend === "positive" ? 1 : 0) +
     (goalsAcquired.length > 0 ? 1 : 0) +
-    (total > 0 && presenceRate >= 85 ? 1 : 0);
+    (attendanceTotal > 0 && presenceRate >= 85 ? 1 : 0);
   const negatives =
     (assessmentTrend === "negative" ? 1 : 0) +
     (promptingTrend === "negative" ? 1 : 0) +
     (incidentsCount > 2 ? 1 : 0) +
-    (total > 0 && presenceRate < 70 ? 1 : 0);
+    (attendanceTotal > 0 && presenceRate < 70 ? 1 : 0);
   if (positives > negatives && positives >= 2) {
     lines.push(
       `Avaliação geral positiva do período. Os indicadores sugerem boa adesão e evolução clínica para ${patientName}.`,
@@ -316,7 +320,7 @@ export function buildMonthlySummary({
   // 6. Recomendações
   lines.push("\nRECOMENDAÇÕES");
   const recs: string[] = [];
-  if (total > 0 && presenceRate < 80) {
+  if (attendanceTotal > 0 && presenceRate < 80) {
     recs.push(
       "Reforçar o vínculo com a família para melhorar a adesão às sessões.",
     );
@@ -349,7 +353,7 @@ export function buildMonthlySummary({
   lines.push(...recs.map((r) => `• ${r}`));
 
   return {
-    totals: { total, present, absent },
+    totals: { total: sessions, present, absent },
     text: lines.join("\n"),
   };
 }
