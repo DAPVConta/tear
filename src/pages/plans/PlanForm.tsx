@@ -202,7 +202,7 @@ export default function PlanForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Dados do plano</CardTitle>
+            <CardTitle>Dados do Plano</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="Paciente" error={errors.patient_id?.message}>
@@ -223,7 +223,7 @@ export default function PlanForm() {
                 )}
               />
             </Field>
-            <Field label="Profissional responsável" error={errors.professional_id?.message}>
+            <Field label="Profissional Responsável" error={errors.professional_id?.message}>
               <Controller
                 control={control}
                 name="professional_id"
@@ -241,10 +241,10 @@ export default function PlanForm() {
                 )}
               />
             </Field>
-            <Field label="Título do plano" error={errors.title?.message} className="sm:col-span-2">
-              <Input {...register("title")} placeholder="Ex.: PTS — Comunicação e autonomia" />
+            <Field label="Título do Plano" error={errors.title?.message} className="sm:col-span-2">
+              <Input {...register("title")} placeholder="Ex: PTS - Terapia ABA - Comunicação Funcional" />
             </Field>
-            <Field label="Início" error={errors.start_date?.message}>
+            <Field label="Data início" error={errors.start_date?.message}>
               <Controller
                 control={control}
                 name="start_date"
@@ -257,7 +257,7 @@ export default function PlanForm() {
                 )}
               />
             </Field>
-            <Field label="Término (opcional)" error={errors.end_date?.message}>
+            <Field label="Data fim (opcional)" error={errors.end_date?.message}>
               <Controller
                 control={control}
                 name="end_date"
@@ -273,7 +273,7 @@ export default function PlanForm() {
             <Field label="Frequência" error={errors.frequency?.message}>
               <Input {...register("frequency")} placeholder="Ex.: 2x por semana" />
             </Field>
-            <Field label="Duração da sessão (min)" error={errors.session_duration?.message}>
+            <Field label="Duração sessão (min)" error={errors.session_duration?.message}>
               <Input type="number" min={1} {...register("session_duration")} />
             </Field>
             {isEdit && (
@@ -298,12 +298,12 @@ export default function PlanForm() {
                 />
               </Field>
             )}
-            <Field label="Objetivo geral" error={errors.general_objective?.message} className="sm:col-span-2">
+            <Field label="Objetivo geral do plano" error={errors.general_objective?.message} className="sm:col-span-2">
               <textarea
                 {...register("general_objective")}
                 rows={3}
                 className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                placeholder="Objetivo terapêutico geral do plano"
+                placeholder="Descreva o objetivo geral do plano terapêutico. Ex: Desenvolver habilidades de comunicação funcional, ampliando o repertório verbal e a interação social em contextos naturais."
               />
             </Field>
           </CardContent>
@@ -311,14 +311,14 @@ export default function PlanForm() {
 
         <Card>
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Metas terapêuticas</CardTitle>
+            <CardTitle>Metas Terapêuticas</CardTitle>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => append(emptyGoal)}
             >
-              <Plus className="h-4 w-4" /> Adicionar meta
+              <Plus className="h-4 w-4" /> Adicionar Meta
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -355,13 +355,13 @@ export default function PlanForm() {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field
-                    label="Descrição"
+                    label="Descrição da meta"
                     error={errors.goals?.[index]?.description?.message}
                     className="sm:col-span-2"
                   >
                     <Input
                       {...register(`goals.${index}.description`)}
-                      placeholder="Descrição da meta"
+                      placeholder="Ex: O paciente deverá solicitar itens desejados utilizando frases de 2 palavras de forma espontânea em pelo menos 3 contextos diferentes."
                     />
                   </Field>
                   <Field label="Categoria" error={errors.goals?.[index]?.category?.message}>
@@ -405,12 +405,12 @@ export default function PlanForm() {
                     />
                   </Field>
                   <Field
-                    label="Critério de alcance"
+                    label="Critério de aquisição"
                     error={errors.goals?.[index]?.target_criteria?.message}
                   >
                     <Input
                       {...register(`goals.${index}.target_criteria`)}
-                      placeholder="Ex.: 80% de acertos em 3 sessões"
+                      placeholder="Ex: 80% de acerto em 3 sessões consecutivas"
                     />
                   </Field>
                   <Field label="Progresso (%)" error={errors.goals?.[index]?.current_progress?.message}>

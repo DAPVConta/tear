@@ -355,7 +355,7 @@ export default function DailyEvolutionForm() {
     <div>
       <PageHeader
         title={isEdit ? "Editar evolução" : "Nova evolução"}
-        description="Registro estruturado da sessão clínica."
+        description="Campos com * são obrigatórios para blindagem de auditoria."
         actions={
           <div className="flex items-center gap-2">
             {locked && (
@@ -379,7 +379,7 @@ export default function DailyEvolutionForm() {
         <fieldset disabled={fieldsDisabled} className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Sessão</CardTitle>
+              <CardTitle>Dados da Sessão</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <Field label="Paciente" error={errors.patient_id?.message}>
@@ -457,10 +457,10 @@ export default function DailyEvolutionForm() {
                   )}
                 />
               </Field>
-              <Field label="Início" error={errors.start_time?.message}>
+              <Field label="Hora início" error={errors.start_time?.message}>
                 <Input type="time" {...register("start_time")} />
               </Field>
-              <Field label="Término" error={errors.end_time?.message}>
+              <Field label="Hora fim" error={errors.end_time?.message}>
                 <Input type="time" {...register("end_time")} />
                 <p className="mt-1 text-xs text-muted-foreground">
                   Duração: {duration > 0 ? `${duration} min` : "—"}
@@ -484,7 +484,7 @@ export default function DailyEvolutionForm() {
               </Field>
 
               {!isPrivate && (
-                <Field label="Guia ativa" error={errors.authorization_id?.message} className="sm:col-span-2">
+                <Field label="Guia/autorização" error={errors.authorization_id?.message} className="sm:col-span-2">
                   <Controller
                     control={control}
                     name="authorization_id"
@@ -512,7 +512,7 @@ export default function DailyEvolutionForm() {
                 </Field>
               )}
 
-              <Field label="Plano terapêutico" className="sm:col-span-2">
+              <Field label="Plano terapêutico (PTS)" className="sm:col-span-2">
                 <Controller
                   control={control}
                   name="plan_id"
@@ -548,7 +548,7 @@ export default function DailyEvolutionForm() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Trabalho realizado</CardTitle>
+              <CardTitle>Habilidades Trabalhadas</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {selectedPlanGoals.length > 0 ? (
@@ -590,7 +590,7 @@ export default function DailyEvolutionForm() {
                 </p>
               )}
 
-              <Field label="Habilidades trabalhadas">
+              <Field label="Registro de habilidades e nível de suporte">
                 <Controller
                   control={control}
                   name="skills_worked"
@@ -604,7 +604,7 @@ export default function DailyEvolutionForm() {
                 />
               </Field>
 
-              <Field label="Nível de ajuda predominante" error={errors.prompting_level?.message}>
+              <Field label="Nível de suporte geral da sessão" error={errors.prompting_level?.message}>
                 <Controller
                   control={control}
                   name="prompting_level"
@@ -629,31 +629,31 @@ export default function DailyEvolutionForm() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Comportamento e ocorrências</CardTitle>
+              <CardTitle>Registro Comportamental</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <Field label="Notas comportamentais">
+              <Field label="Comportamentos barreira observados">
                 <textarea
                   {...register("behavioral_notes")}
                   rows={3}
                   className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Comportamentos observados"
+                  placeholder="Descreva comportamentos desafiadores observados durante a sessão..."
                 />
               </Field>
-              <Field label="Intervenção realizada">
+              <Field label="Intervenções de manejo realizadas">
                 <textarea
                   {...register("behavioral_intervention")}
                   rows={3}
                   className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Estratégia aplicada"
+                  placeholder="Descreva as intervenções comportamentais aplicadas..."
                 />
               </Field>
-              <Field label="Incidentes (opcional)" className="sm:col-span-2">
+              <Field label="Intercorrências" className="sm:col-span-2">
                 <textarea
                   {...register("incidents")}
                   rows={2}
                   className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Qualquer ocorrência relevante"
+                  placeholder="Registre intercorrências, se houver..."
                 />
               </Field>
             </CardContent>
@@ -661,15 +661,15 @@ export default function DailyEvolutionForm() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Síntese</CardTitle>
+              <CardTitle>Síntese da Sessão</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <Field label="Resumo da sessão" error={errors.session_summary?.message} className="sm:col-span-2">
+              <Field label="Síntese/observações clínicas" error={errors.session_summary?.message} className="sm:col-span-2">
                 <textarea
                   {...register("session_summary")}
                   rows={4}
                   className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Síntese do que foi trabalhado e como o paciente respondeu"
+                  placeholder="Descreva detalhadamente o que foi trabalhado, respostas do paciente e observações relevantes..."
                 />
               </Field>
               <Field label="Avaliação de evolução" error={errors.evolution_assessment?.message}>
@@ -692,15 +692,15 @@ export default function DailyEvolutionForm() {
                   )}
                 />
               </Field>
-              <Field label="Próxima sessão (plano)" error={errors.next_session_plan?.message}>
-                <Input {...register("next_session_plan")} placeholder="O que será trabalhado" />
+              <Field label="Plano para próxima sessão" error={errors.next_session_plan?.message}>
+                <Input {...register("next_session_plan")} placeholder="Descreva a conduta e plano para a próxima sessão..." />
               </Field>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Validação do responsável</CardTitle>
+              <CardTitle>Validação de Presença</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <Field label="Presença do responsável validada?" className="sm:col-span-2">
@@ -713,7 +713,7 @@ export default function DailyEvolutionForm() {
                         checked={field.value}
                         onCheckedChange={(v) => field.onChange(Boolean(v))}
                       />
-                      Sim, a presença do responsável foi validada
+                      Confirmo a presença/validação do responsável pelo paciente
                     </label>
                   )}
                 />

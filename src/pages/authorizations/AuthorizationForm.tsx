@@ -159,7 +159,7 @@ export default function AuthorizationForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Dados da guia</CardTitle>
+            <CardTitle>Dados da Guia TISS</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="Paciente" error={errors.patient_id?.message}>
@@ -196,7 +196,7 @@ export default function AuthorizationForm() {
                 )}
               />
             </Field>
-            <Field label="Validade" error={errors.expiration_date?.message}>
+            <Field label="Data de validade" error={errors.expiration_date?.message}>
               <Controller
                 control={control}
                 name="expiration_date"
@@ -243,7 +243,7 @@ export default function AuthorizationForm() {
                 )}
               />
             </Field>
-            <Field label="Quantidade autorizada" error={errors.authorized_quantity?.message}>
+            <Field label="Qtd sessões autorizadas" error={errors.authorized_quantity?.message}>
               <Input type="number" min={1} {...register("authorized_quantity")} />
             </Field>
             {isEdit && (
