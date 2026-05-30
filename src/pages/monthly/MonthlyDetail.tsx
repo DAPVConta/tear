@@ -34,6 +34,10 @@ import {
 } from "@/features/monthlyEvolutions/api";
 import { useClinic } from "@/providers/ClinicProvider";
 import { exportMonthlyEvolutionPDF } from "@/lib/pdf";
+import { specialtyLabels } from "@/lib/labels";
+import { ReportDocument } from "./ReportDocument";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 type FormValues = {
   professional_review: string;
@@ -125,6 +129,11 @@ export default function MonthlyDetail() {
     ? (data.goals_progress as unknown as GoalProgress[])
     : [];
   const period = `${MONTH_NAMES_PT[data.reference_month - 1]} / ${data.reference_year}`;
+  const signatureSource =
+    data.approved && data.approved_at ? data.approved_at : data.created_at;
+  const signatureDate = format(new Date(signatureSource), "dd 'de' MMMM 'de' yyyy", {
+    locale: ptBR,
+  });
 
   return (
     <div>
@@ -150,29 +159,27 @@ export default function MonthlyDetail() {
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Síntese gerada</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
-              {data.generated_summary}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Atendimentos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <Metric label="Sessões" value={data.total_sessions} />
-              <Metric label="Presenças" value={data.total_present} tone="success" />
-              <Metric label="Ausências" value={data.total_absent} tone="muted" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-3">
+          <ReportDocument
+            clinicName={clinic?.name ?? "Clínica"}
+            patientName={data.patient?.name ?? "Paciente"}
+            professionalName={data.professional?.name ?? undefined}
+            professionalRole={
+              data.professional?.specialty
+                ? specialtyLabels[data.professional.specialty]
+                : undefined
+            }
+            period={period}
+            totals={{
+              sessions: data.total_sessions,
+              present: data.total_present,
+              absent: data.total_absent,
+            }}
+            summary={data.generated_summary}
+            approved={data.approved}
+            dateLabel={signatureDate}
+          />
+        </div>
 
         <Card className="lg:col-span-3">
           <CardHeader>
@@ -285,27 +292,3 @@ export default function MonthlyDetail() {
   );
 }
 
-function Metric({
-  label,
-  value,
-  tone = "primary",
-}: {
-  label: string;
-  value: number;
-  tone?: "primary" | "success" | "muted";
-}) {
-  const toneClass =
-    tone === "success"
-      ? "text-emerald-600"
-      : tone === "muted"
-        ? "text-muted-foreground"
-        : "text-primary";
-  return (
-    <div className="rounded-xl border border-border bg-background/60 p-4">
-      <p className={`text-3xl font-bold tabular-nums ${toneClass}`}>{value}</p>
-      <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-    </div>
-  );
-}

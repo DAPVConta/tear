@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { MONTH_NAMES_PT } from "@/features/monthlyEvolutions/api";
 import type { MonthlyRow, GoalProgress } from "@/features/monthlyEvolutions/api";
+import { specialtyLabels } from "@/lib/labels";
 
 const BRAND_DARK: [number, number, number] = [0, 31, 107];
 const BRAND_ACCENT: [number, number, number] = [30, 136, 255];
@@ -177,6 +178,37 @@ export function exportMonthlyEvolutionPDF(
     );
     doc.text(lines, margin, y + 14);
   }
+
+  // Assinatura do profissional responsável
+  const ph = doc.internal.pageSize.getHeight();
+  y += 48;
+  if (y > ph - 90) {
+    doc.addPage();
+    y = 90;
+  }
+  const role = monthly.professional?.specialty
+    ? specialtyLabels[monthly.professional.specialty]
+    : "";
+  const sigSource =
+    monthly.approved && monthly.approved_at
+      ? monthly.approved_at
+      : monthly.created_at;
+  const sigDate = new Date(sigSource).toLocaleDateString("pt-BR");
+  doc.setDrawColor(120);
+  doc.line(margin, y, margin + 240, y);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(0);
+  doc.text(monthly.professional?.name ?? "—", margin, y + 14);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(90);
+  if (role) doc.text(role, margin, y + 27);
+  doc.text(
+    `${monthly.approved ? "Aprovado e assinado" : "Emitido"} em ${sigDate}`,
+    margin,
+    y + (role ? 40 : 27),
+  );
 
   // Rodapé
   const pageHeight = doc.internal.pageSize.getHeight();
