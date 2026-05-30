@@ -140,11 +140,11 @@ export default function ProfessionalForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Dados do profissional</CardTitle>
+            <CardTitle>Dados Pessoais</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="Nome completo" error={errors.name?.message} className="sm:col-span-2">
-              <Input {...register("name")} placeholder="Nome do profissional" />
+              <Input {...register("name")} placeholder="Nome completo do profissional" />
             </Field>
             <Field label="CPF" error={errors.cpf?.message}>
               <Controller
@@ -185,10 +185,10 @@ export default function ProfessionalForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Conselho profissional</CardTitle>
+            <CardTitle>Registro Profissional</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-3">
-            <Field label="Conselho" error={errors.council_type?.message}>
+            <Field label="Tipo de conselho" error={errors.council_type?.message}>
               <Controller
                 control={control}
                 name="council_type"
@@ -209,9 +209,9 @@ export default function ProfessionalForm() {
               />
             </Field>
             <Field label="Número do registro" error={errors.council_number?.message}>
-              <Input {...register("council_number")} placeholder="00000" />
+              <Input {...register("council_number")} placeholder="Ex: 06/12345" />
             </Field>
-            <Field label="UF" error={errors.council_state?.message}>
+            <Field label="UF do conselho" error={errors.council_state?.message}>
               <Controller
                 control={control}
                 name="council_state"
