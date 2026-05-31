@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { keys } from "@/lib/queryKeys";
 import {
+  fetchActiveOptions,
   fetchPaginatedList,
   fetchRecordById,
   insertRecord,
@@ -136,16 +137,12 @@ export function useProfessionalOptions() {
   return useQuery({
     queryKey: keys.professionals.options(clinicId),
     enabled: !!clinicId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("professionals")
-        .select("id, name, specialty")
-        .eq("clinic_id", clinicId!)
-        .eq("active", true)
-        .order("name", { ascending: true });
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () =>
+      fetchActiveOptions<Pick<Professional, "id" | "name" | "specialty">>({
+        table: "professionals",
+        clinicId: clinicId!,
+        columns: "id, name, specialty",
+      }),
   });
 }
 
