@@ -346,10 +346,23 @@ operadora; restrição editar/excluir só pelo criador.
       Clínica / Via dos Pais) com identificação, os 3 campos e assinatura
       física do responsável.
 
+24. [FEITO — Correção #9] Frequência: ciência dos pais + atestado + cobrança.
+    - Colunas em attendance_records (migração 0018): absence_reason,
+      attachment_path, guardian_ack_method, notified_in_time, billable_absence
+      + bucket privado `attendance-attachments` (RLS por clinic_id).
+    - AttendanceForm: ciência do responsável com método de validação
+      (assinatura na tela/biometria/token/presencial); detalhamento dinâmico de
+      falta (motivo, justificativa, upload de atestado) e pergunta de aviso em
+      tempo hábil → marca `billable_absence` (falta tardia = faturável).
+    - AttendanceList: badge "Passível de cobrança".
+    - DEFER: gating de exportação de faturamento por "presença confirmada"
+      (integrar ao módulo de auditoria/BILLING_RULES, #10).
+
 Backlog de correções abertas: #3 evolução mensal (workflow coordenador + trava
 22 dias + assinatura + PDF), #4 aprovação do coordenador (parte do #3), #6
-especialidades multi-select + papéis de gestão (coordenador/supervisor), #9
-frequência (ciência dos pais + atestado + falta passível de cobrança).
+especialidades multi-select + papéis de gestão (coordenador/supervisor) — esta
+tem decisão de arquitetura (enum→array + novo modelo de papéis) e destrava
+#3/#4.
 
 Fase 2 restante: Asaas billing.
 

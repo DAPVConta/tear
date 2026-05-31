@@ -14,42 +14,57 @@ export type Database = {
     Tables: {
       attendance_records: {
         Row: {
+          absence_reason: string | null;
+          attachment_path: string | null;
           authorization_id: number | null;
+          billable_absence: boolean;
           clinic_id: number;
           created_at: string;
           evolution_id: number | null;
+          guardian_ack_method: string | null;
           guardian_signature: boolean;
           id: number;
           is_private: boolean;
           justification: string | null;
+          notified_in_time: boolean | null;
           patient_id: number;
           professional_id: number;
           session_date: string;
           status: Database["public"]["Enums"]["attendance_status"];
         };
         Insert: {
+          absence_reason?: string | null;
+          attachment_path?: string | null;
           authorization_id?: number | null;
+          billable_absence?: boolean;
           clinic_id: number;
           created_at?: string;
           evolution_id?: number | null;
+          guardian_ack_method?: string | null;
           guardian_signature?: boolean;
           id?: never;
           is_private?: boolean;
           justification?: string | null;
+          notified_in_time?: boolean | null;
           patient_id: number;
           professional_id: number;
           session_date: string;
           status: Database["public"]["Enums"]["attendance_status"];
         };
         Update: {
+          absence_reason?: string | null;
+          attachment_path?: string | null;
           authorization_id?: number | null;
+          billable_absence?: boolean;
           clinic_id?: number;
           created_at?: string;
           evolution_id?: number | null;
+          guardian_ack_method?: string | null;
           guardian_signature?: boolean;
           id?: never;
           is_private?: boolean;
           justification?: string | null;
+          notified_in_time?: boolean | null;
           patient_id?: number;
           professional_id?: number;
           session_date?: string;

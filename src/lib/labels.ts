@@ -45,6 +45,21 @@ export const attendanceStatusLabels: Record<
   cancelado_paciente: "Cancelado (paciente)",
 };
 
+// Frequência (#9) — armazenados como texto livre (sem enum no banco).
+export const absenceReasonLabels: Record<string, string> = {
+  doenca: "Doença",
+  viagem: "Viagem",
+  imprevisto_tecnico: "Imprevisto técnico",
+  outros: "Outros",
+};
+
+export const guardianAckMethodLabels: Record<string, string> = {
+  assinatura_tela: "Assinatura na tela/tablet",
+  biometria: "Biometria",
+  token: "Token / WhatsApp",
+  presencial: "Confirmação presencial",
+};
+
 export const attendanceTypeLabels: Record<Enums<"attendance_type">, string> = {
   individual_presencial: "Individual — presencial",
   individual_domiciliar: "Individual — domiciliar",
