@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,7 +11,9 @@ import {
   ArrowRight,
   Sparkles,
   MapPin,
+  LogIn,
 } from "lucide-react";
+import { useRedeemInvite } from "@/features/members/api";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/providers/AuthProvider";
 import { Logo } from "@/components/brand/Logo";
@@ -39,9 +41,32 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [inviteCode, setInviteCode] = useState(
+    (searchParams.get("invite") ?? "").toUpperCase(),
+  );
+  const redeem = useRedeemInvite();
+
+  async function onRedeem() {
+    const code = inviteCode.trim();
+    if (!code) {
+      toast.error("Informe o código do convite");
+      return;
+    }
+    try {
+      await redeem.mutateAsync(code);
+      toast.success("Você entrou na clínica!");
+      await queryClient.invalidateQueries({ queryKey: ["current-clinic"] });
+      navigate("/dashboard");
+    } catch (e) {
+      toast.error("Não foi possível entrar", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    }
+  }
 
   const {
     register,
@@ -172,6 +197,43 @@ export default function Onboarding() {
       </header>
 
       <main className="mx-auto flex max-w-xl flex-col px-6 py-12">
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+          <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+            <LogIn className="h-5 w-5 text-brand-blue-light" /> Tem um convite?
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Use o código que a clínica enviou para entrar na equipe.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Input
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+              placeholder="Código do convite"
+              className="font-mono tracking-wider"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onRedeem();
+              }}
+            />
+            <Button
+              type="button"
+              variant="brand"
+              onClick={onRedeem}
+              disabled={redeem.isPending}
+            >
+              {redeem.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Entrar"
+              )}
+            </Button>
+          </div>
+        </div>
+
+        <div className="my-8 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
+          <span className="h-px flex-1 bg-border" /> ou crie uma nova clínica{" "}
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
         <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-gradient text-white shadow-glow">
           <Building2 className="h-7 w-7" />
         </span>

@@ -168,6 +168,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      clinic_invites: {
+        Row: {
+          active: boolean;
+          clinic_id: number;
+          code: string;
+          created_at: string;
+          created_by: string | null;
+          expires_at: string | null;
+          id: number;
+          role: Database["public"]["Enums"]["member_role"];
+        };
+        Insert: {
+          active?: boolean;
+          clinic_id: number;
+          code: string;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at?: string | null;
+          id?: never;
+          role?: Database["public"]["Enums"]["member_role"];
+        };
+        Update: {
+          active?: boolean;
+          clinic_id?: number;
+          code?: string;
+          created_at?: string;
+          created_by?: string | null;
+          expires_at?: string | null;
+          id?: never;
+          role?: Database["public"]["Enums"]["member_role"];
+        };
+        Relationships: [];
+      };
       clinic_members: {
         Row: {
           active: boolean;
