@@ -39,7 +39,7 @@ import {
 import { DatePicker } from "@/components/ui/date-picker";
 import { FormLoadingSkeleton } from "@/components/form/FormLoadingSkeleton";
 import { maskCPF, maskCEP, maskPhone, unmask, isValidCPF } from "@/lib/masks";
-import { fetchCep } from "@/lib/brasilapi";
+import { useCepLookup } from "@/hooks/useCepLookup";
 import { genderLabels, paymentTypeLabels } from "@/lib/labels";
 import {
   usePatient,
@@ -163,7 +163,7 @@ export default function PatientForm() {
   const paymentType = watch("payment_type");
   const reportValidity = watch("report_validity_date");
   const [cep, setCep] = useState("");
-  const [cepLoading, setCepLoading] = useState(false);
+  const { loading: cepLoading, lookup: lookupCepInfo } = useCepLookup();
   const [reportFile, setReportFile] = useState<File | null>(null);
 
   const uploadReport = useUploadMedicalReport();
@@ -206,19 +206,8 @@ export default function PatientForm() {
     }
   }
 
-  async function lookupCep() {
-    const digits = unmask(cep);
-    if (digits.length !== 8) {
-      toast.error("Digite os 8 dígitos do CEP");
-      return;
-    }
-    setCepLoading(true);
-    try {
-      const info = await fetchCep(digits);
-      if (!info) {
-        toast.error("CEP não encontrado");
-        return;
-      }
+  function lookupCep() {
+    lookupCepInfo(cep, (info) => {
       const formatted = [
         info.street,
         info.neighborhood,
@@ -228,14 +217,7 @@ export default function PatientForm() {
         .filter(Boolean)
         .join(", ");
       setValue("address", formatted, { shouldDirty: true });
-      toast.success("Endereço preenchido");
-    } catch (e) {
-      toast.error("Falha ao consultar CEP", {
-        description: e instanceof Error ? e.message : undefined,
-      });
-    } finally {
-      setCepLoading(false);
-    }
+    });
   }
 
   async function onSubmit(values: FormValues) {
