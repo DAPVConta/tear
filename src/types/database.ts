@@ -493,6 +493,11 @@ export type Database = {
           id: number;
           name: string;
           payment_type: Database["public"]["Enums"]["payment_type"];
+          report_crm: string | null;
+          report_doctor: string | null;
+          report_issue_date: string | null;
+          report_path: string | null;
+          report_validity_date: string | null;
           updated_at: string;
         };
         Insert: {
@@ -516,6 +521,11 @@ export type Database = {
           id?: never;
           name: string;
           payment_type?: Database["public"]["Enums"]["payment_type"];
+          report_crm?: string | null;
+          report_doctor?: string | null;
+          report_issue_date?: string | null;
+          report_path?: string | null;
+          report_validity_date?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -539,6 +549,11 @@ export type Database = {
           id?: never;
           name?: string;
           payment_type?: Database["public"]["Enums"]["payment_type"];
+          report_crm?: string | null;
+          report_doctor?: string | null;
+          report_issue_date?: string | null;
+          report_path?: string | null;
+          report_validity_date?: string | null;
           updated_at?: string;
         };
         Relationships: [];

@@ -299,13 +299,7 @@ operadora; restrição editar/excluir só pelo criador.
       (some de listas/seleções); a revogação de acesso via Supabase Auth/
       clinic_members será feita quando o módulo de membros existir.
 
-Backlog de correções abertas (tabela public.corrections): #3 evolução mensal
-(workflow coordenador + trava 22 dias + assinatura + PDF), #4 aprovação do
-coordenador (parte do #3), #5 paciente (laudo + validade + OCR/IA — IA depende
-de definição de provedor, fase 2), #6 especialidades multi-select + papéis de
-gestão (coordenador/supervisor), #8 evolução "Devolutiva para os Pais"
-(tipo + layout + PDF 2 vias), #9 frequência (ciência dos pais + atestado +
-falta passível de cobrança).
+(Backlog de correções abertas consolidado ao fim desta seção.)
 
 21. [FEITO — Integração IA Claude] Edge Function `claude-analysis` (Supabase
     Functions, Deno + `@anthropic-ai/sdk`, modelo `claude-opus-4-8`): a chave
@@ -322,6 +316,29 @@ falta passível de cobrança).
     - PENDENTE: validar a chamada ponta-a-ponta no app (o sandbox de
       desenvolvimento bloqueia egress p/ *.supabase.co; a função em si roda na
       infra do Supabase, que alcança api.anthropic.com).
+
+22. [FEITO — Correção #5 (núcleo)] Laudo médico + OCR/IA:
+    - Campo de diagnóstico generalizado ("Diagnóstico / Condição de Saúde").
+    - Colunas do laudo em patients (report_doctor, report_crm,
+      report_issue_date, report_validity_date, report_path) + bucket privado
+      `medical-reports` (RLS por clinic_id) — migração 0016.
+    - Edge Function `claude-extract-laudo` (Claude vision/PDF, claude-opus-4-8):
+      extrai médico, CRM/UF, emissão e validade do laudo. Cenário A (validade
+      explícita) e Cenário B (sem validade → emissão + 1 ano). Campos sempre
+      editáveis.
+    - PatientForm: upload do laudo (PDF/imagem), botão "Ler com IA" que
+      preenche os campos, link assinado para o laudo atual e alerta de
+      vencimento (vencido / vence em ≤15 dias).
+    - DEFER (restante do #5): obrigatoriedade do laudo no cadastro,
+      notificação de vencimento na tela inicial e histórico permanente de
+      múltiplos laudos por paciente.
+
+Backlog de correções abertas (tabela public.corrections): #3 evolução mensal
+(workflow coordenador + trava 22 dias + assinatura + PDF), #4 aprovação do
+coordenador (parte do #3), #6 especialidades multi-select + papéis de gestão
+(coordenador/supervisor), #8 evolução "Devolutiva para os Pais" (tipo + layout
++ PDF 2 vias), #9 frequência (ciência dos pais + atestado + falta passível de
+cobrança).
 
 Fase 2 restante: Asaas billing.
 

@@ -13,6 +13,10 @@ import {
   Users,
   CreditCard,
   Stethoscope,
+  FileText,
+  Sparkles,
+  ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -41,7 +45,10 @@ import {
   usePatient,
   useCreatePatient,
   useUpdatePatient,
+  useUploadMedicalReport,
+  useMedicalReportUrl,
 } from "@/features/patients/api";
+import { useExtractLaudo } from "@/features/ai/api";
 
 const optionalCpf = z
   .string()
@@ -65,6 +72,10 @@ const schema = z.object({
   cid10_primary: z.string().min(1, "Informe o CID-10 principal"),
   cid10_secondary: z.string().optional(),
   diagnosis: z.string().optional(),
+  report_doctor: z.string().optional(),
+  report_crm: z.string().optional(),
+  report_issue_date: z.string().optional(),
+  report_validity_date: z.string().optional(),
   address: z.string().optional(),
 });
 type FormValues = z.infer<typeof schema>;
@@ -84,8 +95,24 @@ const defaults: FormValues = {
   cid10_primary: "",
   cid10_secondary: "",
   diagnosis: "",
+  report_doctor: "",
+  report_crm: "",
+  report_issue_date: "",
+  report_validity_date: "",
   address: "",
 };
+
+// Lê um File como base64 puro (sem o prefixo data:) para envio à Edge Function.
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(",")[1] ?? "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+const REPORT_ACCEPT = ".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*";
 
 export default function PatientForm() {
   const { id } = useParams();
@@ -124,14 +151,60 @@ export default function PatientForm() {
         cid10_primary: existing.cid10_primary,
         cid10_secondary: existing.cid10_secondary ?? "",
         diagnosis: existing.diagnosis ?? "",
+        report_doctor: existing.report_doctor ?? "",
+        report_crm: existing.report_crm ?? "",
+        report_issue_date: existing.report_issue_date ?? "",
+        report_validity_date: existing.report_validity_date ?? "",
         address: existing.address ?? "",
       });
     }
   }, [existing, reset]);
 
   const paymentType = watch("payment_type");
+  const reportValidity = watch("report_validity_date");
   const [cep, setCep] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
+  const [reportFile, setReportFile] = useState<File | null>(null);
+
+  const uploadReport = useUploadMedicalReport();
+  const extractLaudo = useExtractLaudo();
+  const { data: reportUrl } = useMedicalReportUrl(existing?.report_path);
+
+  // Dias até o vencimento do laudo (negativo = vencido).
+  const validityDays = reportValidity
+    ? Math.ceil(
+        (new Date(`${reportValidity}T00:00:00`).getTime() - Date.now()) /
+          86_400_000,
+      )
+    : null;
+
+  async function onReadLaudo() {
+    if (!reportFile) {
+      toast.error("Selecione o arquivo do laudo primeiro");
+      return;
+    }
+    try {
+      const fileBase64 = await fileToBase64(reportFile);
+      const mediaType = reportFile.type || "application/pdf";
+      const r = await extractLaudo.mutateAsync({ fileBase64, mediaType });
+      if (r.doctor) setValue("report_doctor", r.doctor, { shouldDirty: true });
+      if (r.crm_uf) setValue("report_crm", r.crm_uf, { shouldDirty: true });
+      if (r.issue_date)
+        setValue("report_issue_date", r.issue_date, { shouldDirty: true });
+      if (r.validity_date)
+        setValue("report_validity_date", r.validity_date, { shouldDirty: true });
+      toast.success("Laudo lido pela IA — confira e ajuste os campos", {
+        description:
+          r.validity_source === "computed"
+            ? "Validade estimada (emissão + 1 ano), pois não havia data explícita."
+            : undefined,
+      });
+    } catch (e) {
+      toast.error("Não foi possível ler o laudo", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    }
+  }
 
   async function lookupCep() {
     const digits = unmask(cep);
@@ -166,6 +239,18 @@ export default function PatientForm() {
   }
 
   async function onSubmit(values: FormValues) {
+    let reportPath = existing?.report_path ?? null;
+    try {
+      if (reportFile) {
+        reportPath = await uploadReport.mutateAsync(reportFile);
+      }
+    } catch (e) {
+      toast.error("Falha ao enviar o laudo", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+      return;
+    }
+
     const payload = {
       name: values.name,
       cpf: values.cpf ? unmask(values.cpf) : null,
@@ -183,6 +268,11 @@ export default function PatientForm() {
       cid10_primary: values.cid10_primary,
       cid10_secondary: values.cid10_secondary || null,
       diagnosis: values.diagnosis || null,
+      report_path: reportPath,
+      report_doctor: values.report_doctor || null,
+      report_crm: values.report_crm || null,
+      report_issue_date: values.report_issue_date || null,
+      report_validity_date: values.report_validity_date || null,
       address: values.address || null,
     };
 
@@ -364,7 +454,9 @@ export default function PatientForm() {
 
         <Card>
           <CardHeader>
-            <SectionTitle icon={Stethoscope}>Diagnóstico TEA</SectionTitle>
+            <SectionTitle icon={Stethoscope}>
+              Diagnóstico / Condição de Saúde
+            </SectionTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <Field label="CID-10 principal" error={errors.cid10_primary?.message}>
@@ -431,6 +523,105 @@ export default function PatientForm() {
                 placeholder="Rua, número, bairro, cidade"
               />
             </Field>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <SectionTitle icon={FileText}>Laudo médico</SectionTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+              <Field label="Arquivo do laudo (PDF ou imagem)">
+                <input
+                  type="file"
+                  accept={REPORT_ACCEPT}
+                  onChange={(e) => setReportFile(e.target.files?.[0] ?? null)}
+                  className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-secondary/70"
+                />
+              </Field>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onReadLaudo}
+                disabled={!reportFile || extractLaudo.isPending}
+              >
+                {extractLaudo.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 text-brand-blue-light" />
+                )}
+                Ler com IA
+              </Button>
+            </div>
+
+            {existing?.report_path && (
+              <p className="text-xs text-muted-foreground">
+                Laudo atual:{" "}
+                {reportUrl ? (
+                  <a
+                    href={reportUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-accent hover:underline"
+                  >
+                    abrir documento <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  "carregando…"
+                )}
+                {reportFile && " — será substituído ao salvar."}
+              </p>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Médico assistente">
+                <Input
+                  {...register("report_doctor")}
+                  placeholder="Nome do médico que assina o laudo"
+                />
+              </Field>
+              <Field label="CRM/UF">
+                <Input {...register("report_crm")} placeholder="Ex: CRM/SP 123456" />
+              </Field>
+              <Field label="Data de emissão do laudo">
+                <Controller
+                  control={control}
+                  name="report_issue_date"
+                  render={({ field }) => (
+                    <DatePicker
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="dd/mm/aaaa"
+                    />
+                  )}
+                />
+              </Field>
+              <Field label="Data de validade do laudo">
+                <Controller
+                  control={control}
+                  name="report_validity_date"
+                  render={({ field }) => (
+                    <DatePicker
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="dd/mm/aaaa"
+                    />
+                  )}
+                />
+                {validityDays !== null && validityDays < 0 && (
+                  <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-destructive">
+                    <AlertTriangle className="h-3 w-3" /> Laudo vencido
+                  </p>
+                )}
+                {validityDays !== null && validityDays >= 0 && validityDays <= 15 && (
+                  <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[hsl(38_92%_42%)]">
+                    <AlertTriangle className="h-3 w-3" /> Vence em {validityDays}{" "}
+                    {validityDays === 1 ? "dia" : "dias"}
+                  </p>
+                )}
+              </Field>
+            </div>
           </CardContent>
         </Card>
 
