@@ -433,6 +433,7 @@ export type Database = {
           clinic_id: number;
           conclusion: string | null;
           created_at: string;
+          digital_signature: Json | null;
           generated_summary: string;
           goals_progress: Json;
           id: number;
@@ -442,10 +443,17 @@ export type Database = {
           professional_review: string | null;
           reference_month: number;
           reference_year: number;
+          rejection_reason: string | null;
+          reviewed_at: string | null;
+          reviewer_id: number | null;
+          reviewer_name: string | null;
+          signed_at: string | null;
+          submitted_at: string | null;
           total_absent: number;
           total_present: number;
           total_sessions: number;
           updated_at: string;
+          workflow_status: Database["public"]["Enums"]["monthly_status"];
         };
         Insert: {
           approved?: boolean;
@@ -453,6 +461,7 @@ export type Database = {
           clinic_id: number;
           conclusion?: string | null;
           created_at?: string;
+          digital_signature?: Json | null;
           generated_summary: string;
           goals_progress?: Json;
           id?: never;
@@ -462,10 +471,17 @@ export type Database = {
           professional_review?: string | null;
           reference_month: number;
           reference_year: number;
+          rejection_reason?: string | null;
+          reviewed_at?: string | null;
+          reviewer_id?: number | null;
+          reviewer_name?: string | null;
+          signed_at?: string | null;
+          submitted_at?: string | null;
           total_absent: number;
           total_present: number;
           total_sessions: number;
           updated_at?: string;
+          workflow_status?: Database["public"]["Enums"]["monthly_status"];
         };
         Update: {
           approved?: boolean;
@@ -473,6 +489,7 @@ export type Database = {
           clinic_id?: number;
           conclusion?: string | null;
           created_at?: string;
+          digital_signature?: Json | null;
           generated_summary?: string;
           goals_progress?: Json;
           id?: never;
@@ -482,10 +499,17 @@ export type Database = {
           professional_review?: string | null;
           reference_month?: number;
           reference_year?: number;
+          rejection_reason?: string | null;
+          reviewed_at?: string | null;
+          reviewer_id?: number | null;
+          reviewer_name?: string | null;
+          signed_at?: string | null;
+          submitted_at?: string | null;
           total_absent?: number;
           total_present?: number;
           total_sessions?: number;
           updated_at?: string;
+          workflow_status?: Database["public"]["Enums"]["monthly_status"];
         };
         Relationships: [];
       };
@@ -842,6 +866,12 @@ export type Database = {
         | "descontinuada";
       guardian_validation_method: "assinatura_digital" | "token" | "presencial";
       member_role: "clinic_admin" | "therapist" | "receptionist";
+      monthly_status:
+        | "rascunho"
+        | "pendente_aprovacao"
+        | "ajustes_solicitados"
+        | "aguardando_assinatura"
+        | "assinada";
       payment_type: "operadora" | "particular";
       plan_status: "ativo" | "revisao" | "encerrado";
       platform_role: "member" | "platform_admin";

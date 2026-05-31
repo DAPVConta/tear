@@ -373,9 +373,28 @@ operadora; restrição editar/excluir só pelo criador.
       "Papéis de gestão" (coordenador + especialidade coordenada + supervisor
       de AT).
 
-Backlog de correções abertas: #3 evolução mensal (workflow coordenador + trava
-22 dias + assinatura + PDF) e #4 aprovação do coordenador (parte do #3). Agora
-destravadas: o papel "Coordenador de especialidade" já existe (#6).
+26. [FEITO — Correções #3 e #4] Evolução mensal: workflow + trava 22 dias +
+    assinatura + PDF.
+    - Enum `monthly_status` (rascunho → pendente_aprovacao →
+      aguardando_assinatura | ajustes_solicitados → assinada) + colunas
+      (submitted_at, reviewer_id/name, rejection_reason, reviewed_at,
+      digital_signature, signed_at). Migração 0020.
+    - Trava de 22 dias no gerador (MonthlyGenerate): bloqueia meses futuros e o
+      mês corrente antes de 22 dias corridos, com a mensagem do critério.
+    - Workflow (MonthlyDetail): rascunho/ajustes editáveis + "Enviar para
+      aprovação"; coordenador (gate por clinic_admin — ver nota) Aprova ou
+      "Solicita ajustes" com justificativa (banner exibido ao profissional);
+      aprovação → "Aguardando assinatura"; assinatura digital A1 local
+      (MonthlySignatureDialog, reusa lib/digitalSignature) → "Assinada".
+    - PDF: carimbo "Aprovado pelo coordenador [Nome]" + bloco da assinatura
+      digital (titular/CPF/emissor/hash/data).
+    - NOTA (gate do coordenador): a aprovação é liberada para clinic_admin como
+      stand-in operacional do "Coordenador de Especialidade" (#6 já gravou
+      coordinator_specialty no profissional). O gate preciso por
+      profissional↔usuário↔especialidade depende da gestão de membros (ainda
+      não implementada).
+
+Todas as correções da tabela public.corrections foram resolvidas.
 
 Fase 2 restante: Asaas billing.
 

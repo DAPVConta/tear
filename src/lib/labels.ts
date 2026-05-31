@@ -1,5 +1,13 @@
 import type { Enums } from "@/types/database";
 
+export const monthlyStatusLabels: Record<Enums<"monthly_status">, string> = {
+  rascunho: "Rascunho",
+  pendente_aprovacao: "Pendente de aprovação",
+  ajustes_solicitados: "Ajustes solicitados",
+  aguardando_assinatura: "Aguardando assinatura",
+  assinada: "Assinada",
+};
+
 export const genderLabels: Record<Enums<"gender">, string> = {
   masculino: "Masculino",
   feminino: "Feminino",

@@ -1,12 +1,39 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { keys } from "@/lib/queryKeys";
+import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Enums, Json, Tables, TablesUpdate } from "@/types/database";
+import type { DigitalSignature } from "@/lib/digitalSignature";
 import { buildMonthlySummary } from "./summary";
 
 export type MonthlyEvolution = Tables<"monthly_evolutions">;
 export const MONTHLY_PAGE_SIZE = 12;
+
+export function getMonthlyDigitalSignature(
+  m: Pick<MonthlyEvolution, "digital_signature"> | null | undefined,
+): DigitalSignature | null {
+  const s = m?.digital_signature;
+  return s && typeof s === "object" && !Array.isArray(s)
+    ? (s as unknown as DigitalSignature)
+    : null;
+}
+
+// String canônica assinada — vincula a assinatura ao conteúdo do relatório.
+export function buildMonthlySignaturePayload(m: MonthlyEvolution): string {
+  return [
+    `Evolução mensal #${m.id}`,
+    `Paciente: ${m.patient_id}`,
+    `Profissional: ${m.professional_id}`,
+    `Período: ${m.reference_month}/${m.reference_year}`,
+    `Sessões: ${m.total_sessions} (presenças ${m.total_present}, ausências ${m.total_absent})`,
+    `Síntese: ${m.generated_summary}`,
+    `Análise: ${m.professional_review ?? ""}`,
+    `Conclusão: ${m.conclusion ?? ""}`,
+    `Próximo mês: ${m.next_month_plan ?? ""}`,
+    `Aprovado por: ${m.reviewer_name ?? ""}`,
+  ].join("\n");
+}
 
 export type MonthlyRow = MonthlyEvolution & {
   patient: { name: string } | null;
@@ -235,20 +262,91 @@ export function useUpdateMonthlyEvolution(id: number) {
   });
 }
 
-export function useApproveMonthlyEvolution() {
+// Profissional envia o rascunho para aprovação do coordenador.
+export function useSubmitMonthly(id: number) {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async () => {
       if (!clinic?.id) throw new Error("Clínica não definida");
       const { error } = await supabase
         .from("monthly_evolutions")
-        .update({ approved: true, approved_at: new Date().toISOString() })
+        .update({
+          workflow_status: "pendente_aprovacao",
+          submitted_at: new Date().toISOString(),
+          rejection_reason: null,
+        })
         .eq("id", id)
         .eq("clinic_id", clinic.id);
       if (error) throw error;
     },
-    onSuccess: (_data, id) => {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.monthly.all });
+      queryClient.invalidateQueries({ queryKey: keys.monthly.byId(id) });
+    },
+  });
+}
+
+// Coordenador aprova (libera para assinatura) ou solicita ajustes.
+export function useReviewMonthly(id: number) {
+  const queryClient = useQueryClient();
+  const { clinic } = useClinic();
+  const { user, profile } = useAuth();
+  return useMutation({
+    mutationFn: async (input: { decision: "approve" | "reject"; reason?: string }) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      const reviewerName = profile?.name ?? user?.email ?? null;
+      const now = new Date().toISOString();
+      const patch =
+        input.decision === "approve"
+          ? {
+              workflow_status: "aguardando_assinatura" as const,
+              approved: true,
+              approved_at: now,
+              reviewed_at: now,
+              reviewer_name: reviewerName,
+              rejection_reason: null,
+            }
+          : {
+              workflow_status: "ajustes_solicitados" as const,
+              approved: false,
+              reviewed_at: now,
+              reviewer_name: reviewerName,
+              rejection_reason: input.reason ?? null,
+            };
+      const { error } = await supabase
+        .from("monthly_evolutions")
+        .update(patch)
+        .eq("id", id)
+        .eq("clinic_id", clinic.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.monthly.all });
+      queryClient.invalidateQueries({ queryKey: keys.monthly.byId(id) });
+    },
+  });
+}
+
+// Assinatura digital (A1 local) que encerra o ciclo.
+export function useSignMonthlyDigital(id: number) {
+  const queryClient = useQueryClient();
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: async (signature: DigitalSignature) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      const { error } = await supabase
+        .from("monthly_evolutions")
+        .update({
+          workflow_status: "assinada",
+          digital_signature: signature as unknown as Json,
+          signed_at: signature.signed_at,
+        })
+        .eq("id", id)
+        .eq("clinic_id", clinic.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.monthly.all });
       queryClient.invalidateQueries({ queryKey: keys.monthly.byId(id) });
     },

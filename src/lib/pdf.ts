@@ -1,6 +1,9 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { MONTH_NAMES_PT } from "@/features/monthlyEvolutions/api";
+import {
+  MONTH_NAMES_PT,
+  getMonthlyDigitalSignature,
+} from "@/features/monthlyEvolutions/api";
 import type { MonthlyRow, GoalProgress } from "@/features/monthlyEvolutions/api";
 import type { Tables } from "@/types/database";
 import {
@@ -216,12 +219,33 @@ export function exportMonthlyEvolutionPDF(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(90);
-  if (role) doc.text(role, margin, y + 27);
-  doc.text(
-    `${monthly.approved ? "Aprovado e assinado" : "Emitido"} em ${sigDate}`,
-    margin,
-    y + (role ? 40 : 27),
-  );
+  let sy = y + 14;
+  if (role) {
+    sy += 13;
+    doc.text(role, margin, sy);
+  }
+  sy += 13;
+  doc.text(`Emitido em ${sigDate}`, margin, sy);
+
+  if (monthly.reviewer_name) {
+    sy += 13;
+    doc.text(`Aprovado pelo coordenador ${monthly.reviewer_name}`, margin, sy);
+  }
+
+  const monthlySig = getMonthlyDigitalSignature(monthly);
+  if (monthlySig) {
+    const rows = [
+      "Assinado digitalmente — ICP-Brasil (A1)",
+      `Titular: ${monthlySig.signer_name}${monthlySig.signer_cpf ? ` · CPF ${monthlySig.signer_cpf}` : ""}`,
+      `Emissor: ${monthlySig.certificate_issuer}`,
+      `Hash SHA-256: ${monthlySig.content_hash}`,
+      `Data/hora: ${new Date(monthlySig.signed_at).toLocaleString("pt-BR")}`,
+    ];
+    rows.forEach((r) => {
+      sy += 12;
+      doc.text(doc.splitTextToSize(r, pageWidth - margin * 2), margin, sy);
+    });
+  }
 
   // Rodapé
   const pageHeight = doc.internal.pageSize.getHeight();

@@ -48,6 +48,7 @@ export default function MonthlyGenerate() {
   const {
     handleSubmit,
     control,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -59,7 +60,25 @@ export default function MonthlyGenerate() {
     },
   });
 
+  // Trava de mês fechado (mínimo 22 dias): bloqueia meses futuros e o mês
+  // corrente enquanto não acumular 22 dias corridos.
+  const selMonth = watch("reference_month");
+  const selYear = watch("reference_year");
+  const periodClosed = (() => {
+    if (selYear < currentYear) return true;
+    if (selYear > currentYear) return false;
+    if (selMonth < currentMonth) return true;
+    if (selMonth > currentMonth) return false;
+    return now.getDate() >= 22;
+  })();
+  const CLOSED_MSG =
+    "Não é possível gerar a evolução mensal. O período selecionado deve contemplar um mês fechado (mínimo de 22 dias).";
+
   async function onSubmit(values: FormValues) {
+    if (!periodClosed) {
+      toast.error(CLOSED_MSG);
+      return;
+    }
     try {
       const created = await generate.mutateAsync(values);
       toast.success("Síntese gerada");
@@ -174,11 +193,16 @@ export default function MonthlyGenerate() {
           </CardContent>
         </Card>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {!periodClosed && (
+            <p className="mr-auto max-w-md text-xs text-muted-foreground">
+              {CLOSED_MSG}
+            </p>
+          )}
           <Button type="button" variant="outline" onClick={() => navigate("/evolucao-mensal")}>
             Cancelar
           </Button>
-          <Button type="submit" variant="brand" disabled={isSubmitting}>
+          <Button type="submit" variant="brand" disabled={isSubmitting || !periodClosed}>
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
