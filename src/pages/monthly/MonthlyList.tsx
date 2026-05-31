@@ -10,6 +10,7 @@ import {
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { monthlyStatusLabels } from "@/lib/labels";
 import { TablePagination } from "@/components/ui/table-pagination";
 import {
   TableSkeletonRows,
@@ -146,15 +147,24 @@ export default function MonthlyList() {
                     {m.total_present}/{m.total_sessions}
                   </TableCell>
                   <TableCell>
-                    {m.approved ? (
-                      <Badge variant="success">
-                        <CheckCircle2 className="h-3 w-3" /> Aprovada
-                      </Badge>
-                    ) : (
-                      <Badge variant="warning">
-                        <CircleDashed className="h-3 w-3" /> Em revisão
-                      </Badge>
-                    )}
+                    <Badge
+                      variant={
+                        m.workflow_status === "assinada"
+                          ? "success"
+                          : m.workflow_status === "aguardando_assinatura"
+                            ? "accent"
+                            : m.workflow_status === "rascunho"
+                              ? "muted"
+                              : "warning"
+                      }
+                    >
+                      {m.workflow_status === "assinada" ? (
+                        <CheckCircle2 className="h-3 w-3" />
+                      ) : (
+                        <CircleDashed className="h-3 w-3" />
+                      )}
+                      {monthlyStatusLabels[m.workflow_status]}
+                    </Badge>
                   </TableCell>
                 </TableRow>
               ))}

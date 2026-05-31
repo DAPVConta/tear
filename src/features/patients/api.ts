@@ -143,3 +143,40 @@ export function useDeactivatePatient() {
   });
 }
 
+const MEDICAL_REPORTS_BUCKET = "medical-reports";
+
+// Sobe o laudo no bucket privado (pasta = clinic_id) e devolve o caminho para
+// gravar em patients.report_path. A exibição usa URL assinada.
+export function useUploadMedicalReport() {
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "pdf";
+      const rand = Math.random().toString(36).slice(2, 8);
+      const path = `${clinic.id}/laudo-${Date.now()}-${rand}.${ext}`;
+      const { error } = await supabase.storage
+        .from(MEDICAL_REPORTS_BUCKET)
+        .upload(path, file, { cacheControl: "3600", upsert: false });
+      if (error) throw error;
+      return path;
+    },
+  });
+}
+
+// URL assinada (1h) para visualizar o laudo de um paciente.
+export function useMedicalReportUrl(path: string | null | undefined) {
+  return useQuery({
+    queryKey: ["medical-report-url", path],
+    enabled: !!path,
+    staleTime: 50 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.storage
+        .from(MEDICAL_REPORTS_BUCKET)
+        .createSignedUrl(path!, 60 * 60);
+      if (error) throw error;
+      return data?.signedUrl ?? null;
+    },
+  });
+}
+

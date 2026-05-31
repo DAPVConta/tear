@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { callRpc } from "@/lib/typedRpc";
 import { keys } from "@/lib/queryKeys";
-import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Enums, Tables, TablesInsert } from "@/types/database";
 
@@ -74,19 +74,20 @@ export function useCorrectionSignedUrls(paths: string[]) {
 export function useCreateCorrection() {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
-  const { user, profile } = useAuth();
   return useMutation({
     mutationFn: async (
       values: Pick<TablesInsert<"corrections">, "link" | "description" | "images">,
     ) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const { error } = await supabase.from("corrections").insert({
-        ...values,
-        clinic_id: clinic.id,
-        created_by: user?.id ?? null,
-        created_by_name: profile?.name ?? user?.email ?? null,
-      } as never);
-      if (error) throw error;
+      // Gravação atômica e server-authoritative (clinic_id/created_by derivados
+      // da sessão). Evita o estado fantasma de um insert que falha após o
+      // upload das imagens.
+      return callRpc<Correction>("save_correction", {
+        p_clinic_id: clinic.id,
+        p_description: values.description,
+        p_link: values.link ?? null,
+        p_images: values.images ?? [],
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.corrections.all });

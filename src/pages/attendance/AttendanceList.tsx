@@ -204,9 +204,14 @@ export default function AttendanceList() {
                   <TableCell>{a.patient?.name ?? "—"}</TableCell>
                   <TableCell>{a.professional?.name ?? "—"}</TableCell>
                   <TableCell>
-                    <Badge variant={statusVariant[a.status]}>
-                      {attendanceStatusLabels[a.status]}
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant={statusVariant[a.status]}>
+                        {attendanceStatusLabels[a.status]}
+                      </Badge>
+                      {a.billable_absence && (
+                        <Badge variant="warning">Passível de cobrança</Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
                     {a.justification || "—"}

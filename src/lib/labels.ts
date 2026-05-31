@@ -1,5 +1,19 @@
 import type { Enums } from "@/types/database";
 
+export const memberRoleLabels: Record<Enums<"member_role">, string> = {
+  clinic_admin: "Administrador",
+  therapist: "Terapeuta",
+  receptionist: "Recepção",
+};
+
+export const monthlyStatusLabels: Record<Enums<"monthly_status">, string> = {
+  rascunho: "Rascunho",
+  pendente_aprovacao: "Pendente de aprovação",
+  ajustes_solicitados: "Ajustes solicitados",
+  aguardando_assinatura: "Aguardando assinatura",
+  assinada: "Assinada",
+};
+
 export const genderLabels: Record<Enums<"gender">, string> = {
   masculino: "Masculino",
   feminino: "Feminino",
@@ -45,11 +59,27 @@ export const attendanceStatusLabels: Record<
   cancelado_paciente: "Cancelado (paciente)",
 };
 
+// Frequência (#9) — armazenados como texto livre (sem enum no banco).
+export const absenceReasonLabels: Record<string, string> = {
+  doenca: "Doença",
+  viagem: "Viagem",
+  imprevisto_tecnico: "Imprevisto técnico",
+  outros: "Outros",
+};
+
+export const guardianAckMethodLabels: Record<string, string> = {
+  assinatura_tela: "Assinatura na tela/tablet",
+  biometria: "Biometria",
+  token: "Token / WhatsApp",
+  presencial: "Confirmação presencial",
+};
+
 export const attendanceTypeLabels: Record<Enums<"attendance_type">, string> = {
   individual_presencial: "Individual — presencial",
   individual_domiciliar: "Individual — domiciliar",
   individual_escolar: "Individual — escolar",
   grupo_presencial: "Grupo — presencial",
+  devolutiva_pais: "Devolutiva para os Pais",
 };
 
 export const promptingLevelLabels: Record<Enums<"prompting_level">, string> = {
@@ -89,4 +119,13 @@ export const specialtyLabels: Record<Enums<"specialty">, string> = {
   psicopedagogia: "Psicopedagogia",
   musicoterapia: "Musicoterapia",
   neuropsicologia: "Neuropsicologia",
+  terapia_ocupacional: "Terapia Ocupacional",
+  neuropediatria: "Neuropediatria",
+  psiquiatria: "Psiquiatria",
+  nutricao: "Nutrição",
+  psicomotricidade_funcional: "Psicomotricidade Funcional",
+  psicomotricidade_relacional: "Psicomotricidade Relacional",
+  aplicador_aba_domiciliar: "Aplicador ABA — Domiciliar",
+  aplicador_aba_escolar: "Aplicador ABA — Escolar",
+  at_is: "AT — Integração Sensorial",
 };

@@ -265,6 +265,137 @@ operadora; restrição editar/excluir só pelo criador.
     externo, dado clínico nunca sai do banco. Substitui o uso de LLM do
     legado (Gemini via Manus Forge) para o relatório mensal.
 
+19. [FEITO — Correção #2] Evolução diária — 3 itens reportados:
+    - Trava de 24h ancorada na ASSINATURA (signed_at), não mais na criação:
+      trigger server-side `enforce_evolution_lock` e `isLocked` client-side
+      atualizados. Enquanto não assinada, a evolução é editável; após 24h da
+      assinatura, só adendo corrige.
+    - Adendo / nota de retificação (`AddendumSection` + `useAddAddendum`)
+      gravado na coluna `addendum` (jsonb, fora da lista protegida pela
+      trigger): anexa correções sem alterar o registro original; aparece no
+      PDF. UX exibida quando travada ou quando já há adendos.
+    - Síntese da evolução em PDF (`exportDailyEvolutionPDF`, jsPDF): cabeçalho
+      institucional, identificação do paciente, dados do profissional
+      (nome + conselho), conteúdo clínico, adendos e bloco de assinatura.
+    - Assinatura digital ICP-Brasil (A1) 100% local (`lib/digitalSignature.ts`
+      via node-forge + `SignatureDialog`): o usuário usa o certificado da
+      própria máquina (.pfx/.p12); gera envelope PKCS#7 + SHA-256, extrai
+      titular/CPF/emissor do certificado e grava em `digital_signature`
+      (coluna jsonb nova, migração 0014). Status "Assinada digitalmente".
+      Sem provedor externo — chave privada e dado clínico nunca saem do
+      navegador.
+      - NOTA: A3 (token/smartcard) exige componente nativo/extensão; hoje
+        suportado apenas A1 (arquivo). BirdID/Soluti em nuvem foi descartado
+        em favor do certificado local (sem contrato/credenciais externas).
+
+20. [FEITO — Correção #7] Profissional ativo/inativo (soft-delete reversível):
+    filtro de status (Ativos/Inativos/Todos) na listagem, badge "Inativo",
+    ação Inativar/Reativar (`useSetProfessionalActive`) com confirmação, e
+    card de status no cadastro. Inativar oculta o profissional de todas as
+    seleções operacionais (options já filtram active=true) preservando o
+    histórico; reativar restaura. Estado persistido na URL.
+    - PENDENTE (depende de gestão de membros, ainda não implementada): bloqueio
+      imediato de LOGIN do profissional inativo. Hoje o bloqueio é operacional
+      (some de listas/seleções); a revogação de acesso via Supabase Auth/
+      clinic_members será feita quando o módulo de membros existir.
+
+(Backlog de correções abertas consolidado ao fim desta seção.)
+
+21. [FEITO — Integração IA Claude] Edge Function `claude-analysis` (Supabase
+    Functions, Deno + `@anthropic-ai/sdk`, modelo `claude-opus-4-8`): a chave
+    `CLAUDE_KEY` fica só nos Secrets do servidor; o front chama a função
+    autenticado pelo JWT (verify_jwt). Primeiro uso: botão "Gerar com IA" na
+    Análise profissional da Evolução mensal — gera um rascunho do
+    `professional_review` a partir dos agregados clínicos já calculados
+    (síntese, metas, frequência), que o profissional revisa e salva.
+    - Privacidade/LGPD: envia só agregados (sem nome/CPF do paciente). É um
+      provedor externo (Anthropic) — diferente do motor mensal IA-free (#18),
+      que nunca sai do banco. O uso é opt-in por clique.
+    - Hook `features/ai/api.ts` (`useGenerateMonthlyAnalysis`) via
+      `supabase.functions.invoke`. CSP já permite `*.supabase.co`.
+    - PENDENTE: validar a chamada ponta-a-ponta no app (o sandbox de
+      desenvolvimento bloqueia egress p/ *.supabase.co; a função em si roda na
+      infra do Supabase, que alcança api.anthropic.com).
+
+22. [FEITO — Correção #5 (núcleo)] Laudo médico + OCR/IA:
+    - Campo de diagnóstico generalizado ("Diagnóstico / Condição de Saúde").
+    - Colunas do laudo em patients (report_doctor, report_crm,
+      report_issue_date, report_validity_date, report_path) + bucket privado
+      `medical-reports` (RLS por clinic_id) — migração 0016.
+    - Edge Function `claude-extract-laudo` (Claude vision/PDF, claude-opus-4-8):
+      extrai médico, CRM/UF, emissão e validade do laudo. Cenário A (validade
+      explícita) e Cenário B (sem validade → emissão + 1 ano). Campos sempre
+      editáveis.
+    - PatientForm: upload do laudo (PDF/imagem), botão "Ler com IA" que
+      preenche os campos, link assinado para o laudo atual e alerta de
+      vencimento (vencido / vence em ≤15 dias).
+    - DEFER (restante do #5): obrigatoriedade do laudo no cadastro,
+      notificação de vencimento na tela inicial e histórico permanente de
+      múltiplos laudos por paciente.
+
+23. [FEITO — Correção #8] Evolução "Devolutiva para os Pais":
+    - Novo tipo de atendimento `devolutiva_pais` (enum) + coluna
+      `parent_feedback` jsonb em daily_evolutions (migração 0017).
+    - DailyEvolutionForm: ao escolher "Devolutiva para os Pais", oculta o
+      formulário técnico (habilidades/comportamental/síntese/guia/plano) e
+      mostra layout exclusivo com aviso de linguagem acessível + 3 campos
+      (atividades anteriores, próximas, orientação para casa). Validação Zod
+      condicional (superRefine). Síntese/próximo passo recebem versões legíveis
+      p/ satisfazer colunas obrigatórias.
+    - PDF "Imprimir Devolutiva" (`exportParentFeedbackPDF`) em 2 vias (Via da
+      Clínica / Via dos Pais) com identificação, os 3 campos e assinatura
+      física do responsável.
+
+24. [FEITO — Correção #9] Frequência: ciência dos pais + atestado + cobrança.
+    - Colunas em attendance_records (migração 0018): absence_reason,
+      attachment_path, guardian_ack_method, notified_in_time, billable_absence
+      + bucket privado `attendance-attachments` (RLS por clinic_id).
+    - AttendanceForm: ciência do responsável com método de validação
+      (assinatura na tela/biometria/token/presencial); detalhamento dinâmico de
+      falta (motivo, justificativa, upload de atestado) e pergunta de aviso em
+      tempo hábil → marca `billable_absence` (falta tardia = faturável).
+    - AttendanceList: badge "Passível de cobrança".
+    - DEFER: gating de exportação de faturamento por "presença confirmada"
+      (integrar ao módulo de auditoria/BILLING_RULES, #10).
+
+25. [FEITO — Correção #6] Especialidades multi-seleção + papéis de gestão.
+    - Novos valores do enum specialty (terapia_ocupacional, neuropediatria,
+      psiquiatria, nutricao, psicomotricidade_funcional/relacional,
+      aplicador_aba_domiciliar/escolar, at_is).
+    - Tabela N:N `professional_specialties` (RLS por clinic_id + audit) com
+      backfill da especialidade atual; `professionals.specialty` permanece como
+      PRINCIPAL (compat. com listas/PDF/seletores). Migração 0019.
+    - Papéis como campos no profissional (decisão do dono): `coordinator_
+      specialty` (coordenador → poderá aprovar a evolução mensal do #3/#4) e
+      `is_at_supervisor`.
+    - ProfessionalForm: grade de checkboxes de especialidades (principal = 1ª),
+      reconciliação N:N ao salvar (useSaveProfessionalSpecialties), card
+      "Papéis de gestão" (coordenador + especialidade coordenada + supervisor
+      de AT).
+
+26. [FEITO — Correções #3 e #4] Evolução mensal: workflow + trava 22 dias +
+    assinatura + PDF.
+    - Enum `monthly_status` (rascunho → pendente_aprovacao →
+      aguardando_assinatura | ajustes_solicitados → assinada) + colunas
+      (submitted_at, reviewer_id/name, rejection_reason, reviewed_at,
+      digital_signature, signed_at). Migração 0020.
+    - Trava de 22 dias no gerador (MonthlyGenerate): bloqueia meses futuros e o
+      mês corrente antes de 22 dias corridos, com a mensagem do critério.
+    - Workflow (MonthlyDetail): rascunho/ajustes editáveis + "Enviar para
+      aprovação"; coordenador (gate por clinic_admin — ver nota) Aprova ou
+      "Solicita ajustes" com justificativa (banner exibido ao profissional);
+      aprovação → "Aguardando assinatura"; assinatura digital A1 local
+      (MonthlySignatureDialog, reusa lib/digitalSignature) → "Assinada".
+    - PDF: carimbo "Aprovado pelo coordenador [Nome]" + bloco da assinatura
+      digital (titular/CPF/emissor/hash/data).
+    - NOTA (gate do coordenador): a aprovação é liberada para clinic_admin como
+      stand-in operacional do "Coordenador de Especialidade" (#6 já gravou
+      coordinator_specialty no profissional). O gate preciso por
+      profissional↔usuário↔especialidade depende da gestão de membros (ainda
+      não implementada).
+
+Todas as correções da tabela public.corrections foram resolvidas.
+
 Fase 2 restante: Asaas billing.
 
 ## Segurança e LGPD

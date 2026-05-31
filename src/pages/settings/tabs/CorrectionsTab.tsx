@@ -13,6 +13,8 @@ import {
   Trash2,
   User,
   X,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +52,7 @@ import {
 } from "@/components/ui/list-states";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/providers/AuthProvider";
+import { useClinic } from "@/providers/ClinicProvider";
 import {
   useCorrections,
   useCorrectionSignedUrls,
@@ -110,23 +113,73 @@ function formatDateTime(iso: string) {
 
 export function CorrectionsTab() {
   const { user, profile } = useAuth();
+  const { clinic } = useClinic();
   const list = useCorrections();
   const createCorrection = useCreateCorrection();
   const uploadImages = useUploadCorrectionImages();
 
   const [pending, setPending] = useState<PendingImage[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [showResolved, setShowResolved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Rascunho local (texto) por clínica: protege o conteúdo digitado contra
+  // falha no envio ou refresh acidental — só é limpo após gravação confirmada.
+  const draftKey = clinic?.id ? `tear:draft:correction:${clinic.id}` : null;
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+  const draftLoadedRef = useRef(false);
 
   const {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { link: "", description: "" },
   });
+
+  // Restaura o rascunho uma única vez ao montar.
+  useEffect(() => {
+    if (!draftKey || draftLoadedRef.current) return;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<FormValues>;
+        if (parsed.link || parsed.description) {
+          reset({ link: parsed.link ?? "", description: parsed.description ?? "" });
+          setDraftSavedAt(new Date());
+        }
+      }
+    } catch {
+      // ignora rascunho corrompido
+    }
+    draftLoadedRef.current = true;
+  }, [draftKey, reset]);
+
+  // Auto-save (debounced) do texto enquanto o usuário digita.
+  useEffect(() => {
+    if (!draftKey) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const sub = watch((values) => {
+      if (!draftLoadedRef.current) return;
+      if (!values.link && !values.description) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        try {
+          localStorage.setItem(draftKey, JSON.stringify(values));
+          setDraftSavedAt(new Date());
+        } catch {
+          // localStorage indisponível
+        }
+      }, 800);
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      sub.unsubscribe();
+    };
+  }, [watch, draftKey]);
 
   const userLabel = profile?.name ?? user?.email ?? "Usuário atual";
   const today = new Date().toLocaleDateString("pt-BR");
@@ -217,9 +270,15 @@ export function CorrectionsTab() {
       pending.forEach((p) => URL.revokeObjectURL(p.preview));
       setPending([]);
       reset({ link: "", description: "" });
+      if (draftKey) localStorage.removeItem(draftKey);
+      setDraftSavedAt(null);
     } catch (e) {
+      // O texto digitado permanece no formulário (e salvo como rascunho local),
+      // de modo que nada se perde quando o envio falha.
       toast.error("Não foi possível registrar a correção", {
-        description: e instanceof Error ? e.message : undefined,
+        description:
+          (e instanceof Error ? `${e.message} ` : "") +
+          "Seu texto foi mantido — tente enviar novamente.",
       });
     }
   }
@@ -352,7 +411,16 @@ export function CorrectionsTab() {
               </div>
             </Field>
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-3">
+              {draftSavedAt && (
+                <span className="mr-auto text-xs text-muted-foreground">
+                  Rascunho salvo às{" "}
+                  {draftSavedAt.toLocaleTimeString("pt-BR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
               <Button type="submit" variant="brand" disabled={busy}>
                 {busy ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -366,6 +434,23 @@ export function CorrectionsTab() {
           </CardContent>
         </form>
       </Card>
+
+      {(list.data?.length ?? 0) > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {STATUS_ORDER.map((s) => {
+            const count = (list.data ?? []).filter((c) => c.status === s).length;
+            const meta = STATUS_META[s];
+            return (
+              <Card key={s}>
+                <CardContent className="p-4">
+                  <Badge variant={meta.variant}>{meta.label}</Badge>
+                  <p className="mt-2 text-3xl font-bold tabular-nums">{count}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -387,11 +472,48 @@ export function CorrectionsTab() {
               description="Use o formulário acima para reportar erros ou melhorias encontradas no sistema."
             />
           ) : (
-            <ul className="space-y-3">
-              {list.data!.map((c) => (
-                <CorrectionRow key={c.id} correction={c} />
-              ))}
-            </ul>
+            <div className="space-y-3">
+              {list.data!.filter((c) => c.status !== "resolvido").length >
+                0 && (
+                <ul className="space-y-3">
+                  {list
+                    .data!.filter((c) => c.status !== "resolvido")
+                    .map((c) => (
+                      <CorrectionRow key={c.id} correction={c} />
+                    ))}
+                </ul>
+              )}
+
+              {(() => {
+                const resolved = list.data!.filter(
+                  (c) => c.status === "resolvido",
+                );
+                if (resolved.length === 0) return null;
+                return (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowResolved((v) => !v)}
+                      className="flex w-full items-center gap-2 rounded-lg border border-border bg-secondary/40 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-secondary/70"
+                    >
+                      {showResolved ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                      Resolvidas ({resolved.length})
+                    </button>
+                    {showResolved && (
+                      <ul className="space-y-3">
+                        {resolved.map((c) => (
+                          <CorrectionRow key={c.id} correction={c} />
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           )}
         </CardContent>
       </Card>

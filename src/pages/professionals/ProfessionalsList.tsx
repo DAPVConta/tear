@@ -5,7 +5,8 @@ import {
   Search,
   Stethoscope,
   Pencil,
-  Trash2,
+  Archive,
+  ArchiveRestore,
   MoreHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,6 +22,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { SortableHead, type SortDir } from "@/components/ui/sortable-head";
 import { TablePagination } from "@/components/ui/table-pagination";
 import {
@@ -50,9 +58,10 @@ import { maskPhone } from "@/lib/masks";
 import { specialtyLabels } from "@/lib/labels";
 import {
   useProfessionals,
-  useDeactivateProfessional,
+  useSetProfessionalActive,
   PROFESSIONALS_PAGE_SIZE,
   type Professional,
+  type ProfessionalStatusFilter,
 } from "@/features/professionals/api";
 
 export default function ProfessionalsList() {
@@ -62,9 +71,13 @@ export default function ProfessionalsList() {
   const [sortBy, setSortBy] = useUrlState("sortBy", "name");
   const [sortDirRaw, setSortDirRaw] = useUrlState("sortDir", "asc");
   const sortDir = (sortDirRaw === "desc" ? "desc" : "asc") as SortDir;
+  const [statusRaw, setStatusRaw] = useUrlState("status", "active");
+  const status = (
+    statusRaw === "inactive" || statusRaw === "all" ? statusRaw : "active"
+  ) as ProfessionalStatusFilter;
   const [searchInput, setSearchInput] = useState(urlSearch);
   const search = useDebounce(searchInput);
-  const [toDelete, setToDelete] = useState<Professional | null>(null);
+  const [toToggle, setToToggle] = useState<Professional | null>(null);
 
   useEffect(() => {
     setUrlSearch(search);
@@ -75,8 +88,9 @@ export default function ProfessionalsList() {
     page,
     sortBy,
     sortDir,
+    status,
   });
-  const deactivate = useDeactivateProfessional();
+  const setActiveMutation = useSetProfessionalActive();
 
   function onSort(key: string) {
     if (sortBy === key) setSortDirRaw(sortDir === "asc" ? "desc" : "asc");
@@ -100,17 +114,18 @@ export default function ProfessionalsList() {
     setPage(1);
   }
 
-  async function confirmDelete() {
-    if (!toDelete) return;
+  async function confirmToggle() {
+    if (!toToggle) return;
+    const nextActive = !toToggle.active;
     try {
-      await deactivate.mutateAsync(toDelete.id);
-      toast.success("Profissional arquivado");
+      await setActiveMutation.mutateAsync({ id: toToggle.id, active: nextActive });
+      toast.success(nextActive ? "Profissional reativado" : "Profissional inativado");
     } catch (e) {
-      toast.error("Falha ao arquivar", {
+      toast.error(nextActive ? "Falha ao reativar" : "Falha ao inativar", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {
-      setToDelete(null);
+      setToToggle(null);
     }
   }
 
@@ -131,8 +146,8 @@ export default function ProfessionalsList() {
       />
 
       <div className="rounded-2xl border border-border bg-card shadow-soft">
-        <div className="border-b border-border p-4">
-          <div className="relative max-w-sm">
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center">
+          <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchInput}
@@ -140,6 +155,24 @@ export default function ProfessionalsList() {
               placeholder="Buscar por nome, registro ou CPF..."
               className="pl-9"
             />
+          </div>
+          <div className="sm:ml-auto sm:w-44">
+            <Select
+              value={status}
+              onValueChange={(v) => {
+                setStatusRaw(v);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Ativos</SelectItem>
+                <SelectItem value="inactive">Inativos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -167,7 +200,10 @@ export default function ProfessionalsList() {
                   onClick={() => navigate(`/profissionais/${p.id}`)}
                 >
                   <TableCell>
-                    <div className="font-semibold">{p.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{p.name}</span>
+                      {!p.active && <Badge variant="muted">Inativo</Badge>}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {p.email || "Sem e-mail"}
                     </div>
@@ -192,12 +228,18 @@ export default function ProfessionalsList() {
                         <DropdownMenuItem onSelect={() => navigate(`/profissionais/${p.id}`)}>
                           <Pencil /> Editar
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onSelect={() => setToDelete(p)}
-                        >
-                          <Trash2 /> Arquivar
-                        </DropdownMenuItem>
+                        {p.active ? (
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onSelect={() => setToToggle(p)}
+                          >
+                            <Archive /> Inativar
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onSelect={() => setToToggle(p)}>
+                            <ArchiveRestore /> Reativar
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -237,19 +279,25 @@ export default function ProfessionalsList() {
         )}
       </div>
 
-      <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
+      <AlertDialog open={!!toToggle} onOpenChange={(o) => !o && setToToggle(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Arquivar profissional?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {toToggle?.active ? "Inativar profissional?" : "Reativar profissional?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {toDelete?.name} deixará de aparecer nas listagens. Os registros
-              históricos são preservados.
+              {toToggle?.active
+                ? `${toToggle?.name} deixará de aparecer nas listagens e seleções de novos atendimentos. Os registros históricos são preservados e a ação pode ser revertida.`
+                : `${toToggle?.name} voltará a aparecer nas listagens e poderá ser selecionado em novos atendimentos.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} disabled={deactivate.isPending}>
-              Arquivar
+            <AlertDialogAction
+              onClick={confirmToggle}
+              disabled={setActiveMutation.isPending}
+            >
+              {toToggle?.active ? "Inativar" : "Reativar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

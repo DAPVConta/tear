@@ -12,8 +12,8 @@ export const keys = {
   },
   professionals: {
     all: ["professionals"] as const,
-    list: (clinicId: number | undefined, search: string, page: number, sortBy: string, sortDir: string) =>
-      ["professionals", clinicId, search, page, sortBy, sortDir] as const,
+    list: (clinicId: number | undefined, search: string, page: number, sortBy: string, sortDir: string, status: string) =>
+      ["professionals", clinicId, search, page, sortBy, sortDir, status] as const,
     byId: (id: number | undefined) => ["professional", id] as const,
     options: (clinicId: number | undefined) => ["professional-options", clinicId] as const,
   },

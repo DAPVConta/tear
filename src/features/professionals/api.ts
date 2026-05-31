@@ -10,16 +10,91 @@ import {
 } from "@/lib/crud";
 import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
-import type { Tables, TablesInsert, TablesUpdate } from "@/types/database";
+import type { Enums, Tables, TablesInsert, TablesUpdate } from "@/types/database";
 
 export type Professional = Tables<"professionals">;
+export type Specialty = Enums<"specialty">;
 export const PROFESSIONALS_PAGE_SIZE = 10;
+
+// Especialidades (N:N) de um profissional.
+export function useProfessionalSpecialties(professionalId: number | undefined) {
+  const { clinic } = useClinic();
+  return useQuery({
+    queryKey: ["professional-specialties", professionalId],
+    enabled: !!professionalId && !!clinic?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("professional_specialties")
+        .select("specialty")
+        .eq("professional_id", professionalId!)
+        .eq("clinic_id", clinic!.id);
+      if (error) throw error;
+      return (data ?? []).map((r) => r.specialty as Specialty);
+    },
+  });
+}
+
+// Reconcilia (insere/remove) as especialidades do profissional.
+export function useSaveProfessionalSpecialties() {
+  const queryClient = useQueryClient();
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: async ({
+      professionalId,
+      specialties,
+    }: {
+      professionalId: number;
+      specialties: Specialty[];
+    }) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      const { data: current, error: fetchErr } = await supabase
+        .from("professional_specialties")
+        .select("id, specialty")
+        .eq("professional_id", professionalId)
+        .eq("clinic_id", clinic.id);
+      if (fetchErr) throw fetchErr;
+      const existing = (current ?? []) as { id: number; specialty: Specialty }[];
+      const existingSet = new Set(existing.map((e) => e.specialty));
+      const wanted = new Set(specialties);
+      const toInsert = specialties.filter((s) => !existingSet.has(s));
+      const toDelete = existing.filter((e) => !wanted.has(e.specialty));
+      if (toInsert.length) {
+        const { error } = await supabase.from("professional_specialties").insert(
+          toInsert.map((s) => ({
+            clinic_id: clinic.id,
+            professional_id: professionalId,
+            specialty: s,
+          })) as never,
+        );
+        if (error) throw error;
+      }
+      if (toDelete.length) {
+        const { error } = await supabase
+          .from("professional_specialties")
+          .delete()
+          .in(
+            "id",
+            toDelete.map((e) => e.id),
+          );
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_d, { professionalId }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["professional-specialties", professionalId],
+      });
+    },
+  });
+}
+
+export type ProfessionalStatusFilter = "active" | "inactive" | "all";
 
 type ListParams = {
   search: string;
   page: number;
   sortBy?: string;
   sortDir?: "asc" | "desc";
+  status?: ProfessionalStatusFilter;
 };
 
 export function useProfessionals({
@@ -27,11 +102,12 @@ export function useProfessionals({
   page,
   sortBy = "name",
   sortDir = "asc",
+  status = "active",
 }: ListParams) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
   return useQuery({
-    queryKey: keys.professionals.list(clinicId, search, page, sortBy, sortDir),
+    queryKey: keys.professionals.list(clinicId, search, page, sortBy, sortDir, status),
     enabled: !!clinicId,
     queryFn: () =>
       fetchPaginatedList<Professional>({
@@ -42,7 +118,13 @@ export function useProfessionals({
         search,
         searchColumns: ["name", "council_number", "cpf"],
         order: { column: sortBy, ascending: sortDir === "asc" },
-        filters: [{ column: "active", op: "eq", value: true }],
+        // "all" não filtra; caso contrário, ativos ou inativos. Inativar é
+        // soft-delete (preserva histórico de prontuários/evoluções), nunca
+        // exclusão.
+        filters:
+          status === "all"
+            ? []
+            : [{ column: "active", op: "eq", value: status === "active" }],
       }),
   });
 }
@@ -124,21 +206,25 @@ export function useUpdateProfessional(id: number) {
   });
 }
 
-export function useDeactivateProfessional() {
+// Ativa/inativa o profissional (soft-delete reversível). Inativar bloqueia o
+// uso operacional (some dos seletores de novos atendimentos/evoluções); o
+// histórico permanece intacto. Reativar restaura imediatamente.
+export function useSetProfessionalActive() {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
-    mutationFn: (id: number) => {
+    mutationFn: ({ id, active }: { id: number; active: boolean }) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
       return setActive({
         table: "professionals",
         id,
         clinicId: clinic.id,
-        active: false,
+        active,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, { id }) => {
       queryClient.invalidateQueries({ queryKey: keys.professionals.all });
+      queryClient.invalidateQueries({ queryKey: keys.professionals.byId(id) });
     },
   });
 }

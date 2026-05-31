@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -10,6 +10,12 @@ import {
   FileDown,
   CheckCircle2,
   CircleDashed,
+  Sparkles,
+  Send,
+  BadgeCheck,
+  AlertTriangle,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -17,6 +23,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Field } from "@/components/form/Field";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -28,13 +42,17 @@ import {
 import {
   useMonthlyEvolution,
   useUpdateMonthlyEvolution,
-  useApproveMonthlyEvolution,
+  useSubmitMonthly,
+  useReviewMonthly,
+  getMonthlyDigitalSignature,
   MONTH_NAMES_PT,
   type GoalProgress,
 } from "@/features/monthlyEvolutions/api";
+import { useGenerateMonthlyAnalysis } from "@/features/ai/api";
 import { useClinic } from "@/providers/ClinicProvider";
 import { exportMonthlyEvolutionPDF } from "@/lib/pdf";
-import { specialtyLabels } from "@/lib/labels";
+import { specialtyLabels, monthlyStatusLabels } from "@/lib/labels";
+import { MonthlySignatureDialog } from "./MonthlySignatureDialog";
 import { ReportDocument } from "./ReportDocument";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -49,16 +67,22 @@ export default function MonthlyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const monthlyId = Number(id);
-  const { clinic } = useClinic();
+  const { clinic, role } = useClinic();
 
   const { data, isLoading } = useMonthlyEvolution(monthlyId);
   const update = useUpdateMonthlyEvolution(monthlyId);
-  const approve = useApproveMonthlyEvolution();
+  const submitMonthly = useSubmitMonthly(monthlyId);
+  const review = useReviewMonthly(monthlyId);
+  const generateAI = useGenerateMonthlyAnalysis();
+  const [sigOpen, setSigOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
@@ -93,12 +117,42 @@ export default function MonthlyDetail() {
     }
   }
 
+  async function onSubmitForApproval() {
+    try {
+      // Salva o conteúdo atual antes de enviar.
+      await handleSubmit(onSave)();
+      await submitMonthly.mutateAsync();
+      toast.success("Enviado para aprovação do coordenador");
+    } catch (e) {
+      toast.error("Não foi possível enviar", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    }
+  }
+
   async function onApprove() {
     try {
-      await approve.mutateAsync(monthlyId);
-      toast.success("Síntese aprovada");
+      await review.mutateAsync({ decision: "approve" });
+      toast.success("Aprovada — aguardando assinatura do profissional");
     } catch (e) {
       toast.error("Falha ao aprovar", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    }
+  }
+
+  async function onReject() {
+    if (rejectReason.trim().length < 5) {
+      toast.error("Descreva os ajustes solicitados (mínimo 5 caracteres).");
+      return;
+    }
+    try {
+      await review.mutateAsync({ decision: "reject", reason: rejectReason.trim() });
+      toast.success("Ajustes solicitados ao profissional");
+      setRejectOpen(false);
+      setRejectReason("");
+    } catch (e) {
+      toast.error("Falha ao recusar", {
         description: e instanceof Error ? e.message : undefined,
       });
     }
@@ -107,6 +161,39 @@ export default function MonthlyDetail() {
   function onExport() {
     if (!data) return;
     exportMonthlyEvolutionPDF(data, clinic?.name ?? "Clínica");
+  }
+
+  async function onGenerateAI() {
+    if (!data) return;
+    const goalsList = Array.isArray(data.goals_progress)
+      ? (data.goals_progress as unknown as GoalProgress[])
+      : [];
+    try {
+      const text = await generateAI.mutateAsync({
+        period: `${MONTH_NAMES_PT[data.reference_month - 1]} / ${data.reference_year}`,
+        specialty: data.professional?.specialty
+          ? specialtyLabels[data.professional.specialty]
+          : undefined,
+        totals: {
+          sessions: data.total_sessions,
+          present: data.total_present,
+          absent: data.total_absent,
+        },
+        summary: data.generated_summary,
+        goals: goalsList.map((g) => ({
+          description: g.description,
+          category: g.category,
+          current_progress: g.current_progress,
+          status: g.status,
+        })),
+      });
+      setValue("professional_review", text, { shouldDirty: true });
+      toast.success("Análise gerada pela IA — revise e salve");
+    } catch (e) {
+      toast.error("Não foi possível gerar a análise", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    }
   }
 
   if (isLoading) {
@@ -135,6 +222,22 @@ export default function MonthlyDetail() {
     locale: ptBR,
   });
 
+  const wf = data.workflow_status;
+  const isDraft = wf === "rascunho" || wf === "ajustes_solicitados";
+  const canReview = wf === "pendente_aprovacao" && role === "clinic_admin";
+  const canSign = wf === "aguardando_assinatura";
+  const digitalSig = getMonthlyDigitalSignature(data);
+  const statusVariant: "muted" | "warning" | "accent" | "success" =
+    wf === "assinada"
+      ? "success"
+      : wf === "aguardando_assinatura"
+        ? "accent"
+        : wf === "ajustes_solicitados"
+          ? "warning"
+          : wf === "pendente_aprovacao"
+            ? "warning"
+            : "muted";
+
   return (
     <div>
       <PageHeader
@@ -142,21 +245,47 @@ export default function MonthlyDetail() {
         description={data.patient?.name ?? undefined}
         actions={
           <div className="flex items-center gap-2">
-            {data.approved ? (
-              <Badge variant="success">
-                <CheckCircle2 className="h-3 w-3" /> Aprovada
-              </Badge>
-            ) : (
-              <Badge variant="warning">
-                <CircleDashed className="h-3 w-3" /> Em revisão
-              </Badge>
-            )}
+            <Badge variant={statusVariant}>
+              {wf === "assinada" ? (
+                <BadgeCheck className="h-3 w-3" />
+              ) : wf === "aguardando_assinatura" ? (
+                <CheckCircle2 className="h-3 w-3" />
+              ) : (
+                <CircleDashed className="h-3 w-3" />
+              )}
+              {monthlyStatusLabels[wf]}
+            </Badge>
             <Button variant="outline" onClick={() => navigate("/evolucao-mensal")}>
               <ArrowLeft className="h-4 w-4" /> Voltar
             </Button>
           </div>
         }
       />
+
+      {wf === "ajustes_solicitados" && data.rejection_reason && (
+        <div className="mb-6 flex items-start gap-2 rounded-xl border border-amber-300/50 bg-amber-50/60 p-4 text-sm dark:bg-amber-950/20">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div>
+            <p className="font-semibold text-amber-700 dark:text-amber-400">
+              Ajustes solicitados pelo coordenador
+              {data.reviewer_name ? ` (${data.reviewer_name})` : ""}
+            </p>
+            <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
+              {data.rejection_reason}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {(wf === "aguardando_assinatura" || wf === "assinada") &&
+        data.reviewer_name && (
+          <div className="mb-6 flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-soft">
+            <CheckCircle2 className="h-4 w-4 text-[hsl(142_70%_40%)]" />
+            Aprovada pelo coordenador <strong>{data.reviewer_name}</strong>
+            {digitalSig &&
+              ` · Assinada digitalmente por ${digitalSig.signer_name}`}
+          </div>
+        )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-3">
@@ -222,17 +351,34 @@ export default function MonthlyDetail() {
         </Card>
 
         <Card className="lg:col-span-3">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
             <CardTitle>Análise profissional</CardTitle>
+            {isDraft && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onGenerateAI}
+                disabled={generateAI.isPending}
+              >
+                {generateAI.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 text-brand-blue-light" />
+                )}
+                Gerar com IA
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSave)} className="space-y-4">
+              <fieldset disabled={!isDraft} className="space-y-4">
               <Field label="Revisão profissional">
                 <textarea
                   {...register("professional_review")}
                   rows={4}
                   className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Comentário do profissional sobre o período"
+                  placeholder="Comentário do profissional sobre o período — ou gere um rascunho com IA"
                 />
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -253,41 +399,129 @@ export default function MonthlyDetail() {
                   />
                 </Field>
               </div>
+              </fieldset>
 
               <div className="flex flex-wrap items-center justify-end gap-3">
+                {wf === "pendente_aprovacao" && !canReview && (
+                  <p className="mr-auto text-xs text-muted-foreground">
+                    Aguardando aprovação do coordenador.
+                  </p>
+                )}
                 <Button type="button" variant="outline" onClick={onExport}>
                   <FileDown className="h-4 w-4" /> Exportar PDF
                 </Button>
-                {!data.approved && (
+
+                {isDraft && (
+                  <>
+                    <Button type="submit" variant="outline" disabled={isSubmitting}>
+                      {isSubmitting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4" /> Salvar
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="brand"
+                      onClick={onSubmitForApproval}
+                      disabled={submitMonthly.isPending || isSubmitting}
+                    >
+                      {submitMonthly.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4" /> Enviar para aprovação
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
+
+                {canReview && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setRejectOpen(true)}
+                      disabled={review.isPending}
+                    >
+                      <ThumbsDown className="h-4 w-4" /> Solicitar ajustes
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="brand"
+                      onClick={onApprove}
+                      disabled={review.isPending}
+                    >
+                      {review.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <ThumbsUp className="h-4 w-4" /> Aprovar
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
+
+                {canSign && (
                   <Button
                     type="button"
-                    variant="accent"
-                    onClick={onApprove}
-                    disabled={approve.isPending}
+                    variant="brand"
+                    onClick={() => setSigOpen(true)}
                   >
-                    {approve.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <ShieldCheck className="h-4 w-4" /> Aprovar
-                      </>
-                    )}
+                    <ShieldCheck className="h-4 w-4" /> Assinar digitalmente
                   </Button>
                 )}
-                <Button type="submit" variant="brand" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4" /> Salvar
-                    </>
-                  )}
-                </Button>
               </div>
             </form>
           </CardContent>
         </Card>
       </div>
+
+      <MonthlySignatureDialog
+        open={sigOpen}
+        onOpenChange={setSigOpen}
+        monthly={data}
+      />
+
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Solicitar ajustes</DialogTitle>
+            <DialogDescription>
+              Descreva o que precisa ser ajustado. O profissional poderá revisar
+              e reenviar para aprovação.
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            rows={4}
+            className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            placeholder="Ex: revisar a conclusão e detalhar o progresso da meta X..."
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="brand"
+              onClick={onReject}
+              disabled={review.isPending}
+            >
+              {review.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Solicitar ajustes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   Lock,
   CheckCircle2,
   CircleDashed,
+  BadgeCheck,
 } from "lucide-react";
 import { format, parseISO, subDays } from "date-fns";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -40,11 +41,18 @@ import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
 import {
   useDailyEvolutions,
   isLocked,
+  getDigitalSignature,
   EVOLUTIONS_PAGE_SIZE,
   type EvolutionRow,
 } from "@/features/dailyEvolutions/api";
 
 function statusBadge(e: EvolutionRow) {
+  if (getDigitalSignature(e))
+    return (
+      <Badge variant="success">
+        <BadgeCheck className="h-3 w-3" /> Assinada digitalmente
+      </Badge>
+    );
   if (isLocked(e))
     return (
       <Badge variant="muted">
