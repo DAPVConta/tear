@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Skeleton } from "@/components/ui/skeleton";
+import { FormLoadingSkeleton } from "@/components/form/FormLoadingSkeleton";
 import { Field } from "@/components/form/Field";
 import { planStatusLabels, goalStatusLabels } from "@/lib/labels";
 import { GOAL_CATEGORIES } from "@/lib/constants";
@@ -179,12 +179,7 @@ export default function PlanForm() {
   }
 
   if (isEdit && isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-96 w-full rounded-2xl" />
-      </div>
-    );
+    return <FormLoadingSkeleton />;
   }
 
   return (
