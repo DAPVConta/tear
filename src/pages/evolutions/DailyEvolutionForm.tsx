@@ -34,7 +34,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TagInput } from "@/components/ui/tag-input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { FormLoadingSkeleton } from "@/components/form/FormLoadingSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Field } from "@/components/form/Field";
 import {
@@ -478,12 +478,7 @@ export default function DailyEvolutionForm() {
   }
 
   if (isEdit && isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-96 w-full rounded-2xl" />
-      </div>
-    );
+    return <FormLoadingSkeleton />;
   }
 
   const fieldsDisabled = locked;

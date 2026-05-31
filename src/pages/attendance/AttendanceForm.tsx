@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Skeleton } from "@/components/ui/skeleton";
+import { FormLoadingSkeleton } from "@/components/form/FormLoadingSkeleton";
 import { Field } from "@/components/form/Field";
 import {
   attendanceStatusLabels,
@@ -240,12 +240,7 @@ export default function AttendanceForm() {
   }
 
   if (isEdit && isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-72 w-full rounded-2xl" />
-      </div>
-    );
+    return <FormLoadingSkeleton cardClassName="h-72 w-full rounded-2xl" />;
   }
 
   return (

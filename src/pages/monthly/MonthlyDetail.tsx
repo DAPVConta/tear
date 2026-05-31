@@ -21,7 +21,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { FormLoadingSkeleton } from "@/components/form/FormLoadingSkeleton";
 import { Field } from "@/components/form/Field";
 import {
   Dialog,
@@ -202,12 +202,7 @@ export default function MonthlyDetail() {
   }
 
   if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-96 w-full rounded-2xl" />
-      </div>
-    );
+    return <FormLoadingSkeleton />;
   }
   if (!data) {
     return (

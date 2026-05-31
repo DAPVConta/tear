@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { FormLoadingSkeleton } from "@/components/form/FormLoadingSkeleton";
 import { maskCPF, maskPhone, unmask, isValidCPF } from "@/lib/masks";
 import { specialtyLabels } from "@/lib/labels";
 import { BR_STATES, COUNCIL_TYPES } from "@/lib/constants";
@@ -233,12 +233,7 @@ export default function ProfessionalForm() {
   }
 
   if (isEdit && isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-96 w-full rounded-2xl" />
-      </div>
-    );
+    return <FormLoadingSkeleton />;
   }
 
   return (

@@ -37,7 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Skeleton } from "@/components/ui/skeleton";
+import { FormLoadingSkeleton } from "@/components/form/FormLoadingSkeleton";
 import { maskCPF, maskCEP, maskPhone, unmask, isValidCPF } from "@/lib/masks";
 import { fetchCep } from "@/lib/brasilapi";
 import { genderLabels, paymentTypeLabels } from "@/lib/labels";
@@ -293,12 +293,7 @@ export default function PatientForm() {
   }
 
   if (isEdit && isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-96 w-full rounded-2xl" />
-      </div>
-    );
+    return <FormLoadingSkeleton />;
   }
 
   return (
