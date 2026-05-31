@@ -265,6 +265,29 @@ operadora; restrição editar/excluir só pelo criador.
     externo, dado clínico nunca sai do banco. Substitui o uso de LLM do
     legado (Gemini via Manus Forge) para o relatório mensal.
 
+19. [FEITO — Correção #2] Evolução diária — 3 itens reportados:
+    - Trava de 24h ancorada na ASSINATURA (signed_at), não mais na criação:
+      trigger server-side `enforce_evolution_lock` e `isLocked` client-side
+      atualizados. Enquanto não assinada, a evolução é editável; após 24h da
+      assinatura, só adendo corrige.
+    - Adendo / nota de retificação (`AddendumSection` + `useAddAddendum`)
+      gravado na coluna `addendum` (jsonb, fora da lista protegida pela
+      trigger): anexa correções sem alterar o registro original; aparece no
+      PDF. UX exibida quando travada ou quando já há adendos.
+    - Síntese da evolução em PDF (`exportDailyEvolutionPDF`, jsPDF): cabeçalho
+      institucional, identificação do paciente, dados do profissional
+      (nome + conselho), conteúdo clínico, adendos e bloco de assinatura.
+    - Assinatura digital ICP-Brasil (A1) 100% local (`lib/digitalSignature.ts`
+      via node-forge + `SignatureDialog`): o usuário usa o certificado da
+      própria máquina (.pfx/.p12); gera envelope PKCS#7 + SHA-256, extrai
+      titular/CPF/emissor do certificado e grava em `digital_signature`
+      (coluna jsonb nova, migração 0014). Status "Assinada digitalmente".
+      Sem provedor externo — chave privada e dado clínico nunca saem do
+      navegador.
+      - NOTA: A3 (token/smartcard) exige componente nativo/extensão; hoje
+        suportado apenas A1 (arquivo). BirdID/Soluti em nuvem foi descartado
+        em favor do certificado local (sem contrato/credenciais externas).
+
 Fase 2 restante: Asaas billing.
 
 ## Segurança e LGPD

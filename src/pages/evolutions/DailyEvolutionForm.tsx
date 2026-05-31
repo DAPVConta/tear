@@ -11,6 +11,8 @@ import {
   Lock,
   CheckCircle2,
   ShieldCheck,
+  FileDown,
+  BadgeCheck,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -37,8 +39,11 @@ import {
   evolutionAssessmentLabels,
   guardianValidationMethodLabels,
 } from "@/lib/labels";
-import { usePatientOptions } from "@/features/patients/api";
-import { useProfessionalOptions } from "@/features/professionals/api";
+import { usePatientOptions, usePatient } from "@/features/patients/api";
+import {
+  useProfessionalOptions,
+  useProfessional,
+} from "@/features/professionals/api";
 import {
   useDailyEvolution,
   useCreateEvolution,
@@ -47,7 +52,12 @@ import {
   useActiveAuthorizationsByPatient,
   usePlansWithGoalsByPatient,
   isLocked,
+  getDigitalSignature,
+  getAddenda,
 } from "@/features/dailyEvolutions/api";
+import { exportDailyEvolutionPDF } from "@/lib/pdf";
+import { SignatureDialog } from "@/pages/evolutions/SignatureDialog";
+import { AddendumSection } from "@/pages/evolutions/AddendumSection";
 
 const MIN_SESSION_MINUTES = 30;
 
@@ -166,9 +176,26 @@ export default function DailyEvolutionForm() {
   const createEvo = useCreateEvolution();
   const updateEvo = useUpdateEvolution(evoId ?? 0);
   const signEvo = useSignEvolution();
+  const [sigOpen, setSigOpen] = useState(false);
 
   const locked = existing ? isLocked(existing) : false;
   const signed = existing?.professional_signature ?? false;
+  const digitalSig = existing ? getDigitalSignature(existing) : null;
+  const addenda = existing ? getAddenda(existing) : [];
+
+  // Dados completos para a síntese em PDF (carregados em modo edição).
+  const { data: pdfPatient } = usePatient(existing?.patient_id);
+  const { data: pdfProfessional } = useProfessional(existing?.professional_id);
+
+  function handleExportPdf() {
+    if (!existing) return;
+    exportDailyEvolutionPDF(
+      existing,
+      pdfPatient ?? null,
+      pdfProfessional ?? null,
+      clinic?.trade_name || clinic?.name || "Clínica",
+    );
+  }
 
   const {
     register,
@@ -360,10 +387,15 @@ export default function DailyEvolutionForm() {
           <div className="flex items-center gap-2">
             {locked && (
               <Badge variant="muted">
-                <Lock className="h-3 w-3" /> Bloqueada (&gt;24h)
+                <Lock className="h-3 w-3" /> Bloqueada (&gt;24h da assinatura)
               </Badge>
             )}
-            {signed && !locked && (
+            {digitalSig && (
+              <Badge variant="success">
+                <BadgeCheck className="h-3 w-3" /> Assinada digitalmente
+              </Badge>
+            )}
+            {signed && !digitalSig && !locked && (
               <Badge variant="success">
                 <CheckCircle2 className="h-3 w-3" /> Assinada
               </Badge>
@@ -747,10 +779,15 @@ export default function DailyEvolutionForm() {
           </Card>
         </fieldset>
 
+        {isEdit && existing && (locked || addenda.length > 0) && (
+          <AddendumSection evolution={existing} />
+        )}
+
         <div className="flex flex-wrap items-center justify-end gap-3">
           {locked ? (
             <p className="mr-auto text-xs text-muted-foreground">
-              Sessão bloqueada após 24h. Para corrigir, use um adendo (em breve).
+              Sessão bloqueada após 24h da assinatura. Para corrigir, use um
+              adendo acima.
             </p>
           ) : (
             !isEdit &&
@@ -767,33 +804,57 @@ export default function DailyEvolutionForm() {
           <Button type="button" variant="outline" onClick={() => navigate("/evolucoes")}>
             Cancelar
           </Button>
-          {isEdit && !signed && !locked && (
-            <Button
-              type="button"
-              variant="accent"
-              onClick={onSign}
-              disabled={signEvo.isPending}
-            >
-              {signEvo.isPending ? (
+          {isEdit && existing && (
+            <Button type="button" variant="outline" onClick={handleExportPdf}>
+              <FileDown className="h-4 w-4" /> Gerar síntese em PDF
+            </Button>
+          )}
+          {isEdit && existing && !signed && !locked && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onSign}
+                disabled={signEvo.isPending}
+              >
+                {signEvo.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <ShieldCheck className="h-4 w-4" /> Assinar (sem certificado)
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="accent"
+                onClick={() => setSigOpen(true)}
+              >
+                <BadgeCheck className="h-4 w-4" /> Assinar com certificado digital
+              </Button>
+            </>
+          )}
+          {!locked && (
+            <Button type="submit" variant="brand" disabled={isSubmitting}>
+              {isSubmitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  <ShieldCheck className="h-4 w-4" /> Assinar evolução
+                  <Save className="h-4 w-4" /> Salvar
                 </>
               )}
             </Button>
           )}
-          <Button type="submit" variant="brand" disabled={isSubmitting || locked}>
-            {isSubmitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <>
-                <Save className="h-4 w-4" /> Salvar
-              </>
-            )}
-          </Button>
         </div>
       </form>
+
+      {isEdit && existing && (
+        <SignatureDialog
+          open={sigOpen}
+          onOpenChange={setSigOpen}
+          evolution={existing}
+        />
+      )}
     </div>
   );
 }

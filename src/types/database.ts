@@ -307,6 +307,7 @@ export type Database = {
           clinic_id: number;
           created_at: string;
           created_by: string | null;
+          digital_signature: Json | null;
           end_time: string;
           evolution_assessment: Database["public"]["Enums"]["evolution_assessment"];
           goals_worked: Json;
@@ -342,6 +343,7 @@ export type Database = {
           clinic_id: number;
           created_at?: string;
           created_by?: string | null;
+          digital_signature?: Json | null;
           end_time: string;
           evolution_assessment: Database["public"]["Enums"]["evolution_assessment"];
           goals_worked?: Json;
@@ -377,6 +379,7 @@ export type Database = {
           clinic_id?: number;
           created_at?: string;
           created_by?: string | null;
+          digital_signature?: Json | null;
           end_time?: string;
           evolution_assessment?: Database["public"]["Enums"]["evolution_assessment"];
           goals_worked?: Json;

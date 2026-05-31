@@ -2,7 +2,19 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { MONTH_NAMES_PT } from "@/features/monthlyEvolutions/api";
 import type { MonthlyRow, GoalProgress } from "@/features/monthlyEvolutions/api";
-import { specialtyLabels } from "@/lib/labels";
+import type { Tables } from "@/types/database";
+import {
+  getAddenda,
+  getDigitalSignature,
+  type DailyEvolution,
+} from "@/features/dailyEvolutions/api";
+import {
+  specialtyLabels,
+  attendanceTypeLabels,
+  promptingLevelLabels,
+  evolutionAssessmentLabels,
+  guardianValidationMethodLabels,
+} from "@/lib/labels";
 
 const BRAND_DARK: [number, number, number] = [0, 31, 107];
 const BRAND_ACCENT: [number, number, number] = [30, 136, 255];
@@ -223,5 +235,230 @@ export function exportMonthlyEvolutionPDF(
   );
 
   const file = `evolucao-mensal-${monthly.patient?.name?.replace(/\s+/g, "_") ?? "paciente"}-${monthly.reference_year}-${String(monthly.reference_month).padStart(2, "0")}.pdf`;
+  doc.save(file);
+}
+
+function formatDateBR(iso: string): string {
+  // datas "yyyy-mm-dd" sem timezone para evitar deslocamento de 1 dia.
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+}
+
+// Síntese da evolução diária em PDF A4 — cabeçalho institucional, identificação
+// do paciente, conteúdo clínico, adendos e bloco de assinatura (digital
+// ICP-Brasil quando houver). Otimizado para impressão.
+export function exportDailyEvolutionPDF(
+  evo: DailyEvolution,
+  patient: Pick<Tables<"patients">, "name" | "cpf" | "birth_date"> | null,
+  professional: Pick<
+    Tables<"professionals">,
+    "name" | "specialty" | "council_type" | "council_number" | "council_state"
+  > | null,
+  clinicName: string,
+) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  const contentWidth = pageWidth - margin * 2;
+
+  // Cabeçalho institucional
+  doc.setFillColor(...BRAND_DARK);
+  doc.rect(0, 0, pageWidth, 60, "F");
+  doc.setTextColor(255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("TEAR", margin, 38);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text("Prontuário Inteligente para Clínicas de TEA", margin, 52);
+  doc.setFontSize(11);
+  doc.text(clinicName, pageWidth - margin, 38, { align: "right" });
+  doc.setFontSize(9);
+  doc.text(
+    `Emitido em ${new Date().toLocaleString("pt-BR")}`,
+    pageWidth - margin,
+    52,
+    { align: "right" },
+  );
+
+  // Título
+  doc.setTextColor(...BRAND_DARK);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Evolução Diária", margin, 96);
+
+  // Identificação
+  doc.setDrawColor(220);
+  doc.line(margin, 108, pageWidth - margin, 108);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80);
+  doc.text("Paciente:", margin, 128);
+  doc.text("Profissional:", margin, 146);
+  doc.setTextColor(0);
+  doc.setFont("helvetica", "bold");
+  const patientLine = [
+    patient?.name ?? "—",
+    patient?.cpf ? `CPF ${patient.cpf}` : null,
+    patient?.birth_date ? `Nasc. ${formatDateBR(patient.birth_date)}` : null,
+  ]
+    .filter(Boolean)
+    .join("  ·  ");
+  const councilParts = [
+    professional?.council_type,
+    professional?.council_number,
+    professional?.council_state,
+  ].filter(Boolean);
+  const profLine = [
+    professional?.name ?? "—",
+    professional?.specialty ? specialtyLabels[professional.specialty] : null,
+    councilParts.length ? councilParts.join(" ") : null,
+  ]
+    .filter(Boolean)
+    .join("  ·  ");
+  doc.text(patientLine, margin + 90, 128);
+  doc.text(profLine, margin + 90, 146);
+  doc.setFont("helvetica", "normal");
+
+  // Dados da sessão
+  autoTable(doc, {
+    startY: 162,
+    head: [["Data", "Horário", "Duração", "Tipo", "Faturamento"]],
+    body: [
+      [
+        formatDateBR(evo.session_date),
+        `${evo.start_time.slice(0, 5)}–${evo.end_time.slice(0, 5)}`,
+        `${evo.session_duration_minutes} min`,
+        attendanceTypeLabels[evo.attendance_type],
+        evo.is_private ? "Particular" : "Guia/operadora",
+      ],
+    ],
+    theme: "grid",
+    headStyles: { fillColor: BRAND_ACCENT, textColor: 255, fontStyle: "bold" },
+    styles: { fontSize: 9, halign: "center" },
+    margin: { left: margin, right: margin },
+  });
+
+  let y =
+    (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
+      .finalY + 22;
+
+  function ensureSpace(needed: number) {
+    if (y + needed > pageHeight - 60) {
+      doc.addPage();
+      y = 60;
+    }
+  }
+
+  function section(title: string, body: string) {
+    const text = body.trim() || "—";
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    const lines = doc.splitTextToSize(text, contentWidth);
+    ensureSpace(20 + lines.length * 12);
+    doc.setTextColor(...BRAND_DARK);
+    doc.text(title, margin, y);
+    y += 14;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(40);
+    doc.text(lines, margin, y);
+    y += lines.length * 12 + 10;
+  }
+
+  const skills = Array.isArray(evo.skills_worked)
+    ? (evo.skills_worked as unknown[]).filter(
+        (v): v is string => typeof v === "string",
+      )
+    : [];
+  if (skills.length) section("Habilidades trabalhadas", skills.join(", "));
+  section("Nível de suporte geral", promptingLevelLabels[evo.prompting_level]);
+  if (evo.behavioral_notes)
+    section("Comportamentos barreira observados", evo.behavioral_notes);
+  if (evo.behavioral_intervention)
+    section("Intervenções de manejo", evo.behavioral_intervention);
+  section("Síntese / observações clínicas", evo.session_summary);
+  section(
+    "Avaliação de evolução",
+    evolutionAssessmentLabels[evo.evolution_assessment],
+  );
+  section("Plano para a próxima sessão", evo.next_session_plan);
+  if (evo.incidents) section("Intercorrências", evo.incidents);
+  section(
+    "Validação de presença do responsável",
+    evo.guardian_presence_validation
+      ? `Confirmada${
+          evo.guardian_validation_method
+            ? ` (${guardianValidationMethodLabels[evo.guardian_validation_method]})`
+            : ""
+        }`
+      : "Não validada",
+  );
+
+  // Adendos / notas de retificação
+  const addenda = getAddenda(evo);
+  if (addenda.length) {
+    addenda.forEach((a, i) => {
+      const stamp = `${a.author_name ?? "—"} · ${new Date(a.created_at).toLocaleString("pt-BR")}`;
+      section(`Adendo ${i + 1} — ${stamp}`, a.text);
+    });
+  }
+
+  // Bloco de assinatura
+  const sig = getDigitalSignature(evo);
+  ensureSpace(110);
+  y += 8;
+  doc.setDrawColor(120);
+  doc.line(margin, y, margin + 260, y);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(0);
+  doc.text(sig?.signer_name ?? professional?.name ?? "—", margin, y + 14);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(90);
+  let sy = y + 27;
+  if (professional?.specialty) {
+    doc.text(specialtyLabels[professional.specialty], margin, sy);
+    sy += 13;
+  }
+  if (sig) {
+    const rows = [
+      "Assinado digitalmente — ICP-Brasil (A1)",
+      sig.signer_cpf ? `CPF ${sig.signer_cpf}` : null,
+      `Emissor: ${sig.certificate_issuer}`,
+      `Certificado nº ${sig.certificate_serial}`,
+      `Algoritmo: ${sig.algorithm}`,
+      `Hash SHA-256: ${sig.content_hash}`,
+      `Data/hora: ${new Date(sig.signed_at).toLocaleString("pt-BR")}`,
+    ].filter(Boolean) as string[];
+    rows.forEach((r) => {
+      ensureSpace(13);
+      doc.text(doc.splitTextToSize(r, contentWidth), margin, sy);
+      sy += 12;
+    });
+  } else if (evo.professional_signature) {
+    doc.text(
+      `Assinatura eletrônica${evo.signed_at ? ` em ${new Date(evo.signed_at).toLocaleString("pt-BR")}` : ""}`,
+      margin,
+      sy,
+    );
+  } else {
+    doc.text("Documento ainda não assinado.", margin, sy);
+  }
+
+  // Rodapé
+  doc.setDrawColor(220);
+  doc.line(margin, pageHeight - 40, pageWidth - margin, pageHeight - 40);
+  doc.setFontSize(8);
+  doc.setTextColor(120);
+  doc.text(
+    "Documento gerado pelo TEAR — Prontuário Inteligente para Clínicas de TEA.",
+    margin,
+    pageHeight - 24,
+  );
+
+  const file = `evolucao-diaria-${patient?.name?.replace(/\s+/g, "_") ?? "paciente"}-${evo.session_date}.pdf`;
   doc.save(file);
 }

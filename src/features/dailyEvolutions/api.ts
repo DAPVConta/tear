@@ -3,10 +3,54 @@ import { supabase } from "@/lib/supabase";
 import { keys } from "@/lib/queryKeys";
 import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
-import type { Tables, TablesInsert, TablesUpdate } from "@/types/database";
+import type { Json, Tables, TablesInsert, TablesUpdate } from "@/types/database";
+import type { DigitalSignature } from "@/lib/digitalSignature";
 
 export type DailyEvolution = Tables<"daily_evolutions">;
 export const EVOLUTIONS_PAGE_SIZE = 15;
+
+// Adendo / nota de retificação anexada à evolução sem alterar o registro
+// original (única forma de "corrigir" após o bloqueio de 24h).
+export type Addendum = {
+  text: string;
+  author_id: string | null;
+  author_name: string | null;
+  created_at: string;
+};
+
+export function getAddenda(
+  e: Pick<DailyEvolution, "addendum"> | null | undefined,
+): Addendum[] {
+  return Array.isArray(e?.addendum) ? (e!.addendum as unknown as Addendum[]) : [];
+}
+
+export function getDigitalSignature(
+  e: Pick<DailyEvolution, "digital_signature"> | null | undefined,
+): DigitalSignature | null {
+  const s = e?.digital_signature;
+  return s && typeof s === "object" && !Array.isArray(s)
+    ? (s as unknown as DigitalSignature)
+    : null;
+}
+
+// String canônica assinada digitalmente — vincula a assinatura ao conteúdo
+// clínico exato da evolução no momento da finalização.
+export function buildEvolutionSignaturePayload(e: DailyEvolution): string {
+  return [
+    `Evolução diária #${e.id}`,
+    `Paciente: ${e.patient_id}`,
+    `Profissional: ${e.professional_id}`,
+    `Data: ${e.session_date} ${e.start_time}–${e.end_time}`,
+    `Tipo: ${e.attendance_type}`,
+    `Nível de suporte: ${e.prompting_level}`,
+    `Síntese: ${e.session_summary}`,
+    `Avaliação: ${e.evolution_assessment}`,
+    `Próxima sessão: ${e.next_session_plan}`,
+    `Comportamento: ${e.behavioral_notes ?? ""}`,
+    `Intervenção: ${e.behavioral_intervention ?? ""}`,
+    `Intercorrências: ${e.incidents ?? ""}`,
+  ].join("\n");
+}
 
 export type EvolutionRow = DailyEvolution & {
   patient: { name: string } | null;
@@ -71,11 +115,14 @@ export function useDailyEvolution(id: number | undefined) {
   });
 }
 
-// Bloqueio automático após 24h da criação (regra de blindagem).
+// Bloqueio automático após 24h da ASSINATURA (regra de blindagem). O contador
+// inicia no timestamp da assinatura; enquanto não houver assinatura, a evolução
+// permanece editável. Espelha a trigger server-side enforce_evolution_lock.
 const LOCK_AFTER_MS = 24 * 60 * 60 * 1000;
-export function isLocked(e: DailyEvolution): boolean {
+export function isLocked(e: Pick<DailyEvolution, "locked" | "signed_at">): boolean {
   if (e.locked) return true;
-  return Date.now() - new Date(e.created_at).getTime() > LOCK_AFTER_MS;
+  if (!e.signed_at) return false;
+  return Date.now() - new Date(e.signed_at).getTime() > LOCK_AFTER_MS;
 }
 
 // Normaliza "HH:MM" → "HH:MM:SS" para casar com o formato do tipo `time`
@@ -224,6 +271,72 @@ export function useSignEvolution() {
       if (error) throw error;
     },
     onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.all });
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.byId(id) });
+    },
+  });
+}
+
+// Finaliza a evolução com assinatura digital ICP-Brasil (A1) gerada localmente.
+// Persiste o envelope PKCS#7 + metadados do certificado e inicia o contador de
+// 24h via signed_at. O status passa a "Assinado Digitalmente".
+export function useSignEvolutionDigital(id: number) {
+  const queryClient = useQueryClient();
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: async (signature: DigitalSignature) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      const { error } = await supabase
+        .from("daily_evolutions")
+        .update({
+          professional_signature: true,
+          signed_at: signature.signed_at,
+          digital_signature: signature as unknown as Json,
+        } as never)
+        .eq("id", id)
+        .eq("clinic_id", clinic.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.all });
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.byId(id) });
+    },
+  });
+}
+
+// Anexa um adendo/nota de retificação. Permitido mesmo com a evolução travada
+// (a coluna addendum fica fora da lista protegida pela trigger de bloqueio).
+export function useAddAddendum(id: number) {
+  const queryClient = useQueryClient();
+  const { clinic } = useClinic();
+  const { user, profile } = useAuth();
+  return useMutation({
+    mutationFn: async (text: string) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      const { data: current, error: fetchErr } = await supabase
+        .from("daily_evolutions")
+        .select("addendum")
+        .eq("id", id)
+        .eq("clinic_id", clinic.id)
+        .maybeSingle();
+      if (fetchErr) throw fetchErr;
+      const next: Addendum[] = [
+        ...getAddenda(current),
+        {
+          text,
+          author_id: user?.id ?? null,
+          author_name: profile?.name ?? user?.email ?? null,
+          created_at: new Date().toISOString(),
+        },
+      ];
+      const { error } = await supabase
+        .from("daily_evolutions")
+        .update({ addendum: next as unknown as Json } as never)
+        .eq("id", id)
+        .eq("clinic_id", clinic.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.evolutions.all });
       queryClient.invalidateQueries({ queryKey: keys.evolutions.byId(id) });
     },
