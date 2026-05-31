@@ -1,5 +1,11 @@
 import type { Enums } from "@/types/database";
 
+export const memberRoleLabels: Record<Enums<"member_role">, string> = {
+  clinic_admin: "Administrador",
+  therapist: "Terapeuta",
+  receptionist: "Recepção",
+};
+
 export const monthlyStatusLabels: Record<Enums<"monthly_status">, string> = {
   rascunho: "Rascunho",
   pendente_aprovacao: "Pendente de aprovação",
