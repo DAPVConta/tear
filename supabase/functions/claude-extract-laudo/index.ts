@@ -7,10 +7,46 @@
 // completo (PHI identificável) ao provedor externo (Anthropic). Uso opt-in;
 // cobrir em política de privacidade + DPA.
 import Anthropic from "npm:@anthropic-ai/sdk@0.69.0";
-import { corsHeaders, getAuthedUser } from "../_shared/auth.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.46.1";
 
 // ~10 MB de arquivo → ~13,5 MB em base64. Limite defensivo (custo/DoS).
 const MAX_BASE64_CHARS = 14_000_000;
+
+// --- Helpers compartilhados (inline para deploy independente de layout) ---
+// CORS com allowlist (ALLOWED_ORIGINS) e verificação defensiva do JWT no código
+// (além do verify_jwt do config.toml): se a flag cair num deploy, a função
+// ainda recusa chamadas anônimas.
+function corsHeaders(req: Request): Record<string, string> {
+  const list = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const origin = req.headers.get("Origin") ?? "";
+  const allow =
+    list.length === 0 ? "*" : list.includes(origin) ? origin : list[0];
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
+
+async function getAuthedUser(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return null;
+  const url = Deno.env.get("SUPABASE_URL");
+  const anon = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!url || !anon) return null;
+  const client = createClient(url, anon, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await client.auth.getUser();
+  if (error || !data.user) return null;
+  return data.user;
+}
 
 type Payload = { fileBase64?: string; mediaType?: string };
 
