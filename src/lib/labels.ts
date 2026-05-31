@@ -50,6 +50,7 @@ export const attendanceTypeLabels: Record<Enums<"attendance_type">, string> = {
   individual_domiciliar: "Individual — domiciliar",
   individual_escolar: "Individual — escolar",
   grupo_presencial: "Grupo — presencial",
+  devolutiva_pais: "Devolutiva para os Pais",
 };
 
 export const promptingLevelLabels: Record<Enums<"prompting_level">, string> = {

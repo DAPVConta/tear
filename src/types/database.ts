@@ -321,6 +321,7 @@ export type Database = {
           locked: boolean;
           locked_at: string | null;
           next_session_plan: string;
+          parent_feedback: Json | null;
           patient_id: number;
           plan_id: number | null;
           professional_id: number;
@@ -357,6 +358,7 @@ export type Database = {
           locked?: boolean;
           locked_at?: string | null;
           next_session_plan: string;
+          parent_feedback?: Json | null;
           patient_id: number;
           plan_id?: number | null;
           professional_id: number;
@@ -393,6 +395,7 @@ export type Database = {
           locked?: boolean;
           locked_at?: string | null;
           next_session_plan?: string;
+          parent_feedback?: Json | null;
           patient_id?: number;
           plan_id?: number | null;
           professional_id?: number;
@@ -768,7 +771,8 @@ export type Database = {
         | "individual_presencial"
         | "individual_domiciliar"
         | "individual_escolar"
-        | "grupo_presencial";
+        | "grupo_presencial"
+        | "devolutiva_pais";
       authorization_status: "ativa" | "vencida" | "cancelada" | "esgotada";
       clinic_plan: "trial" | "basic" | "professional" | "enterprise";
       clinic_plan_status: "active" | "past_due" | "canceled" | "trialing";

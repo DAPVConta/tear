@@ -33,6 +33,28 @@ export function getDigitalSignature(
     : null;
 }
 
+// Devolutiva para os pais — campos em linguagem acessível para familiares.
+export type ParentFeedback = {
+  previous_activities: string;
+  next_activities: string;
+  home_guidance: string;
+};
+
+export function getParentFeedback(
+  e: Pick<DailyEvolution, "parent_feedback"> | null | undefined,
+): ParentFeedback | null {
+  const f = e?.parent_feedback;
+  if (!f || typeof f !== "object" || Array.isArray(f)) return null;
+  const o = f as Record<string, unknown>;
+  return {
+    previous_activities:
+      typeof o.previous_activities === "string" ? o.previous_activities : "",
+    next_activities:
+      typeof o.next_activities === "string" ? o.next_activities : "",
+    home_guidance: typeof o.home_guidance === "string" ? o.home_guidance : "",
+  };
+}
+
 // String canônica assinada digitalmente — vincula a assinatura ao conteúdo
 // clínico exato da evolução no momento da finalização.
 export function buildEvolutionSignaturePayload(e: DailyEvolution): string {

@@ -13,6 +13,9 @@ import {
   ShieldCheck,
   FileDown,
   BadgeCheck,
+  Users,
+  Printer,
+  Info,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -54,8 +57,9 @@ import {
   isLocked,
   getDigitalSignature,
   getAddenda,
+  getParentFeedback,
 } from "@/features/dailyEvolutions/api";
-import { exportDailyEvolutionPDF } from "@/lib/pdf";
+import { exportDailyEvolutionPDF, exportParentFeedbackPDF } from "@/lib/pdf";
 import { SignatureDialog } from "@/pages/evolutions/SignatureDialog";
 import { AddendumSection } from "@/pages/evolutions/AddendumSection";
 
@@ -85,6 +89,8 @@ function minutesBetween(start: string, end: string): number {
   return eh * 60 + em - (sh * 60 + sm);
 }
 
+const DEVOLUTIVA = "devolutiva_pais";
+
 const schema = z
   .object({
     patient_id: z.coerce.number({ message: "Selecione o paciente" }).int().positive(),
@@ -104,28 +110,40 @@ const schema = z
     prompting_level: z.enum(promptingLevels),
     behavioral_notes: z.string().optional(),
     behavioral_intervention: z.string().optional(),
-    session_summary: z.string().min(5, "Descreva a sessão"),
+    session_summary: z.string().optional(),
     evolution_assessment: z.enum(evolutionAssessments),
-    next_session_plan: z.string().min(5, "Defina o próximo passo"),
+    next_session_plan: z.string().optional(),
     incidents: z.string().optional(),
     guardian_presence_validation: z.boolean(),
     guardian_validation_method: z.string(),
+    // Devolutiva para os pais (linguagem acessível).
+    parent_previous: z.string().optional(),
+    parent_next: z.string().optional(),
+    parent_home: z.string().optional(),
   })
   .refine((v) => minutesBetween(v.start_time, v.end_time) > 0, {
     message: "Término deve ser após o início",
     path: ["end_time"],
   })
   .refine(
-    (v) => minutesBetween(v.start_time, v.end_time) >= MIN_SESSION_MINUTES,
+    (v) =>
+      v.attendance_type === DEVOLUTIVA ||
+      minutesBetween(v.start_time, v.end_time) >= MIN_SESSION_MINUTES,
     {
       message: `Duração mínima de ${MIN_SESSION_MINUTES} minutos`,
       path: ["end_time"],
     },
   )
-  .refine((v) => v.is_private || v.authorization_id !== "", {
-    message: "Selecione a guia (ou marque como sessão particular)",
-    path: ["authorization_id"],
-  })
+  .refine(
+    (v) =>
+      v.attendance_type === DEVOLUTIVA ||
+      v.is_private ||
+      v.authorization_id !== "",
+    {
+      message: "Selecione a guia (ou marque como sessão particular)",
+      path: ["authorization_id"],
+    },
+  )
   .refine(
     (v) =>
       !v.guardian_presence_validation || v.guardian_validation_method !== "",
@@ -133,7 +151,43 @@ const schema = z
       message: "Informe o método de validação",
       path: ["guardian_validation_method"],
     },
-  );
+  )
+  .superRefine((v, ctx) => {
+    const min = (s: string | undefined) => (s ?? "").trim().length >= 5;
+    if (v.attendance_type === DEVOLUTIVA) {
+      if (!min(v.parent_previous))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["parent_previous"],
+          message: "Descreva as atividades do plano anterior",
+        });
+      if (!min(v.parent_next))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["parent_next"],
+          message: "Descreva as atividades do próximo plano",
+        });
+      if (!min(v.parent_home))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["parent_home"],
+          message: "Descreva a orientação para casa",
+        });
+    } else {
+      if (!min(v.session_summary))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["session_summary"],
+          message: "Descreva a sessão",
+        });
+      if (!min(v.next_session_plan))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["next_session_plan"],
+          message: "Defina o próximo passo",
+        });
+    }
+  });
 type FormValues = z.infer<typeof schema>;
 
 const defaults: FormValues = {
@@ -157,6 +211,9 @@ const defaults: FormValues = {
   incidents: "",
   guardian_presence_validation: false,
   guardian_validation_method: "",
+  parent_previous: "",
+  parent_next: "",
+  parent_home: "",
 };
 
 export default function DailyEvolutionForm() {
@@ -197,6 +254,16 @@ export default function DailyEvolutionForm() {
     );
   }
 
+  function handleExportDevolutiva() {
+    if (!existing) return;
+    exportParentFeedbackPDF(
+      existing,
+      pdfPatient ?? null,
+      pdfProfessional ?? null,
+      clinic?.trade_name || clinic?.name || "Clínica",
+    );
+  }
+
   const {
     register,
     handleSubmit,
@@ -217,6 +284,8 @@ export default function DailyEvolutionForm() {
   const startTime = watch("start_time");
   const endTime = watch("end_time");
   const goalsWorked = watch("goals_worked");
+  const attendanceType = watch("attendance_type");
+  const isDevolutiva = attendanceType === DEVOLUTIVA;
 
   const { data: authorizations } = useActiveAuthorizationsByPatient(patientId);
   const { data: plans } = usePlansWithGoalsByPatient(patientId);
@@ -299,12 +368,23 @@ export default function DailyEvolutionForm() {
         incidents: existing.incidents ?? "",
         guardian_presence_validation: existing.guardian_presence_validation,
         guardian_validation_method: existing.guardian_validation_method ?? "",
+        parent_previous: getParentFeedback(existing)?.previous_activities ?? "",
+        parent_next: getParentFeedback(existing)?.next_activities ?? "",
+        parent_home: getParentFeedback(existing)?.home_guidance ?? "",
       });
     }
   }, [existing, reset]);
 
   async function onSubmit(values: FormValues) {
-    const payload = {
+    const devolutiva = values.attendance_type === DEVOLUTIVA;
+    const guardianMethod = values.guardian_presence_validation
+      ? (values.guardian_validation_method as
+          | "assinatura_digital"
+          | "token"
+          | "presencial")
+      : null;
+
+    const base = {
       patient_id: values.patient_id,
       professional_id: values.professional_id,
       session_date: values.session_date,
@@ -312,30 +392,52 @@ export default function DailyEvolutionForm() {
       end_time: values.end_time,
       session_duration_minutes: minutesBetween(values.start_time, values.end_time),
       attendance_type: values.attendance_type,
-      is_private: values.is_private,
-      authorization_id: values.is_private
-        ? null
-        : values.authorization_id
-          ? Number(values.authorization_id)
-          : null,
-      plan_id: values.plan_id ? Number(values.plan_id) : null,
-      goals_worked: values.goals_worked,
-      skills_worked: values.skills_worked,
-      prompting_level: values.prompting_level,
-      behavioral_notes: values.behavioral_notes || null,
-      behavioral_intervention: values.behavioral_intervention || null,
-      session_summary: values.session_summary,
       evolution_assessment: values.evolution_assessment,
-      next_session_plan: values.next_session_plan,
       incidents: values.incidents || null,
       guardian_presence_validation: values.guardian_presence_validation,
-      guardian_validation_method: values.guardian_presence_validation
-        ? (values.guardian_validation_method as
-            | "assinatura_digital"
-            | "token"
-            | "presencial")
-        : null,
+      guardian_validation_method: guardianMethod,
     };
+
+    // Devolutiva: layout próprio (sem guia/metas técnicas). Os 3 campos vão
+    // para parent_feedback; síntese/próximo passo recebem versões legíveis
+    // para satisfazer as colunas obrigatórias e os relatórios existentes.
+    const payload = devolutiva
+      ? {
+          ...base,
+          is_private: true,
+          authorization_id: null,
+          plan_id: null,
+          goals_worked: [],
+          skills_worked: [],
+          prompting_level: values.prompting_level,
+          behavioral_notes: null,
+          behavioral_intervention: null,
+          session_summary: "Devolutiva para os pais (ver orientações domiciliares).",
+          next_session_plan: values.parent_home ?? "",
+          parent_feedback: {
+            previous_activities: values.parent_previous ?? "",
+            next_activities: values.parent_next ?? "",
+            home_guidance: values.parent_home ?? "",
+          },
+        }
+      : {
+          ...base,
+          is_private: values.is_private,
+          authorization_id: values.is_private
+            ? null
+            : values.authorization_id
+              ? Number(values.authorization_id)
+              : null,
+          plan_id: values.plan_id ? Number(values.plan_id) : null,
+          goals_worked: values.goals_worked,
+          skills_worked: values.skills_worked,
+          prompting_level: values.prompting_level,
+          behavioral_notes: values.behavioral_notes || null,
+          behavioral_intervention: values.behavioral_intervention || null,
+          session_summary: values.session_summary ?? "",
+          next_session_plan: values.next_session_plan ?? "",
+          parent_feedback: null,
+        };
 
     try {
       if (isEdit) {
@@ -499,6 +601,8 @@ export default function DailyEvolutionForm() {
                 </p>
               </Field>
 
+              {!isDevolutiva && (
+                <>
               <Field label="Sessão particular?" className="sm:col-span-2">
                 <Controller
                   control={control}
@@ -575,9 +679,67 @@ export default function DailyEvolutionForm() {
                   )}
                 />
               </Field>
+                </>
+              )}
             </CardContent>
           </Card>
 
+          {isDevolutiva && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-brand-blue-light" />
+                  Devolutiva para os Pais
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-2 rounded-lg border border-accent/30 bg-accent/5 p-3 text-sm text-muted-foreground">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+                  <span>
+                    Atenção: este documento é destinado aos familiares. Utilize
+                    linguagem clara, acessível e evite termos técnicos clínicos ou
+                    jurídicos complexos.
+                  </span>
+                </div>
+                <Field
+                  label="Atividades trabalhadas com a criança no plano anterior"
+                  error={errors.parent_previous?.message}
+                >
+                  <textarea
+                    {...register("parent_previous")}
+                    rows={3}
+                    className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="O que foi trabalhado no período anterior..."
+                  />
+                </Field>
+                <Field
+                  label="Atividades que serão trabalhadas no próximo plano"
+                  error={errors.parent_next?.message}
+                >
+                  <textarea
+                    {...register("parent_next")}
+                    rows={3}
+                    className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="O que será trabalhado a seguir..."
+                  />
+                </Field>
+                <Field
+                  label="Orientação para Casa: atividades que os pais devem realizar"
+                  error={errors.parent_home?.message}
+                >
+                  <textarea
+                    {...register("parent_home")}
+                    rows={3}
+                    className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="Orientações práticas para a família realizar em casa..."
+                  />
+                </Field>
+              </CardContent>
+            </Card>
+          )}
+
+          {!isDevolutiva && (
+            <>
           <Card>
             <CardHeader>
               <CardTitle>Habilidades Trabalhadas</CardTitle>
@@ -729,6 +891,8 @@ export default function DailyEvolutionForm() {
               </Field>
             </CardContent>
           </Card>
+            </>
+          )}
 
           <Card>
             <CardHeader>
@@ -804,9 +968,14 @@ export default function DailyEvolutionForm() {
           <Button type="button" variant="outline" onClick={() => navigate("/evolucoes")}>
             Cancelar
           </Button>
-          {isEdit && existing && (
+          {isEdit && existing && !isDevolutiva && (
             <Button type="button" variant="outline" onClick={handleExportPdf}>
               <FileDown className="h-4 w-4" /> Gerar síntese em PDF
+            </Button>
+          )}
+          {isEdit && existing && isDevolutiva && (
+            <Button type="button" variant="outline" onClick={handleExportDevolutiva}>
+              <Printer className="h-4 w-4" /> Imprimir Devolutiva (PDF)
             </Button>
           )}
           {isEdit && existing && !signed && !locked && (

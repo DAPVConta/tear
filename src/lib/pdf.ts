@@ -6,6 +6,7 @@ import type { Tables } from "@/types/database";
 import {
   getAddenda,
   getDigitalSignature,
+  getParentFeedback,
   type DailyEvolution,
 } from "@/features/dailyEvolutions/api";
 import {
@@ -460,5 +461,142 @@ export function exportDailyEvolutionPDF(
   );
 
   const file = `evolucao-diaria-${patient?.name?.replace(/\s+/g, "_") ?? "paciente"}-${evo.session_date}.pdf`;
+  doc.save(file);
+}
+
+// Devolutiva para os Pais em PDF, em 2 vias (Clínica / Pais), com linguagem
+// acessível e campo de assinatura física do responsável.
+export function exportParentFeedbackPDF(
+  evo: DailyEvolution,
+  patient:
+    | Pick<Tables<"patients">, "name" | "guardian_name" | "cpf">
+    | null,
+  professional: Pick<
+    Tables<"professionals">,
+    "name" | "specialty" | "council_type" | "council_number" | "council_state"
+  > | null,
+  clinicName: string,
+) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  const contentWidth = pageWidth - margin * 2;
+  const fb = getParentFeedback(evo) ?? {
+    previous_activities: "",
+    next_activities: "",
+    home_guidance: "",
+  };
+  const councilParts = [
+    professional?.council_type,
+    professional?.council_number,
+    professional?.council_state,
+  ].filter(Boolean);
+
+  function renderVia(viaLabel: string) {
+    doc.setFillColor(...BRAND_DARK);
+    doc.rect(0, 0, pageWidth, 60, "F");
+    doc.setTextColor(255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("TEAR", margin, 38);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("Prontuário Inteligente para Clínicas de TEA", margin, 52);
+    doc.setFontSize(11);
+    doc.text(clinicName, pageWidth - margin, 34, { align: "right" });
+    doc.setFontSize(9);
+    doc.text(viaLabel, pageWidth - margin, 50, { align: "right" });
+
+    doc.setTextColor(...BRAND_DARK);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Devolutiva para os Pais", margin, 96);
+
+    doc.setDrawColor(220);
+    doc.line(margin, 108, pageWidth - margin, 108);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80);
+    doc.text("Paciente:", margin, 128);
+    doc.text("Responsável:", margin, 146);
+    doc.text("Data / Profissional:", margin, 164);
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "bold");
+    doc.text(patient?.name ?? "—", margin + 120, 128);
+    doc.text(patient?.guardian_name ?? "—", margin + 120, 146);
+    doc.text(
+      [
+        formatDateBR(evo.session_date),
+        professional?.name ?? "—",
+        councilParts.length ? councilParts.join(" ") : null,
+      ]
+        .filter(Boolean)
+        .join("  ·  "),
+      margin + 120,
+      164,
+    );
+    doc.setFont("helvetica", "normal");
+
+    let y = 192;
+    function section(title: string, body: string) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(...BRAND_DARK);
+      doc.text(title, margin, y);
+      y += 14;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(40);
+      const lines = doc.splitTextToSize(body.trim() || "—", contentWidth);
+      doc.text(lines, margin, y);
+      y += lines.length * 12 + 14;
+    }
+    section("Atividades trabalhadas no plano anterior", fb.previous_activities);
+    section("Atividades do próximo plano", fb.next_activities);
+    section("Orientação para casa", fb.home_guidance);
+
+    // Assinaturas
+    const sy = pageHeight - 130;
+    doc.setDrawColor(120);
+    doc.line(margin, sy, margin + 230, sy);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    doc.text(professional?.name ?? "—", margin, sy + 14);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(90);
+    if (councilParts.length) doc.text(councilParts.join(" "), margin, sy + 27);
+    doc.text("Profissional responsável", margin, sy + (councilParts.length ? 40 : 27));
+
+    doc.setTextColor(0);
+    doc.setFontSize(10);
+    doc.text(
+      "Ciente em: ____/____/______",
+      margin,
+      sy + 70,
+    );
+    doc.line(margin, sy + 96, margin + 280, sy + 96);
+    doc.setFontSize(9);
+    doc.setTextColor(90);
+    doc.text("Assinatura do responsável", margin, sy + 110);
+
+    doc.setDrawColor(220);
+    doc.line(margin, pageHeight - 32, pageWidth - margin, pageHeight - 32);
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    doc.text(
+      `${viaLabel} — Documento gerado pelo TEAR.`,
+      margin,
+      pageHeight - 18,
+    );
+  }
+
+  renderVia("Via da Clínica");
+  doc.addPage();
+  renderVia("Via dos Pais");
+
+  const file = `devolutiva-${patient?.name?.replace(/\s+/g, "_") ?? "paciente"}-${evo.session_date}.pdf`;
   doc.save(file);
 }

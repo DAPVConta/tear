@@ -333,12 +333,23 @@ operadora; restrição editar/excluir só pelo criador.
       notificação de vencimento na tela inicial e histórico permanente de
       múltiplos laudos por paciente.
 
-Backlog de correções abertas (tabela public.corrections): #3 evolução mensal
-(workflow coordenador + trava 22 dias + assinatura + PDF), #4 aprovação do
-coordenador (parte do #3), #6 especialidades multi-select + papéis de gestão
-(coordenador/supervisor), #8 evolução "Devolutiva para os Pais" (tipo + layout
-+ PDF 2 vias), #9 frequência (ciência dos pais + atestado + falta passível de
-cobrança).
+23. [FEITO — Correção #8] Evolução "Devolutiva para os Pais":
+    - Novo tipo de atendimento `devolutiva_pais` (enum) + coluna
+      `parent_feedback` jsonb em daily_evolutions (migração 0017).
+    - DailyEvolutionForm: ao escolher "Devolutiva para os Pais", oculta o
+      formulário técnico (habilidades/comportamental/síntese/guia/plano) e
+      mostra layout exclusivo com aviso de linguagem acessível + 3 campos
+      (atividades anteriores, próximas, orientação para casa). Validação Zod
+      condicional (superRefine). Síntese/próximo passo recebem versões legíveis
+      p/ satisfazer colunas obrigatórias.
+    - PDF "Imprimir Devolutiva" (`exportParentFeedbackPDF`) em 2 vias (Via da
+      Clínica / Via dos Pais) com identificação, os 3 campos e assinatura
+      física do responsável.
+
+Backlog de correções abertas: #3 evolução mensal (workflow coordenador + trava
+22 dias + assinatura + PDF), #4 aprovação do coordenador (parte do #3), #6
+especialidades multi-select + papéis de gestão (coordenador/supervisor), #9
+frequência (ciência dos pais + atestado + falta passível de cobrança).
 
 Fase 2 restante: Asaas billing.
 
