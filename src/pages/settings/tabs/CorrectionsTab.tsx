@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -41,6 +41,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 import { Field } from "@/components/form/Field";
 import { SectionTitle } from "@/components/form/SectionTitle";
 import {
@@ -114,6 +115,7 @@ export function CorrectionsTab() {
   const uploadImages = useUploadCorrectionImages();
 
   const [pending, setPending] = useState<PendingImage[]>([]);
+  const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -130,11 +132,8 @@ export function CorrectionsTab() {
   const today = new Date().toLocaleDateString("pt-BR");
   const busy = isSubmitting || createCorrection.isPending || uploadImages.isPending;
 
-  function onPickImages(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    if (fileRef.current) fileRef.current.value = "";
+  function addFiles(files: File[]) {
     if (!files.length) return;
-
     const accepted: PendingImage[] = [];
     for (const file of files) {
       if (pending.length + accepted.length >= MAX_IMAGES) {
@@ -142,16 +141,57 @@ export function CorrectionsTab() {
         break;
       }
       if (!file.type.startsWith("image/")) {
-        toast.error(`"${file.name}" não é uma imagem`);
+        toast.error(`"${file.name || "arquivo"}" não é uma imagem`);
         continue;
       }
       if (file.size > MAX_IMAGE_BYTES) {
-        toast.error(`"${file.name}" excede 5 MB`);
+        toast.error(`"${file.name || "imagem"}" excede 5 MB`);
         continue;
       }
       accepted.push({ file, preview: URL.createObjectURL(file) });
     }
     if (accepted.length) setPending((prev) => [...prev, ...accepted]);
+  }
+
+  // Mantém a referência mais recente de addFiles para o listener de "paste"
+  // (registrado uma única vez) sempre enxergar o estado atual.
+  const addFilesRef = useRef(addFiles);
+  addFilesRef.current = addFiles;
+
+  // Colar (Ctrl+V) um print da área de transferência adiciona como anexo.
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const imgs: File[] = [];
+      for (const item of items) {
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          const f = item.getAsFile();
+          if (f) imgs.push(f);
+        }
+      }
+      if (imgs.length) {
+        e.preventDefault();
+        addFilesRef.current(imgs);
+        toast.success(
+          imgs.length === 1 ? "Imagem colada" : `${imgs.length} imagens coladas`,
+        );
+      }
+    }
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []);
+
+  function onPickImages(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (fileRef.current) fileRef.current.value = "";
+    addFiles(files);
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    addFiles(Array.from(e.dataTransfer.files ?? []));
   }
 
   function removePending(index: number) {
@@ -262,18 +302,53 @@ export function CorrectionsTab() {
                     ))}
                   </div>
                 )}
-                <Button
-                  type="button"
-                  variant="outline"
+                <div
+                  onDrop={onDrop}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
                   onClick={() => fileRef.current?.click()}
-                  disabled={busy || pending.length >= MAX_IMAGES}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      fileRef.current?.click();
+                    }
+                  }}
+                  className={cn(
+                    "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-7 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    dragOver
+                      ? "border-accent bg-accent/5"
+                      : "border-border hover:border-accent/60 hover:bg-muted/40",
+                    (busy || pending.length >= MAX_IMAGES) &&
+                      "pointer-events-none opacity-50",
+                  )}
                 >
-                  <ImagePlus className="h-4 w-4" /> Adicionar imagens
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  Até {MAX_IMAGES} imagens, máx. 5 MB cada. As imagens são
-                  armazenadas com segurança no Supabase.
-                </p>
+                  <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent/12 text-accent">
+                    <ImagePlus className="h-5 w-5" />
+                  </span>
+                  <p className="text-sm font-medium">
+                    Cole um print{" "}
+                    <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+                      Ctrl
+                    </kbd>
+                    {" + "}
+                    <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+                      V
+                    </kbd>
+                    , arraste ou{" "}
+                    <span className="text-accent underline underline-offset-2">
+                      clique para escolher
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Até {MAX_IMAGES} imagens, máx. 5 MB cada. Armazenadas com
+                    segurança no Supabase (bucket privado).
+                  </p>
+                </div>
               </div>
             </Field>
 
