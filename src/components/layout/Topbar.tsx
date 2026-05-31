@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { Search, Menu, ChevronDown, LogOut, User } from "lucide-react";
+import { Search, Menu, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
+import { useCommandPalette } from "./CommandPalette";
 
 function initials(value: string | null | undefined, fallback: string) {
   if (!value) return fallback;
@@ -26,6 +28,7 @@ export function Topbar({ onOpenMobile }: { onOpenMobile: () => void }) {
   const navigate = useNavigate();
   const { profile, user, signOut } = useAuth();
   const { clinic } = useClinic();
+  const { open: openPalette } = useCommandPalette();
 
   const displayName = profile?.name || user?.email || "Usuário";
 
@@ -54,15 +57,17 @@ export function Topbar({ onOpenMobile }: { onOpenMobile: () => void }) {
         <span className="max-w-[12rem] truncate">
           {clinic?.name ?? "Minha Clínica"}
         </span>
-        <ChevronDown className="h-4 w-4 text-muted-foreground" />
       </div>
 
-      <button className="group ml-auto flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground shadow-soft transition-colors hover:bg-secondary md:ml-0">
-        <Search className="h-4 w-4" />
-        <span className="flex-1 text-left">Buscar...</span>
-        <kbd className="hidden rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium md:inline">
-          ⌘K
-        </kbd>
+      <button
+        type="button"
+        onClick={openPalette}
+        aria-label="Buscar (atalho Ctrl+K)"
+        className="group ml-auto flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground shadow-soft transition-colors hover:border-accent/40 hover:bg-secondary md:ml-0"
+      >
+        <Search className="h-4 w-4 transition-colors group-hover:text-accent" />
+        <span className="flex-1 text-left">Buscar pacientes, telas...</span>
+        <Kbd className="hidden md:inline-flex">⌘K</Kbd>
       </button>
 
       <div className="ml-auto flex items-center gap-1">

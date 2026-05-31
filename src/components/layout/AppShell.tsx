@@ -7,29 +7,32 @@ import { useClinic } from "@/providers/ClinicProvider";
 import { Sidebar } from "./Sidebar";
 import { SidebarNav } from "./SidebarNav";
 import { Topbar } from "./Topbar";
+import { CommandPaletteProvider } from "./CommandPalette";
 
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
+    <CommandPaletteProvider>
+      <div className="flex h-screen overflow-hidden bg-background">
+        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
 
-      {/* Drawer mobile */}
-      <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} />
+        {/* Drawer mobile */}
+        <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} />
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar onOpenMobile={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-7xl px-4 py-8 animate-fade-in lg:px-8 lg:py-10">
-            <Suspense fallback={<RouteLoader />}>
-              <Outlet />
-            </Suspense>
-          </div>
-        </main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Topbar onOpenMobile={() => setMobileOpen(true)} />
+          <main className="flex-1 overflow-y-auto">
+            <div className="mx-auto w-full max-w-7xl px-4 py-8 animate-fade-in lg:px-8 lg:py-10">
+              <Suspense fallback={<RouteLoader />}>
+                <Outlet />
+              </Suspense>
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </CommandPaletteProvider>
   );
 }
 
