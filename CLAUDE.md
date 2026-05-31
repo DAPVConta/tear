@@ -396,6 +396,21 @@ operadora; restrição editar/excluir só pelo criador.
 
 Todas as correções da tabela public.corrections foram resolvidas.
 
+## Gestão de Membros
+- [FEITO — Fase 1] Aba Configurações → Membros: RPC `clinic_members_overview`
+  (SECURITY DEFINER, expõe nome/e-mail dos membros sem afrouxar
+  profiles_select), listar/trocar papel/ativar-inativar (só clinic_admin) com
+  guarda de "último admin ativo". Migração 0021 (+audit em clinic_members).
+- [FEITO — Fase 2] Convite por link/código: tabela `clinic_invites` (RLS por
+  admin + audit) + RPCs `create_clinic_invite` (gera código/papel/validade) e
+  `redeem_clinic_invite` (usuário resgata e entra na clínica). UI: gerar/
+  copiar/revogar convites na aba Membros; box "Tem um convite?" no Onboarding
+  (lê `?invite=CODE`). Migração 0022.
+- [PENDENTE — Fase 3] Vínculo profissional↔usuário (professionals.user_id) +
+  bloqueio de acesso do membro/profissional inativo.
+- [PENDENTE — Fase 4] Gate preciso do Coordenador na aprovação mensal
+  (substituir o stand-in clinic_admin) via vínculo + coordinator_specialty.
+
 Fase 2 restante: Asaas billing.
 
 ## Segurança e LGPD
