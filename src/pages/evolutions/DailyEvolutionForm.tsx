@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useClinic } from "@/providers/ClinicProvider";
+import { useAuth } from "@/providers/AuthProvider";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TagInput } from "@/components/ui/tag-input";
@@ -223,10 +224,17 @@ export default function DailyEvolutionForm() {
   const evoId = isEdit ? Number(id) : undefined;
 
   const { clinic } = useClinic();
+  const { user } = useAuth();
   const { data: patients } = usePatientOptions();
   const { data: professionals } = useProfessionalOptions();
   const { data: existing, isLoading } = useDailyEvolution(evoId);
-  const draftKey = clinic?.id ? `tear:draft:evolution:${clinic.id}:new` : null;
+  // Rascunho contém dado clínico sensível (LGPD): isola por clínica E por
+  // usuário, para que outro membro no mesmo navegador (ex.: recepção
+  // compartilhada) não veja o rascunho. A limpeza no logout fica no AuthProvider.
+  const draftKey =
+    clinic?.id && user?.id
+      ? `tear:draft:evolution:${clinic.id}:${user.id}:new`
+      : null;
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const draftLoadedRef = useRef(false);
 

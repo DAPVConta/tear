@@ -3,15 +3,49 @@
 // já agregados (síntese, metas, frequência). A chave da API Claude fica em
 // segredo no servidor (CLAUDE_KEY) — nunca chega ao navegador. Recebe apenas
 // agregados clínicos (sem nome/CPF do paciente) para minimizar exposição de
-// dados pessoais (LGPD). Requer JWT válido (verify_jwt).
+// dados pessoais (LGPD). Requer JWT válido (verify_jwt + checagem em código).
 import Anthropic from "npm:@anthropic-ai/sdk@0.69.0";
+import { createClient } from "npm:@supabase/supabase-js@2.46.1";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// Limite defensivo do corpo da requisição (agregados são pequenos).
+const MAX_BODY_BYTES = 64 * 1024;
+const MAX_GOALS = 200;
+
+// --- Helpers compartilhados (inline para deploy independente de layout) ---
+// CORS com allowlist (ALLOWED_ORIGINS) e verificação defensiva do JWT no código
+// (além do verify_jwt do config.toml): se a flag cair num deploy, a função
+// ainda recusa chamadas anônimas.
+function corsHeaders(req: Request): Record<string, string> {
+  const list = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const origin = req.headers.get("Origin") ?? "";
+  const allow =
+    list.length === 0 ? "*" : list.includes(origin) ? origin : list[0];
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
+
+async function getAuthedUser(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return null;
+  const url = Deno.env.get("SUPABASE_URL");
+  const anon = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!url || !anon) return null;
+  const client = createClient(url, anon, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await client.auth.getUser();
+  if (error || !data.user) return null;
+  return data.user;
+}
 
 type Goal = {
   description: string;
@@ -64,18 +98,25 @@ function buildUserPrompt(p: Payload): string {
 }
 
 Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: cors });
   }
 
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
       status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
 
   if (req.method !== "POST") {
     return json({ error: "Método não permitido." }, 405);
+  }
+
+  // Defesa em profundidade: exige sessão válida mesmo se verify_jwt cair.
+  const user = await getAuthedUser(req);
+  if (!user) {
+    return json({ error: "Não autenticado." }, 401);
   }
 
   const apiKey = Deno.env.get("CLAUDE_KEY");
@@ -83,11 +124,18 @@ Deno.serve(async (req: Request) => {
     return json({ error: "CLAUDE_KEY não configurada no servidor." }, 500);
   }
 
+  const raw = await req.text();
+  if (raw.length > MAX_BODY_BYTES) {
+    return json({ error: "Requisição muito grande." }, 413);
+  }
   let payload: Payload;
   try {
-    payload = (await req.json()) as Payload;
+    payload = JSON.parse(raw) as Payload;
   } catch {
     return json({ error: "Corpo inválido." }, 400);
+  }
+  if (payload.goals && payload.goals.length > MAX_GOALS) {
+    return json({ error: "Número de metas excede o limite." }, 413);
   }
 
   try {
@@ -113,7 +161,8 @@ Deno.serve(async (req: Request) => {
 
     return json({ text });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Falha ao gerar análise.";
-    return json({ error: msg }, 502);
+    // Loga o detalhe no servidor; ao cliente, mensagem genérica.
+    console.error("claude-analysis error:", e);
+    return json({ error: "Falha ao gerar análise." }, 502);
   }
 });

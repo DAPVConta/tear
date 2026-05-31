@@ -65,6 +65,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     loading,
     signOut: async () => {
+      // Limpa rascunhos com dado clínico (LGPD) antes de encerrar a sessão —
+      // evita que o próximo usuário do mesmo navegador leia conteúdo de
+      // paciente persistido em localStorage.
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key?.startsWith("tear:draft:")) localStorage.removeItem(key);
+        }
+      } catch {
+        // localStorage indisponível — segue com o signOut.
+      }
       await supabase.auth.signOut();
     },
   };
