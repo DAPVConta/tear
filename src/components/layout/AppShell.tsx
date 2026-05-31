@@ -1,6 +1,7 @@
 import { Suspense, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { X } from "lucide-react";
+import { MotionProvider, PageTransition } from "@/components/motion/motion";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/brand/Logo";
 import { useClinic } from "@/providers/ClinicProvider";
@@ -12,9 +13,11 @@ import { CommandPaletteProvider } from "./CommandPalette";
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
 
   return (
     <CommandPaletteProvider>
+      <MotionProvider>
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
 
@@ -24,14 +27,18 @@ export function AppShell() {
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar onOpenMobile={() => setMobileOpen(true)} />
           <main className="flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-7xl px-4 py-8 animate-fade-in lg:px-8 lg:py-10">
+            <div className="mx-auto w-full max-w-7xl px-4 py-8 lg:px-8 lg:py-10">
               <Suspense fallback={<RouteLoader />}>
-                <Outlet />
+                {/* Transição de página por rota (fade + leve subida). */}
+                <PageTransition key={location.pathname}>
+                  <Outlet />
+                </PageTransition>
               </Suspense>
             </div>
           </main>
         </div>
       </div>
+      </MotionProvider>
     </CommandPaletteProvider>
   );
 }

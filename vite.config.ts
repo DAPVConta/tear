@@ -46,6 +46,8 @@ export default defineConfig({
             return "vendor-pdf";
           if (id.includes("recharts") || id.includes("/d3-"))
             return "vendor-charts";
+          if (id.includes("framer-motion") || id.includes("/motion-dom") || id.includes("/motion-utils"))
+            return "vendor-motion";
           // Vendors compartilhados do load inicial, separados para cache
           // estável entre deploys.
           if (id.includes("@radix-ui")) return "vendor-radix";

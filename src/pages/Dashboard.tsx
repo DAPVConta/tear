@@ -25,6 +25,7 @@ import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Stagger, StaggerItem } from "@/components/motion/motion";
 import { useClinic } from "@/providers/ClinicProvider";
 import {
   useDashboardMetrics,
@@ -97,38 +98,46 @@ export default function Dashboard() {
       </section>
 
       {/* Métricas — acento TEA por cartão (diversidade da marca) */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric
-          label="Pacientes ativos"
-          icon={Users}
-          value={metrics?.patientsActive}
-          loading={loadingMetrics}
-          accent="blue"
-        />
-        <Metric
-          label="Sessões na semana"
-          icon={ClipboardList}
-          value={metrics?.sessionsThisWeek}
-          loading={loadingMetrics}
-          accent="cyan"
-        />
-        <Metric
-          label="Guias vigentes"
-          icon={FileCheck2}
-          value={metrics?.activeGuides}
-          loading={loadingMetrics}
-          accent="yellow"
-        />
-        <Metric
-          label="Taxa de presença (30d)"
-          icon={TrendingUp}
-          value={metrics?.attendanceRate}
-          suffix={metrics?.attendanceRate == null ? "" : "%"}
-          fallback="—"
-          loading={loadingMetrics}
-          accent="red"
-        />
-      </section>
+      <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StaggerItem>
+          <Metric
+            label="Pacientes ativos"
+            icon={Users}
+            value={metrics?.patientsActive}
+            loading={loadingMetrics}
+            accent="blue"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Metric
+            label="Sessões na semana"
+            icon={ClipboardList}
+            value={metrics?.sessionsThisWeek}
+            loading={loadingMetrics}
+            accent="cyan"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Metric
+            label="Guias vigentes"
+            icon={FileCheck2}
+            value={metrics?.activeGuides}
+            loading={loadingMetrics}
+            accent="yellow"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <Metric
+            label="Taxa de presença (30d)"
+            icon={TrendingUp}
+            value={metrics?.attendanceRate}
+            suffix={metrics?.attendanceRate == null ? "" : "%"}
+            fallback="—"
+            loading={loadingMetrics}
+            accent="red"
+          />
+        </StaggerItem>
+      </Stagger>
 
       {/* Gráficos */}
       <section className="grid gap-6 lg:grid-cols-3">
