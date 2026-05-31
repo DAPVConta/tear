@@ -83,6 +83,10 @@ export const keys = {
   platform: {
     overview: ["platform-overview"] as const,
   },
+  corrections: {
+    all: ["corrections"] as const,
+    list: (clinicId: number | undefined) => ["corrections", clinicId] as const,
+  },
   currentClinic: Object.assign(
     (userId: string | undefined) => ["current-clinic", userId] as const,
     { all: ["current-clinic"] as const },
