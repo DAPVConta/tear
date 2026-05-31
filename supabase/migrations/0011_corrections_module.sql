@@ -55,6 +55,16 @@ insert into storage.buckets (id, name, public)
 values ('correction-attachments', 'correction-attachments', true)
 on conflict (id) do nothing;
 
+-- Leitura para membros da clínica. Necessária para o INSERT ... RETURNING que
+-- o serviço de Storage executa ao subir o arquivo (sem ela, o upload falha com
+-- "new row violates row-level security policy"); a exibição usa getPublicUrl.
+create policy "correction_attachments_member_read"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'correction-attachments'
+    and public.is_clinic_member(((storage.foldername(name))[1])::bigint)
+  );
+
 create policy "correction_attachments_member_insert"
   on storage.objects for insert to authenticated
   with check (
