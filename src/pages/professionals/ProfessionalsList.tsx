@@ -118,7 +118,11 @@ export default function ProfessionalsList() {
     if (!toToggle) return;
     const nextActive = !toToggle.active;
     try {
-      await setActiveMutation.mutateAsync({ id: toToggle.id, active: nextActive });
+      await setActiveMutation.mutateAsync({
+        id: toToggle.id,
+        active: nextActive,
+        userId: toToggle.user_id,
+      });
       toast.success(nextActive ? "Profissional reativado" : "Profissional inativado");
     } catch (e) {
       toast.error(nextActive ? "Falha ao reativar" : "Falha ao inativar", {

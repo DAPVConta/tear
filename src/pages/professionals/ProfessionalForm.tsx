@@ -50,6 +50,7 @@ import {
   useSaveProfessionalSpecialties,
   type Specialty,
 } from "@/features/professionals/api";
+import { useClinicMembers } from "@/features/members/api";
 
 const specialties = Object.keys(specialtyLabels) as [
   keyof typeof specialtyLabels,
@@ -71,6 +72,7 @@ const schema = z
     is_coordinator: z.boolean(),
     coordinator_specialty: z.string().optional(),
     is_at_supervisor: z.boolean(),
+    user_id: z.string().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.is_coordinator) {
@@ -102,6 +104,7 @@ const defaults: FormValues = {
   is_coordinator: false,
   coordinator_specialty: "",
   is_at_supervisor: false,
+  user_id: "",
 };
 
 export default function ProfessionalForm() {
@@ -112,6 +115,7 @@ export default function ProfessionalForm() {
 
   const { data: existing, isLoading } = useProfessional(professionalId);
   const { data: existingSpecialties } = useProfessionalSpecialties(professionalId);
+  const { data: members } = useClinicMembers();
   const createProfessional = useCreateProfessional();
   const updateProfessional = useUpdateProfessional(professionalId ?? 0);
   const setActiveMutation = useSetProfessionalActive();
@@ -124,7 +128,11 @@ export default function ProfessionalForm() {
     if (!professionalId) return;
     const nextActive = !isActive;
     try {
-      await setActiveMutation.mutateAsync({ id: professionalId, active: nextActive });
+      await setActiveMutation.mutateAsync({
+        id: professionalId,
+        active: nextActive,
+        userId: existing?.user_id,
+      });
       toast.success(nextActive ? "Profissional reativado" : "Profissional inativado");
     } catch (e) {
       toast.error(nextActive ? "Falha ao reativar" : "Falha ao inativar", {
@@ -162,6 +170,7 @@ export default function ProfessionalForm() {
         is_coordinator: !!existing.coordinator_specialty,
         coordinator_specialty: existing.coordinator_specialty ?? "",
         is_at_supervisor: existing.is_at_supervisor,
+        user_id: existing.user_id ?? "",
       });
     }
   }, [existing, reset]);
@@ -192,6 +201,7 @@ export default function ProfessionalForm() {
         ? (values.coordinator_specialty as Specialty)
         : null,
       is_at_supervisor: values.is_at_supervisor,
+      user_id: values.user_id || null,
       council_type: values.council_type,
       council_number: values.council_number,
       council_state: values.council_state,
@@ -384,6 +394,34 @@ export default function ProfessionalForm() {
                   </label>
                 )}
               />
+            </Field>
+            <Field label="Conta de acesso (membro)" className="sm:col-span-2">
+              <Controller
+                control={control}
+                name="user_id"
+                render={({ field }) => (
+                  <Select
+                    value={field.value || "none"}
+                    onValueChange={(v) => field.onChange(v === "none" ? "" : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Vincular a um membro (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem conta de acesso</SelectItem>
+                      {(members ?? []).map((m) => (
+                        <SelectItem key={m.user_id} value={m.user_id}>
+                          {m.name || m.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Ao inativar o profissional, o acesso do membro vinculado é
+                revogado automaticamente.
+              </p>
             </Field>
           </CardContent>
         </Card>
