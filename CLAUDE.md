@@ -307,6 +307,22 @@ gestão (coordenador/supervisor), #8 evolução "Devolutiva para os Pais"
 (tipo + layout + PDF 2 vias), #9 frequência (ciência dos pais + atestado +
 falta passível de cobrança).
 
+21. [FEITO — Integração IA Claude] Edge Function `claude-analysis` (Supabase
+    Functions, Deno + `@anthropic-ai/sdk`, modelo `claude-opus-4-8`): a chave
+    `CLAUDE_KEY` fica só nos Secrets do servidor; o front chama a função
+    autenticado pelo JWT (verify_jwt). Primeiro uso: botão "Gerar com IA" na
+    Análise profissional da Evolução mensal — gera um rascunho do
+    `professional_review` a partir dos agregados clínicos já calculados
+    (síntese, metas, frequência), que o profissional revisa e salva.
+    - Privacidade/LGPD: envia só agregados (sem nome/CPF do paciente). É um
+      provedor externo (Anthropic) — diferente do motor mensal IA-free (#18),
+      que nunca sai do banco. O uso é opt-in por clique.
+    - Hook `features/ai/api.ts` (`useGenerateMonthlyAnalysis`) via
+      `supabase.functions.invoke`. CSP já permite `*.supabase.co`.
+    - PENDENTE: validar a chamada ponta-a-ponta no app (o sandbox de
+      desenvolvimento bloqueia egress p/ *.supabase.co; a função em si roda na
+      infra do Supabase, que alcança api.anthropic.com).
+
 Fase 2 restante: Asaas billing.
 
 ## Segurança e LGPD

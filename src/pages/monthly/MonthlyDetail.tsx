@@ -10,6 +10,7 @@ import {
   FileDown,
   CheckCircle2,
   CircleDashed,
+  Sparkles,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import {
   MONTH_NAMES_PT,
   type GoalProgress,
 } from "@/features/monthlyEvolutions/api";
+import { useGenerateMonthlyAnalysis } from "@/features/ai/api";
 import { useClinic } from "@/providers/ClinicProvider";
 import { exportMonthlyEvolutionPDF } from "@/lib/pdf";
 import { specialtyLabels } from "@/lib/labels";
@@ -54,11 +56,13 @@ export default function MonthlyDetail() {
   const { data, isLoading } = useMonthlyEvolution(monthlyId);
   const update = useUpdateMonthlyEvolution(monthlyId);
   const approve = useApproveMonthlyEvolution();
+  const generateAI = useGenerateMonthlyAnalysis();
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
@@ -107,6 +111,39 @@ export default function MonthlyDetail() {
   function onExport() {
     if (!data) return;
     exportMonthlyEvolutionPDF(data, clinic?.name ?? "Clínica");
+  }
+
+  async function onGenerateAI() {
+    if (!data) return;
+    const goalsList = Array.isArray(data.goals_progress)
+      ? (data.goals_progress as unknown as GoalProgress[])
+      : [];
+    try {
+      const text = await generateAI.mutateAsync({
+        period: `${MONTH_NAMES_PT[data.reference_month - 1]} / ${data.reference_year}`,
+        specialty: data.professional?.specialty
+          ? specialtyLabels[data.professional.specialty]
+          : undefined,
+        totals: {
+          sessions: data.total_sessions,
+          present: data.total_present,
+          absent: data.total_absent,
+        },
+        summary: data.generated_summary,
+        goals: goalsList.map((g) => ({
+          description: g.description,
+          category: g.category,
+          current_progress: g.current_progress,
+          status: g.status,
+        })),
+      });
+      setValue("professional_review", text, { shouldDirty: true });
+      toast.success("Análise gerada pela IA — revise e salve");
+    } catch (e) {
+      toast.error("Não foi possível gerar a análise", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    }
   }
 
   if (isLoading) {
@@ -222,8 +259,22 @@ export default function MonthlyDetail() {
         </Card>
 
         <Card className="lg:col-span-3">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
             <CardTitle>Análise profissional</CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onGenerateAI}
+              disabled={generateAI.isPending}
+            >
+              {generateAI.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 text-brand-blue-light" />
+              )}
+              Gerar com IA
+            </Button>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSave)} className="space-y-4">
@@ -232,7 +283,7 @@ export default function MonthlyDetail() {
                   {...register("professional_review")}
                   rows={4}
                   className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Comentário do profissional sobre o período"
+                  placeholder="Comentário do profissional sobre o período — ou gere um rascunho com IA"
                 />
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
