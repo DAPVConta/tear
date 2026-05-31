@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/form/Field";
-import { signWithA1Certificate } from "@/lib/digitalSignature";
 import {
   buildEvolutionSignaturePayload,
   useSignEvolutionDigital,
@@ -52,6 +51,7 @@ export function SignatureDialog({
     try {
       const payload = buildEvolutionSignaturePayload(evolution);
       // Assinatura gerada localmente; nada sai do navegador além do resultado.
+      const { signWithA1Certificate } = await import("@/lib/digitalSignature");
       const signature = await signWithA1Certificate(file, password, payload);
       await signDigital.mutateAsync(signature);
       toast.success("Evolução assinada digitalmente", {

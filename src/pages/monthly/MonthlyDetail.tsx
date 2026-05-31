@@ -51,7 +51,6 @@ import {
 import { useGenerateMonthlyAnalysis } from "@/features/ai/api";
 import { useMyProfessional } from "@/features/professionals/api";
 import { useClinic } from "@/providers/ClinicProvider";
-import { exportMonthlyEvolutionPDF } from "@/lib/pdf";
 import { specialtyLabels, monthlyStatusLabels } from "@/lib/labels";
 import { MonthlySignatureDialog } from "./MonthlySignatureDialog";
 import { ReportDocument } from "./ReportDocument";
@@ -163,8 +162,9 @@ export default function MonthlyDetail() {
     }
   }
 
-  function onExport() {
+  async function onExport() {
     if (!data) return;
+    const { exportMonthlyEvolutionPDF } = await import("@/lib/pdf");
     exportMonthlyEvolutionPDF(data, clinic?.name ?? "Clínica");
   }
 

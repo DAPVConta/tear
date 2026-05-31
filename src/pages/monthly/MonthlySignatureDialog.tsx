@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/form/Field";
-import { signWithA1Certificate } from "@/lib/digitalSignature";
 import {
   buildMonthlySignaturePayload,
   useSignMonthlyDigital,
@@ -51,6 +50,7 @@ export function MonthlySignatureDialog({
     setBusy(true);
     try {
       const payload = buildMonthlySignaturePayload(monthly);
+      const { signWithA1Certificate } = await import("@/lib/digitalSignature");
       const signature = await signWithA1Certificate(file, password, payload);
       await sign.mutateAsync(signature);
       toast.success("Evolução mensal assinada digitalmente", {
