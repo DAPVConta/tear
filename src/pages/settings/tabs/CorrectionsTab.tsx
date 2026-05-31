@@ -13,6 +13,8 @@ import {
   Trash2,
   User,
   X,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,6 +120,7 @@ export function CorrectionsTab() {
 
   const [pending, setPending] = useState<PendingImage[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [showResolved, setShowResolved] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Rascunho local (texto) por clínica: protege o conteúdo digitado contra
@@ -469,11 +472,48 @@ export function CorrectionsTab() {
               description="Use o formulário acima para reportar erros ou melhorias encontradas no sistema."
             />
           ) : (
-            <ul className="space-y-3">
-              {list.data!.map((c) => (
-                <CorrectionRow key={c.id} correction={c} />
-              ))}
-            </ul>
+            <div className="space-y-3">
+              {list.data!.filter((c) => c.status !== "resolvido").length >
+                0 && (
+                <ul className="space-y-3">
+                  {list
+                    .data!.filter((c) => c.status !== "resolvido")
+                    .map((c) => (
+                      <CorrectionRow key={c.id} correction={c} />
+                    ))}
+                </ul>
+              )}
+
+              {(() => {
+                const resolved = list.data!.filter(
+                  (c) => c.status === "resolvido",
+                );
+                if (resolved.length === 0) return null;
+                return (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowResolved((v) => !v)}
+                      className="flex w-full items-center gap-2 rounded-lg border border-border bg-secondary/40 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-secondary/70"
+                    >
+                      {showResolved ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                      Resolvidas ({resolved.length})
+                    </button>
+                    {showResolved && (
+                      <ul className="space-y-3">
+                        {resolved.map((c) => (
+                          <CorrectionRow key={c.id} correction={c} />
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           )}
         </CardContent>
       </Card>
