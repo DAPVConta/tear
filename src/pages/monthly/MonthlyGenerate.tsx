@@ -20,6 +20,7 @@ import { usePatientOptions } from "@/features/patients/api";
 import { useProfessionalOptions } from "@/features/professionals/api";
 import {
   useGenerateMonthlyEvolution,
+  MonthlyExistsError,
   MONTH_NAMES_PT,
 } from "@/features/monthlyEvolutions/api";
 
@@ -84,6 +85,19 @@ export default function MonthlyGenerate() {
       toast.success("Síntese gerada");
       navigate(`/evolucao-mensal/${created.id}`);
     } catch (e) {
+      if (e instanceof MonthlyExistsError) {
+        toast.error("Evolução mensal já existe", {
+          description:
+            "Já há uma síntese para este paciente neste mês/ano.",
+          action: e.existingId
+            ? {
+                label: "Abrir existente",
+                onClick: () => navigate(`/evolucao-mensal/${e.existingId}`),
+              }
+            : undefined,
+        });
+        return;
+      }
       toast.error("Não foi possível gerar", {
         description: e instanceof Error ? e.message : undefined,
       });

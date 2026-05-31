@@ -121,6 +121,17 @@ type GenerateInput = {
   reference_month: number;
 };
 
+// Lançado quando já existe uma evolução mensal para o período (unique
+// paciente+ano+mês). Carrega o id da existente para a UI oferecer abri-la.
+export class MonthlyExistsError extends Error {
+  existingId?: number;
+  constructor(existingId?: number) {
+    super("Já existe uma evolução mensal para este paciente neste mês.");
+    this.name = "MonthlyExistsError";
+    this.existingId = existingId;
+  }
+}
+
 // Motor de Inteligência: agrega frequência, evoluções e metas para
 // gerar a síntese mensal do paciente.
 export function useGenerateMonthlyEvolution() {
@@ -230,7 +241,22 @@ export function useGenerateMonthlyEvolution() {
         })
         .select()
         .single();
-      if (error) throw error;
+      if (error) {
+        // Unique (paciente, ano, mês): já existe evolução para o período.
+        // Busca a existente para oferecer abri-la em vez de erro técnico.
+        if (error.code === "23505") {
+          const { data: existing } = await supabase
+            .from("monthly_evolutions")
+            .select("id")
+            .eq("clinic_id", clinic.id)
+            .eq("patient_id", input.patient_id)
+            .eq("reference_year", input.reference_year)
+            .eq("reference_month", input.reference_month)
+            .maybeSingle();
+          throw new MonthlyExistsError(existing?.id);
+        }
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
