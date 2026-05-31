@@ -432,6 +432,23 @@ export function CorrectionsTab() {
         </form>
       </Card>
 
+      {(list.data?.length ?? 0) > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {STATUS_ORDER.map((s) => {
+            const count = (list.data ?? []).filter((c) => c.status === s).length;
+            const meta = STATUS_META[s];
+            return (
+              <Card key={s}>
+                <CardContent className="p-4">
+                  <Badge variant={meta.variant}>{meta.label}</Badge>
+                  <p className="mt-2 text-3xl font-bold tabular-nums">{count}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Correções registradas</CardTitle>
