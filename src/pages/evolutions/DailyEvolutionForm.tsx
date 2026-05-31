@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useClinic } from "@/providers/ClinicProvider";
+import { useAuth } from "@/providers/AuthProvider";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TagInput } from "@/components/ui/tag-input";
