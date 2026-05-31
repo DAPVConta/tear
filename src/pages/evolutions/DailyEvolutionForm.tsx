@@ -60,7 +60,6 @@ import {
   getAddenda,
   getParentFeedback,
 } from "@/features/dailyEvolutions/api";
-import { exportDailyEvolutionPDF, exportParentFeedbackPDF } from "@/lib/pdf";
 import { SignatureDialog } from "@/pages/evolutions/SignatureDialog";
 import { AddendumSection } from "@/pages/evolutions/AddendumSection";
 
@@ -252,8 +251,9 @@ export default function DailyEvolutionForm() {
   const { data: pdfPatient } = usePatient(existing?.patient_id);
   const { data: pdfProfessional } = useProfessional(existing?.professional_id);
 
-  function handleExportPdf() {
+  async function handleExportPdf() {
     if (!existing) return;
+    const { exportDailyEvolutionPDF } = await import("@/lib/pdf");
     exportDailyEvolutionPDF(
       existing,
       pdfPatient ?? null,
@@ -262,8 +262,9 @@ export default function DailyEvolutionForm() {
     );
   }
 
-  function handleExportDevolutiva() {
+  async function handleExportDevolutiva() {
     if (!existing) return;
+    const { exportParentFeedbackPDF } = await import("@/lib/pdf");
     exportParentFeedbackPDF(
       existing,
       pdfPatient ?? null,
