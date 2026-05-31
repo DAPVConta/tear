@@ -49,10 +49,11 @@ create policy corrections_delete on public.corrections for delete to authenticat
 create trigger audit_corrections after insert or update or delete on public.corrections
   for each row execute function public.log_audit_event();
 
--- Bucket público para anexos de correções (primeiro segmento da pasta =
--- clinic_id; escrita liberada a qualquer membro da clínica).
+-- Bucket PRIVADO para anexos de correções (screenshots podem conter dados de
+-- paciente — LGPD). O acesso é feito por URLs assinadas de curta duração; o
+-- primeiro segmento da pasta = clinic_id. Leitura/escrita só por membros.
 insert into storage.buckets (id, name, public)
-values ('correction-attachments', 'correction-attachments', true)
+values ('correction-attachments', 'correction-attachments', false)
 on conflict (id) do nothing;
 
 -- Leitura para membros da clínica. Necessária para o INSERT ... RETURNING que

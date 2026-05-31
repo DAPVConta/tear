@@ -30,14 +30,14 @@ export function useCorrections() {
   });
 }
 
-// Faz upload das imagens no bucket (pasta = clinic_id) e devolve as URLs
-// públicas para gravar junto da correção.
+// Faz upload das imagens no bucket privado (pasta = clinic_id) e devolve os
+// caminhos (paths) para gravar na correção. A exibição usa URLs assinadas.
 export function useUploadCorrectionImages() {
   const { clinic } = useClinic();
   return useMutation({
     mutationFn: async (files: File[]) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const urls: string[] = [];
+      const paths: string[] = [];
       for (const file of files) {
         const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
         const rand = Math.random().toString(36).slice(2, 8);
@@ -46,12 +46,27 @@ export function useUploadCorrectionImages() {
           .from(CORRECTIONS_BUCKET)
           .upload(path, file, { cacheControl: "3600" });
         if (upErr) throw upErr;
-        const { data } = supabase.storage
-          .from(CORRECTIONS_BUCKET)
-          .getPublicUrl(path);
-        urls.push(data.publicUrl);
+        paths.push(path);
       }
-      return urls;
+      return paths;
+    },
+  });
+}
+
+// Gera URLs assinadas (curta duração) para exibir os anexos de uma correção.
+// O bucket é privado; cada path é resolvido sob demanda.
+export function useCorrectionSignedUrls(paths: string[]) {
+  return useQuery({
+    queryKey: keys.corrections.signedUrls(paths),
+    enabled: paths.length > 0,
+    // Signed URLs valem 1h; revalida bem antes de expirar.
+    staleTime: 50 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.storage
+        .from(CORRECTIONS_BUCKET)
+        .createSignedUrls(paths, 60 * 60);
+      if (error) throw error;
+      return (data ?? []).map((d) => d.signedUrl ?? null);
     },
   });
 }

@@ -51,6 +51,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   useCorrections,
+  useCorrectionSignedUrls,
   useCreateCorrection,
   useDeleteCorrection,
   useUpdateCorrectionStatus,
@@ -433,25 +434,47 @@ function CorrectionRow({ correction }: { correction: Correction }) {
       )}
 
       {correction.images.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {correction.images.map((url, i) => (
-            <a
-              key={url}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-20 w-20 overflow-hidden rounded-lg border border-border bg-muted transition-transform hover:scale-[1.03]"
-            >
-              <img
-                src={url}
-                alt={`Anexo ${i + 1}`}
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-            </a>
-          ))}
-        </div>
+        <CorrectionImages paths={correction.images} />
       )}
     </li>
+  );
+}
+
+function CorrectionImages({ paths }: { paths: string[] }) {
+  const { data, isLoading } = useCorrectionSignedUrls(paths);
+
+  if (isLoading) {
+    return (
+      <div className="mt-3 flex flex-wrap gap-2">
+        {paths.map((p) => (
+          <Skeleton key={p} className="h-20 w-20 rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {paths.map((p, i) => {
+        const url = data?.[i] ?? null;
+        if (!url) return null;
+        return (
+          <a
+            key={p}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-20 w-20 overflow-hidden rounded-lg border border-border bg-muted transition-transform hover:scale-[1.03]"
+          >
+            <img
+              src={url}
+              alt={`Anexo ${i + 1}`}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          </a>
+        );
+      })}
+    </div>
   );
 }

@@ -86,6 +86,8 @@ export const keys = {
   corrections: {
     all: ["corrections"] as const,
     list: (clinicId: number | undefined) => ["corrections", clinicId] as const,
+    signedUrls: (paths: string[]) =>
+      ["correction-signed-urls", ...paths] as const,
   },
   currentClinic: Object.assign(
     (userId: string | undefined) => ["current-clinic", userId] as const,
