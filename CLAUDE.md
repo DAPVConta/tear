@@ -394,6 +394,56 @@ operadora; restrição editar/excluir só pelo criador.
       profissional↔usuário↔especialidade depende da gestão de membros (ainda
       não implementada).
 
+27. [FEITO — Correção #11] Conselho profissional condicional à especialidade
+    (ProfessionalForm): mapa `specialtyCouncil` (lib/labels) sugere
+    automaticamente o conselho ao escolher a especialidade principal; adiciona
+    CRN (Nutrição) e CBO (áreas sem conselho federal) aos tipos, com descrição
+    por extenso (`COUNCIL_LABELS` em lib/constants). Número do registro e UF
+    seguem obrigatórios. Sugestão não sobrescreve escolha manual nem valor de
+    profissional já gravado.
+
+28. [FEITO — Correção #10] CID-11 no cadastro de pacientes com De-Para para
+    CID-10 (migração 0025: colunas cid11_primary/secondary). Recorte curado
+    `lib/cid11` focado em TEA/desenvolvimento, com mapeamento para o CID-10
+    equivalente (ex.: 6A02→F84.0); `Cid11Combobox` buscável que aceita código
+    personalizado. Ao selecionar o CID-11, o CID-10 correspondente é
+    autopreenchido (compatibilidade com operadoras) e permanece editável;
+    exibe código + descrição. CID-11 também disponível no formulário médico
+    da evolução diária (#29).
+
+29. [FEITO — Correção #12] Formulários de evolução diária dinâmicos por
+    especialidade (migração 0026):
+    - Remove definitivamente a especialidade `at_is` (AT — Integração
+      Sensorial); recria o enum `specialty` sem o valor (nenhum registro o
+      usava). Focos de T.O. (IS e AVDs) mantidos.
+    - Renderização por tipo derivado da especialidade do profissional
+      (`features/dailyEvolutions/formTypes`):
+      * Aplicador ABA/AT: supervisor responsável, comportamentos-alvo e
+        barreiras, tabela de programas de ensino (tentativas), níveis de ajuda
+        (%) e análise da sessão.
+      * Médico (neuropediatria/psiquiatria): anamnese, exame clínico,
+        CID-11/CID-10 com De-Para, conduta medicamentosa, botões de receita/
+        atestado/laudo.
+      * Clínico: evolução técnica padrão (mantida). Devolutiva (#23) intacta.
+    - Workflow de homologação técnica do AT: assinatura eletrônica simples →
+      `validation_status='pendente_validacao'` → fila do supervisor (painel de
+      pendências na listagem) → homologação com certificado A1 local
+      (`SupervisorSignatureDialog`, reusa lib/digitalSignature). Decisão do
+      projeto mantida: BirdID/Soluti descartado em favor do A1 local.
+    - `structured_data` (jsonb) persiste métricas ABA e campos médicos para
+      relatórios e futuros gráficos; a trava de 24h passa a congelar também
+      `structured_data` (trigger `enforce_evolution_lock` atualizada). Colunas
+      de workflow do supervisor ficam fora da lista protegida.
+    - Timeline com filtro por especialidade (inner join em professionals) e
+      badges de validação técnica.
+    - Emissão de laudo na tela médica atualiza automaticamente a validade do
+      laudo no cadastro do paciente (emissão + 1 ano).
+    - PDF da evolução: tabela de programas ABA + bloco de homologação do
+      supervisor; novos PDFs de receita/atestado/laudo (`exportMedicalDocumentPDF`).
+    - DEFER: gráficos longitudinais (linha de base ABA) cross-sessão — os dados
+      já são persistidos de forma estruturada; visualização agregada fica como
+      follow-up.
+
 Todas as correções da tabela public.corrections foram resolvidas.
 
 ## Gestão de Membros
