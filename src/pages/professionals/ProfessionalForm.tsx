@@ -1,14 +1,25 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Archive, ArchiveRestore } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Field } from "@/components/form/Field";
 import {
   Select,
@@ -25,6 +36,7 @@ import {
   useProfessional,
   useCreateProfessional,
   useUpdateProfessional,
+  useSetProfessionalActive,
 } from "@/features/professionals/api";
 
 const specialties = Object.keys(specialtyLabels) as [
@@ -64,6 +76,25 @@ export default function ProfessionalForm() {
   const { data: existing, isLoading } = useProfessional(professionalId);
   const createProfessional = useCreateProfessional();
   const updateProfessional = useUpdateProfessional(professionalId ?? 0);
+  const setActiveMutation = useSetProfessionalActive();
+  const [toggleOpen, setToggleOpen] = useState(false);
+
+  const isActive = existing?.active ?? true;
+
+  async function onToggleActive() {
+    if (!professionalId) return;
+    const nextActive = !isActive;
+    try {
+      await setActiveMutation.mutateAsync({ id: professionalId, active: nextActive });
+      toast.success(nextActive ? "Profissional reativado" : "Profissional inativado");
+    } catch (e) {
+      toast.error(nextActive ? "Falha ao reativar" : "Falha ao inativar", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setToggleOpen(false);
+    }
+  }
 
   const {
     register,
@@ -131,9 +162,16 @@ export default function ProfessionalForm() {
         title={isEdit ? "Editar profissional" : "Novo profissional"}
         description="Dados cadastrais e registro no conselho."
         actions={
-          <Button variant="outline" onClick={() => navigate("/profissionais")}>
-            <ArrowLeft className="h-4 w-4" /> Voltar
-          </Button>
+          <div className="flex items-center gap-2">
+            {isEdit && (
+              <Badge variant={isActive ? "success" : "muted"}>
+                {isActive ? "Ativo" : "Inativo"}
+              </Badge>
+            )}
+            <Button variant="outline" onClick={() => navigate("/profissionais")}>
+              <ArrowLeft className="h-4 w-4" /> Voltar
+            </Button>
+          </div>
         }
       />
 
@@ -274,6 +312,62 @@ export default function ProfessionalForm() {
           </Button>
         </div>
       </form>
+
+      {isEdit && (
+        <Card className="mt-6 border-dashed">
+          <CardHeader>
+            <CardTitle>Status do profissional</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="max-w-prose text-sm text-muted-foreground">
+              {isActive
+                ? "Profissional ativo. Inativar preserva todo o histórico (prontuários, evoluções assinadas, relatórios) e apenas o oculta de listagens e seleções de novos atendimentos."
+                : "Profissional inativo: oculto das listagens ativas, mas visível em consultas históricas. Reative para restaurar o uso operacional."}
+            </p>
+            <Button
+              type="button"
+              variant={isActive ? "outline" : "brand"}
+              className={isActive ? "text-destructive hover:text-destructive" : ""}
+              onClick={() => setToggleOpen(true)}
+              disabled={setActiveMutation.isPending}
+            >
+              {isActive ? (
+                <>
+                  <Archive className="h-4 w-4" /> Inativar profissional
+                </>
+              ) : (
+                <>
+                  <ArchiveRestore className="h-4 w-4" /> Reativar profissional
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <AlertDialog open={toggleOpen} onOpenChange={setToggleOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isActive ? "Inativar profissional?" : "Reativar profissional?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isActive
+                ? "O profissional deixará de aparecer nas listagens e seleções de novos atendimentos. Os registros históricos são preservados e a ação pode ser revertida."
+                : "O profissional voltará a aparecer nas listagens e poderá ser selecionado em novos atendimentos."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onToggleActive}
+              disabled={setActiveMutation.isPending}
+            >
+              {isActive ? "Inativar" : "Reativar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

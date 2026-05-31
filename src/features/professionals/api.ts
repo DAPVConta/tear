@@ -15,11 +15,14 @@ import type { Tables, TablesInsert, TablesUpdate } from "@/types/database";
 export type Professional = Tables<"professionals">;
 export const PROFESSIONALS_PAGE_SIZE = 10;
 
+export type ProfessionalStatusFilter = "active" | "inactive" | "all";
+
 type ListParams = {
   search: string;
   page: number;
   sortBy?: string;
   sortDir?: "asc" | "desc";
+  status?: ProfessionalStatusFilter;
 };
 
 export function useProfessionals({
@@ -27,11 +30,12 @@ export function useProfessionals({
   page,
   sortBy = "name",
   sortDir = "asc",
+  status = "active",
 }: ListParams) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
   return useQuery({
-    queryKey: keys.professionals.list(clinicId, search, page, sortBy, sortDir),
+    queryKey: keys.professionals.list(clinicId, search, page, sortBy, sortDir, status),
     enabled: !!clinicId,
     queryFn: () =>
       fetchPaginatedList<Professional>({
@@ -42,7 +46,13 @@ export function useProfessionals({
         search,
         searchColumns: ["name", "council_number", "cpf"],
         order: { column: sortBy, ascending: sortDir === "asc" },
-        filters: [{ column: "active", op: "eq", value: true }],
+        // "all" não filtra; caso contrário, ativos ou inativos. Inativar é
+        // soft-delete (preserva histórico de prontuários/evoluções), nunca
+        // exclusão.
+        filters:
+          status === "all"
+            ? []
+            : [{ column: "active", op: "eq", value: status === "active" }],
       }),
   });
 }
@@ -124,21 +134,25 @@ export function useUpdateProfessional(id: number) {
   });
 }
 
-export function useDeactivateProfessional() {
+// Ativa/inativa o profissional (soft-delete reversível). Inativar bloqueia o
+// uso operacional (some dos seletores de novos atendimentos/evoluções); o
+// histórico permanece intacto. Reativar restaura imediatamente.
+export function useSetProfessionalActive() {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
-    mutationFn: (id: number) => {
+    mutationFn: ({ id, active }: { id: number; active: boolean }) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
       return setActive({
         table: "professionals",
         id,
         clinicId: clinic.id,
-        active: false,
+        active,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, { id }) => {
       queryClient.invalidateQueries({ queryKey: keys.professionals.all });
+      queryClient.invalidateQueries({ queryKey: keys.professionals.byId(id) });
     },
   });
 }

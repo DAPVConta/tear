@@ -288,6 +288,25 @@ operadora; restrição editar/excluir só pelo criador.
         suportado apenas A1 (arquivo). BirdID/Soluti em nuvem foi descartado
         em favor do certificado local (sem contrato/credenciais externas).
 
+20. [FEITO — Correção #7] Profissional ativo/inativo (soft-delete reversível):
+    filtro de status (Ativos/Inativos/Todos) na listagem, badge "Inativo",
+    ação Inativar/Reativar (`useSetProfessionalActive`) com confirmação, e
+    card de status no cadastro. Inativar oculta o profissional de todas as
+    seleções operacionais (options já filtram active=true) preservando o
+    histórico; reativar restaura. Estado persistido na URL.
+    - PENDENTE (depende de gestão de membros, ainda não implementada): bloqueio
+      imediato de LOGIN do profissional inativo. Hoje o bloqueio é operacional
+      (some de listas/seleções); a revogação de acesso via Supabase Auth/
+      clinic_members será feita quando o módulo de membros existir.
+
+Backlog de correções abertas (tabela public.corrections): #3 evolução mensal
+(workflow coordenador + trava 22 dias + assinatura + PDF), #4 aprovação do
+coordenador (parte do #3), #5 paciente (laudo + validade + OCR/IA — IA depende
+de definição de provedor, fase 2), #6 especialidades multi-select + papéis de
+gestão (coordenador/supervisor), #8 evolução "Devolutiva para os Pais"
+(tipo + layout + PDF 2 vias), #9 frequência (ciência dos pais + atestado +
+falta passível de cobrança).
+
 Fase 2 restante: Asaas billing.
 
 ## Segurança e LGPD
