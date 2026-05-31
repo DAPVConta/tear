@@ -209,22 +209,63 @@ export function useUpdateProfessional(id: number) {
 // Ativa/inativa o profissional (soft-delete reversível). Inativar bloqueia o
 // uso operacional (some dos seletores de novos atendimentos/evoluções); o
 // histórico permanece intacto. Reativar restaura imediatamente.
+//
+// Se houver conta de acesso vinculada (user_id) e o operador for admin, o
+// status do MEMBRO é sincronizado: inativar o profissional revoga o acesso ao
+// sistema; reativar restaura. Há proteção para não derrubar o último admin.
 export function useSetProfessionalActive() {
   const queryClient = useQueryClient();
-  const { clinic } = useClinic();
+  const { clinic, role } = useClinic();
   return useMutation({
-    mutationFn: ({ id, active }: { id: number; active: boolean }) => {
+    mutationFn: async ({
+      id,
+      active,
+      userId,
+    }: {
+      id: number;
+      active: boolean;
+      userId?: string | null;
+    }) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      return setActive({
+      const result = await setActive({
         table: "professionals",
         id,
         clinicId: clinic.id,
         active,
       });
+
+      // Sincroniza o acesso do membro vinculado (só admin pode; RLS exige).
+      if (userId && role === "clinic_admin") {
+        if (!active) {
+          // Não derrubar o último administrador ativo.
+          const { data: m } = await supabase
+            .from("clinic_members")
+            .select("role")
+            .eq("clinic_id", clinic.id)
+            .eq("user_id", userId)
+            .maybeSingle();
+          if (m?.role === "clinic_admin") {
+            const { count } = await supabase
+              .from("clinic_members")
+              .select("id", { count: "exact", head: true })
+              .eq("clinic_id", clinic.id)
+              .eq("active", true)
+              .eq("role", "clinic_admin");
+            if ((count ?? 0) <= 1) return result; // mantém acesso do membro
+          }
+        }
+        await supabase
+          .from("clinic_members")
+          .update({ active } as never)
+          .eq("clinic_id", clinic.id)
+          .eq("user_id", userId);
+      }
+      return result;
     },
     onSuccess: (_data, { id }) => {
       queryClient.invalidateQueries({ queryKey: keys.professionals.all });
       queryClient.invalidateQueries({ queryKey: keys.professionals.byId(id) });
+      queryClient.invalidateQueries({ queryKey: ["clinic-members"] });
     },
   });
 }

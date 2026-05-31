@@ -406,8 +406,12 @@ Todas as correções da tabela public.corrections foram resolvidas.
   `redeem_clinic_invite` (usuário resgata e entra na clínica). UI: gerar/
   copiar/revogar convites na aba Membros; box "Tem um convite?" no Onboarding
   (lê `?invite=CODE`). Migração 0022.
-- [PENDENTE — Fase 3] Vínculo profissional↔usuário (professionals.user_id) +
-  bloqueio de acesso do membro/profissional inativo.
+- [FEITO — Fase 3] Vínculo profissional↔usuário + bloqueio de acesso do
+  inativo. ClinicProvider já barra membro inativo (.eq active true). No
+  ProfessionalForm, campo "Conta de acesso (membro)" grava professionals.
+  user_id. useSetProfessionalActive sincroniza o membro: inativar o
+  profissional vinculado revoga o acesso (clinic_members.active=false);
+  reativar restaura. Só admin sincroniza (RLS) e há proteção do último admin.
 - [PENDENTE — Fase 4] Gate preciso do Coordenador na aprovação mensal
   (substituir o stand-in clinic_admin) via vínculo + coordinator_specialty.
 
