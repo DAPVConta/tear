@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -16,6 +16,12 @@ import {
   Users,
   Printer,
   Info,
+  Stethoscope,
+  ClipboardList,
+  Plus,
+  Trash2,
+  FileText,
+  Pill,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -31,6 +37,7 @@ import {
 } from "@/components/ui/select";
 import { useClinic } from "@/providers/ClinicProvider";
 import { useAuth } from "@/providers/AuthProvider";
+import type { Json } from "@/types/database";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TagInput } from "@/components/ui/tag-input";
@@ -43,25 +50,40 @@ import {
   evolutionAssessmentLabels,
   guardianValidationMethodLabels,
 } from "@/lib/labels";
-import { usePatientOptions, usePatient } from "@/features/patients/api";
+import { usePatientOptions, usePatient, useUpdatePatient } from "@/features/patients/api";
 import {
   useProfessionalOptions,
   useProfessional,
+  useMyProfessional,
 } from "@/features/professionals/api";
 import {
   useDailyEvolution,
   useCreateEvolution,
   useUpdateEvolution,
   useSignEvolution,
+  useSubmitForTechnicalValidation,
+  useAtSupervisors,
   useActiveAuthorizationsByPatient,
   usePlansWithGoalsByPatient,
   isLocked,
   getDigitalSignature,
+  getStructuredData,
   getAddenda,
   getParentFeedback,
 } from "@/features/dailyEvolutions/api";
+import {
+  formTypeForSpecialty,
+  evolutionFormTypeLabels,
+  type EvolutionFormType,
+  type StructuredData,
+  type AbaProgram,
+} from "@/features/dailyEvolutions/formTypes";
 import { SignatureDialog } from "@/pages/evolutions/SignatureDialog";
+import { SupervisorSignatureDialog } from "@/pages/evolutions/SupervisorSignatureDialog";
 import { AddendumSection } from "@/pages/evolutions/AddendumSection";
+import { CidCombobox } from "@/components/form/CidCombobox";
+import { Cid11Combobox } from "@/components/form/Cid11Combobox";
+import { cid10ForCid11 } from "@/lib/cid11";
 
 const MIN_SESSION_MINUTES = 30;
 
@@ -91,104 +113,122 @@ function minutesBetween(start: string, end: string): number {
 
 const DEVOLUTIVA = "devolutiva_pais";
 
-const schema = z
-  .object({
-    patient_id: z.coerce.number({ message: "Selecione o paciente" }).int().positive(),
-    professional_id: z.coerce
-      .number({ message: "Selecione o profissional" })
-      .int()
-      .positive(),
-    session_date: z.string().min(1, "Informe a data"),
-    start_time: z.string().min(1, "Início obrigatório"),
-    end_time: z.string().min(1, "Término obrigatório"),
-    attendance_type: z.enum(attendanceTypes),
-    is_private: z.boolean(),
-    authorization_id: z.string(),
-    plan_id: z.string(),
-    goals_worked: z.array(z.number()),
-    skills_worked: z.array(z.string()),
-    prompting_level: z.enum(promptingLevels),
-    behavioral_notes: z.string().optional(),
-    behavioral_intervention: z.string().optional(),
-    session_summary: z.string().optional(),
-    evolution_assessment: z.enum(evolutionAssessments),
-    next_session_plan: z.string().optional(),
-    incidents: z.string().optional(),
-    guardian_presence_validation: z.boolean(),
-    guardian_validation_method: z.string(),
-    // Devolutiva para os pais (linguagem acessível).
-    parent_previous: z.string().optional(),
-    parent_next: z.string().optional(),
-    parent_home: z.string().optional(),
-  })
-  .refine((v) => minutesBetween(v.start_time, v.end_time) > 0, {
-    message: "Término deve ser após o início",
-    path: ["end_time"],
-  })
-  .refine(
-    (v) =>
-      v.attendance_type === DEVOLUTIVA ||
-      minutesBetween(v.start_time, v.end_time) >= MIN_SESSION_MINUTES,
-    {
-      message: `Duração mínima de ${MIN_SESSION_MINUTES} minutos`,
+const schemaShape = z.object({
+  patient_id: z.coerce.number({ message: "Selecione o paciente" }).int().positive(),
+  professional_id: z.coerce
+    .number({ message: "Selecione o profissional" })
+    .int()
+    .positive(),
+  session_date: z.string().min(1, "Informe a data"),
+  start_time: z.string().min(1, "Início obrigatório"),
+  end_time: z.string().min(1, "Término obrigatório"),
+  attendance_type: z.enum(attendanceTypes),
+  is_private: z.boolean(),
+  authorization_id: z.string(),
+  plan_id: z.string(),
+  goals_worked: z.array(z.number()),
+  skills_worked: z.array(z.string()),
+  prompting_level: z.enum(promptingLevels),
+  behavioral_notes: z.string().optional(),
+  behavioral_intervention: z.string().optional(),
+  session_summary: z.string().optional(),
+  evolution_assessment: z.enum(evolutionAssessments),
+  next_session_plan: z.string().optional(),
+  incidents: z.string().optional(),
+  guardian_presence_validation: z.boolean(),
+  guardian_validation_method: z.string(),
+  // Devolutiva para os pais (linguagem acessível).
+  parent_previous: z.string().optional(),
+  parent_next: z.string().optional(),
+  parent_home: z.string().optional(),
+  // Formulário Aplicador ABA / AT (correção #12).
+  supervisor_id: z.string().optional(),
+  aba_target_behaviors: z.string().optional(),
+  aba_programs: z
+    .array(z.object({ program: z.string(), trials: z.string() }))
+    .optional(),
+  prompt_physical: z.string().optional(),
+  prompt_gestural: z.string().optional(),
+  prompt_verbal: z.string().optional(),
+  prompt_independent: z.string().optional(),
+  aba_session_analysis: z.string().optional(),
+  // Formulário Área médica (correção #12).
+  med_anamnesis: z.string().optional(),
+  med_clinical_exam: z.string().optional(),
+  med_cid11: z.string().optional(),
+  med_cid10: z.string().optional(),
+  med_therapeutic_conduct: z.string().optional(),
+});
+
+type FormValues = z.infer<typeof schemaShape>;
+
+// O schema é ciente do tipo de formulário (derivado da especialidade do
+// profissional), que vive fora dos valores do form — por isso o resolver lê o
+// tipo atual via getter no momento da validação.
+function buildSchema(getFormType: () => EvolutionFormType) {
+  const min = (s: string | undefined) => (s ?? "").trim().length >= 5;
+  return schemaShape
+    .refine((v) => minutesBetween(v.start_time, v.end_time) > 0, {
+      message: "Término deve ser após o início",
       path: ["end_time"],
-    },
-  )
-  .refine(
-    (v) =>
-      v.attendance_type === DEVOLUTIVA ||
-      v.is_private ||
-      v.authorization_id !== "",
-    {
-      message: "Selecione a guia (ou marque como sessão particular)",
-      path: ["authorization_id"],
-    },
-  )
-  .refine(
-    (v) =>
-      !v.guardian_presence_validation || v.guardian_validation_method !== "",
-    {
-      message: "Informe o método de validação",
-      path: ["guardian_validation_method"],
-    },
-  )
-  .superRefine((v, ctx) => {
-    const min = (s: string | undefined) => (s ?? "").trim().length >= 5;
-    if (v.attendance_type === DEVOLUTIVA) {
-      if (!min(v.parent_previous))
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["parent_previous"],
-          message: "Descreva as atividades do plano anterior",
-        });
-      if (!min(v.parent_next))
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["parent_next"],
-          message: "Descreva as atividades do próximo plano",
-        });
-      if (!min(v.parent_home))
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["parent_home"],
-          message: "Descreva a orientação para casa",
-        });
-    } else {
-      if (!min(v.session_summary))
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["session_summary"],
-          message: "Descreva a sessão",
-        });
-      if (!min(v.next_session_plan))
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["next_session_plan"],
-          message: "Defina o próximo passo",
-        });
-    }
-  });
-type FormValues = z.infer<typeof schema>;
+    })
+    .refine(
+      (v) =>
+        v.attendance_type === DEVOLUTIVA ||
+        minutesBetween(v.start_time, v.end_time) >= MIN_SESSION_MINUTES,
+      {
+        message: `Duração mínima de ${MIN_SESSION_MINUTES} minutos`,
+        path: ["end_time"],
+      },
+    )
+    .refine(
+      (v) =>
+        v.attendance_type === DEVOLUTIVA ||
+        v.is_private ||
+        v.authorization_id !== "",
+      {
+        message: "Selecione a guia (ou marque como sessão particular)",
+        path: ["authorization_id"],
+      },
+    )
+    .refine(
+      (v) => !v.guardian_presence_validation || v.guardian_validation_method !== "",
+      {
+        message: "Informe o método de validação",
+        path: ["guardian_validation_method"],
+      },
+    )
+    .superRefine((v, ctx) => {
+      if (v.attendance_type === DEVOLUTIVA) {
+        if (!min(v.parent_previous))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["parent_previous"], message: "Descreva as atividades do plano anterior" });
+        if (!min(v.parent_next))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["parent_next"], message: "Descreva as atividades do próximo plano" });
+        if (!min(v.parent_home))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["parent_home"], message: "Descreva a orientação para casa" });
+        return;
+      }
+      const formType = getFormType();
+      if (formType === "aba_at") {
+        if (!v.supervisor_id)
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["supervisor_id"], message: "Selecione o supervisor responsável" });
+        if (!min(v.aba_target_behaviors))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["aba_target_behaviors"], message: "Descreva comportamentos-alvo e barreiras" });
+        if (!min(v.aba_session_analysis))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["aba_session_analysis"], message: "Descreva a análise da sessão e conduta" });
+      } else if (formType === "medico") {
+        if (!min(v.med_anamnesis))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["med_anamnesis"], message: "Preencha a anamnese / evolução clínica" });
+        if (!min(v.med_therapeutic_conduct))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["med_therapeutic_conduct"], message: "Descreva a conduta terapêutica/medicamentosa" });
+      } else {
+        if (!min(v.session_summary))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["session_summary"], message: "Descreva a sessão" });
+        if (!min(v.next_session_plan))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["next_session_plan"], message: "Defina o próximo passo" });
+      }
+    });
+}
 
 const defaults: FormValues = {
   patient_id: undefined as unknown as number,
@@ -214,7 +254,86 @@ const defaults: FormValues = {
   parent_previous: "",
   parent_next: "",
   parent_home: "",
+  supervisor_id: "",
+  aba_target_behaviors: "",
+  aba_programs: [{ program: "", trials: "" }],
+  prompt_physical: "",
+  prompt_gestural: "",
+  prompt_verbal: "",
+  prompt_independent: "",
+  aba_session_analysis: "",
+  med_anamnesis: "",
+  med_clinical_exam: "",
+  med_cid11: "",
+  med_cid10: "",
+  med_therapeutic_conduct: "",
 };
+
+// Campos estruturados do form, com valores neutros (usados no reset).
+type StructuredFormSlice = Pick<
+  FormValues,
+  | "aba_target_behaviors"
+  | "aba_programs"
+  | "prompt_physical"
+  | "prompt_gestural"
+  | "prompt_verbal"
+  | "prompt_independent"
+  | "aba_session_analysis"
+  | "med_anamnesis"
+  | "med_clinical_exam"
+  | "med_cid11"
+  | "med_cid10"
+  | "med_therapeutic_conduct"
+>;
+
+const emptyStructuredSlice: StructuredFormSlice = {
+  aba_target_behaviors: "",
+  aba_programs: [{ program: "", trials: "" }],
+  prompt_physical: "",
+  prompt_gestural: "",
+  prompt_verbal: "",
+  prompt_independent: "",
+  aba_session_analysis: "",
+  med_anamnesis: "",
+  med_clinical_exam: "",
+  med_cid11: "",
+  med_cid10: "",
+  med_therapeutic_conduct: "",
+};
+
+const numToStr = (n: number | null | undefined) =>
+  n === null || n === undefined ? "" : String(n);
+const strToNum = (s: string | undefined) => {
+  const n = Number((s ?? "").replace(",", "."));
+  return Number.isFinite(n) && (s ?? "").trim() !== "" ? n : null;
+};
+
+function structuredToFormValues(sd: StructuredData | null): StructuredFormSlice {
+  if (!sd) return { ...emptyStructuredSlice };
+  if (sd.kind === "aba_at") {
+    return {
+      ...emptyStructuredSlice,
+      aba_target_behaviors: sd.target_behaviors ?? "",
+      aba_programs:
+        sd.programs?.length
+          ? sd.programs.map((p) => ({ program: p.program, trials: numToStr(p.trials) }))
+          : [{ program: "", trials: "" }],
+      prompt_physical: numToStr(sd.prompting?.physical),
+      prompt_gestural: numToStr(sd.prompting?.gestural),
+      prompt_verbal: numToStr(sd.prompting?.verbal),
+      prompt_independent: numToStr(sd.prompting?.independent),
+      aba_session_analysis: sd.session_analysis ?? "",
+    };
+  }
+  return {
+    ...emptyStructuredSlice,
+    med_anamnesis: sd.anamnesis ?? "",
+    med_clinical_exam: sd.clinical_exam ?? "",
+    med_cid11: sd.cid11 ?? "",
+    med_cid10: sd.cid10 ?? "",
+    med_therapeutic_conduct: sd.therapeutic_conduct ?? "",
+  };
+}
 
 export default function DailyEvolutionForm() {
   const { id } = useParams();
@@ -222,10 +341,11 @@ export default function DailyEvolutionForm() {
   const isEdit = !!id && id !== "novo";
   const evoId = isEdit ? Number(id) : undefined;
 
-  const { clinic } = useClinic();
+  const { clinic, role } = useClinic();
   const { user } = useAuth();
   const { data: patients } = usePatientOptions();
   const { data: professionals } = useProfessionalOptions();
+  const { data: myProfessional } = useMyProfessional();
   const { data: existing, isLoading } = useDailyEvolution(evoId);
   // Rascunho contém dado clínico sensível (LGPD): isola por clínica E por
   // usuário, para que outro membro no mesmo navegador (ex.: recepção
@@ -240,11 +360,21 @@ export default function DailyEvolutionForm() {
   const createEvo = useCreateEvolution();
   const updateEvo = useUpdateEvolution(evoId ?? 0);
   const signEvo = useSignEvolution();
+  const submitForValidation = useSubmitForTechnicalValidation(evoId ?? 0);
+  const updatePatientReport = useUpdatePatient(existing?.patient_id ?? 0);
   const [sigOpen, setSigOpen] = useState(false);
+  const [supSigOpen, setSupSigOpen] = useState(false);
 
   const locked = existing ? isLocked(existing) : false;
   const signed = existing?.professional_signature ?? false;
   const digitalSig = existing ? getDigitalSignature(existing) : null;
+  const validationStatus = existing?.validation_status ?? null;
+  // Pode homologar: o supervisor designado da evolução, ou um admin (stand-in).
+  const canHomologate =
+    isEdit &&
+    !!existing &&
+    validationStatus === "pendente_validacao" &&
+    (role === "clinic_admin" || myProfessional?.id === existing.supervisor_id);
   const addenda = existing ? getAddenda(existing) : [];
 
   // Dados completos para a síntese em PDF (carregados em modo edição).
@@ -273,6 +403,78 @@ export default function DailyEvolutionForm() {
     );
   }
 
+  // Emite receita/atestado (PDF para impressão) a partir da evolução médica.
+  async function handleEmitMedicalDoc(kind: "receita" | "atestado") {
+    if (!existing) return;
+    const { exportMedicalDocumentPDF } = await import("@/lib/pdf");
+    exportMedicalDocumentPDF(
+      kind,
+      existing,
+      pdfPatient ?? null,
+      pdfProfessional ?? null,
+      clinic?.trade_name || clinic?.name || "Clínica",
+    );
+  }
+
+  // Emite um laudo e atualiza automaticamente a validade do laudo no cadastro
+  // do paciente (emissão hoje + 1 ano), conforme a correção #12.
+  async function handleEmitLaudo() {
+    if (!existing?.patient_id) return;
+    const today = new Date();
+    const issue = today.toISOString().slice(0, 10);
+    const validity = new Date(
+      today.getFullYear() + 1,
+      today.getMonth(),
+      today.getDate(),
+    )
+      .toISOString()
+      .slice(0, 10);
+    try {
+      await updatePatientReport.mutateAsync({
+        report_issue_date: issue,
+        report_validity_date: validity,
+        report_doctor: pdfProfessional?.name ?? null,
+        report_crm: pdfProfessional
+          ? `${pdfProfessional.council_type}/${pdfProfessional.council_state} ${pdfProfessional.council_number}`
+          : null,
+      });
+      const { exportMedicalDocumentPDF } = await import("@/lib/pdf");
+      exportMedicalDocumentPDF(
+        "laudo",
+        existing,
+        pdfPatient ?? null,
+        pdfProfessional ?? null,
+        clinic?.trade_name || clinic?.name || "Clínica",
+      );
+      toast.success("Laudo emitido — validade atualizada no cadastro do paciente", {
+        description: `Nova validade: ${validity.split("-").reverse().join("/")}`,
+      });
+    } catch (e) {
+      toast.error("Não foi possível emitir o laudo", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    }
+  }
+
+  // AT/Aplicador ABA encerra a evolução (assinatura eletrônica simples) e a
+  // envia para a fila de homologação do supervisor.
+  async function onSubmitForValidation() {
+    if (!evoId) return;
+    try {
+      await submitForValidation.mutateAsync();
+      toast.success("Evolução enviada para validação do supervisor");
+      navigate("/evolucoes");
+    } catch (e) {
+      toast.error("Falha ao enviar para validação", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    }
+  }
+
+  // O tipo de formulário depende da especialidade do profissional (fora dos
+  // valores do form); o resolver lê o tipo corrente via este ref.
+  const formTypeRef = useRef<EvolutionFormType>("clinico");
+
   const {
     register,
     handleSubmit,
@@ -282,11 +484,15 @@ export default function DailyEvolutionForm() {
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(buildSchema(() => formTypeRef.current)),
     defaultValues: defaults,
   });
 
+  const { fields: abaProgramFields, append: appendProgram, remove: removeProgram } =
+    useFieldArray({ control, name: "aba_programs" });
+
   const patientId = watch("patient_id");
+  const professionalId = watch("professional_id");
   const planIdStr = watch("plan_id");
   const isPrivate = watch("is_private");
   const guardianChecked = watch("guardian_presence_validation");
@@ -296,8 +502,21 @@ export default function DailyEvolutionForm() {
   const attendanceType = watch("attendance_type");
   const isDevolutiva = attendanceType === DEVOLUTIVA;
 
+  const { data: supervisors } = useAtSupervisors();
   const { data: authorizations } = useActiveAuthorizationsByPatient(patientId);
   const { data: plans } = usePlansWithGoalsByPatient(patientId);
+
+  // Tipo do formulário, derivado da especialidade do profissional selecionado.
+  const selectedProfessional = (professionals ?? []).find(
+    (p) => p.id === professionalId,
+  );
+  const formType: EvolutionFormType = isDevolutiva
+    ? "clinico"
+    : formTypeForSpecialty(selectedProfessional?.specialty);
+  formTypeRef.current = formType;
+  const isAt = !isDevolutiva && formType === "aba_at";
+  const isMedical = !isDevolutiva && formType === "medico";
+  const isClinical = !isDevolutiva && formType === "clinico";
 
   const selectedPlanGoals = useMemo(() => {
     const planId = planIdStr ? Number(planIdStr) : null;
@@ -380,6 +599,8 @@ export default function DailyEvolutionForm() {
         parent_previous: getParentFeedback(existing)?.previous_activities ?? "",
         parent_next: getParentFeedback(existing)?.next_activities ?? "",
         parent_home: getParentFeedback(existing)?.home_guidance ?? "",
+        supervisor_id: existing.supervisor_id ? String(existing.supervisor_id) : "",
+        ...structuredToFormValues(getStructuredData(existing)),
       });
     }
   }, [existing, reset]);
@@ -406,6 +627,72 @@ export default function DailyEvolutionForm() {
       guardian_presence_validation: values.guardian_presence_validation,
       guardian_validation_method: guardianMethod,
     };
+
+    // Campos clínicos específicos do tipo de formulário (correção #12): os
+    // formulários ABA/médico alimentam structured_data e também mapeiam para as
+    // colunas existentes (síntese/comportamento/próximo passo) para manter
+    // relatórios mensais, PDF e blindagem funcionando sem hardcode por tela.
+    let typed: {
+      behavioral_notes: string | null;
+      behavioral_intervention: string | null;
+      session_summary: string;
+      next_session_plan: string;
+      structured_data: Json | null;
+      supervisor_id: number | null;
+    };
+    if (formType === "aba_at") {
+      const programs: AbaProgram[] = (values.aba_programs ?? [])
+        .filter((p) => p.program.trim())
+        .map((p) => ({ program: p.program.trim(), trials: strToNum(p.trials) }));
+      const structured: StructuredData = {
+        kind: "aba_at",
+        target_behaviors: values.aba_target_behaviors ?? "",
+        programs,
+        prompting: {
+          physical: strToNum(values.prompt_physical),
+          gestural: strToNum(values.prompt_gestural),
+          verbal: strToNum(values.prompt_verbal),
+          independent: strToNum(values.prompt_independent),
+        },
+        session_analysis: values.aba_session_analysis ?? "",
+      };
+      typed = {
+        behavioral_notes: values.aba_target_behaviors || null,
+        behavioral_intervention: values.aba_session_analysis || null,
+        session_summary: values.aba_session_analysis ?? "",
+        next_session_plan:
+          values.next_session_plan?.trim() ||
+          "Continuidade dos programas de ensino aplicados.",
+        structured_data: structured as unknown as Json,
+        supervisor_id: values.supervisor_id ? Number(values.supervisor_id) : null,
+      };
+    } else if (formType === "medico") {
+      const structured: StructuredData = {
+        kind: "medical",
+        anamnesis: values.med_anamnesis ?? "",
+        clinical_exam: values.med_clinical_exam ?? "",
+        cid11: values.med_cid11 ?? "",
+        cid10: values.med_cid10 ?? "",
+        therapeutic_conduct: values.med_therapeutic_conduct ?? "",
+      };
+      typed = {
+        behavioral_notes: values.med_clinical_exam || null,
+        behavioral_intervention: null,
+        session_summary: values.med_anamnesis ?? "",
+        next_session_plan: values.med_therapeutic_conduct ?? "",
+        structured_data: structured as unknown as Json,
+        supervisor_id: null,
+      };
+    } else {
+      typed = {
+        behavioral_notes: values.behavioral_notes || null,
+        behavioral_intervention: values.behavioral_intervention || null,
+        session_summary: values.session_summary ?? "",
+        next_session_plan: values.next_session_plan ?? "",
+        structured_data: null,
+        supervisor_id: null,
+      };
+    }
 
     // Devolutiva: layout próprio (sem guia/metas técnicas). Os 3 campos vão
     // para parent_feedback; síntese/próximo passo recebem versões legíveis
@@ -441,11 +728,8 @@ export default function DailyEvolutionForm() {
           goals_worked: values.goals_worked,
           skills_worked: values.skills_worked,
           prompting_level: values.prompting_level,
-          behavioral_notes: values.behavioral_notes || null,
-          behavioral_intervention: values.behavioral_intervention || null,
-          session_summary: values.session_summary ?? "",
-          next_session_plan: values.next_session_plan ?? "",
           parent_feedback: null,
+          ...typed,
         };
 
     try {
@@ -490,7 +774,18 @@ export default function DailyEvolutionForm() {
         title={isEdit ? "Editar evolução" : "Nova evolução"}
         description="Campos com * são obrigatórios para blindagem de auditoria."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {!isDevolutiva && (
+              <Badge variant="muted">{evolutionFormTypeLabels[formType]}</Badge>
+            )}
+            {validationStatus === "pendente_validacao" && (
+              <Badge variant="warning">Pendente de validação técnica</Badge>
+            )}
+            {validationStatus === "homologada" && (
+              <Badge variant="success">
+                <ShieldCheck className="h-3 w-3" /> Homologada
+              </Badge>
+            )}
             {locked && (
               <Badge variant="muted">
                 <Lock className="h-3 w-3" /> Bloqueada (&gt;24h da assinatura)
@@ -742,7 +1037,271 @@ export default function DailyEvolutionForm() {
             </Card>
           )}
 
-          {!isDevolutiva && (
+          {isAt && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-brand-blue-light" />
+                  Aplicação ABA / AT
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-2 rounded-lg border border-brand-blue-light/30 bg-brand-blue-light/5 p-3 text-sm text-muted-foreground">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand-blue-light" />
+                  <span>
+                    Após o encerramento, esta evolução vai para a fila de
+                    homologação do supervisor responsável (validação técnica).
+                  </span>
+                </div>
+                <Field
+                  label="Supervisor responsável"
+                  error={errors.supervisor_id?.message}
+                >
+                  <Controller
+                    control={control}
+                    name="supervisor_id"
+                    render={({ field }) => (
+                      <Select value={field.value || ""} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o supervisor (Psicologia/ABA)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(supervisors ?? []).map((s) => (
+                            <SelectItem key={s.id} value={String(s.id)}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                          {supervisors?.length === 0 && (
+                            <div className="p-3 text-sm text-muted-foreground">
+                              Nenhum supervisor cadastrado. Marque "Supervisor de
+                              AT" ou "Coordenador de Psicologia/ABA" no
+                              profissional.
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+                <Field
+                  label="Comportamentos-alvo e barreiras"
+                  error={errors.aba_target_behaviors?.message}
+                >
+                  <textarea
+                    {...register("aba_target_behaviors")}
+                    rows={3}
+                    className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="Crises, recusas, estereotipias e demais comportamentos observados na sessão..."
+                  />
+                </Field>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-semibold">
+                      Programas de ensino aplicados
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => appendProgram({ program: "", trials: "" })}
+                    >
+                      <Plus className="h-4 w-4" /> Programa
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {abaProgramFields.map((f, i) => (
+                      <div key={f.id} className="flex items-start gap-2">
+                        <Input
+                          {...register(`aba_programs.${i}.program` as const)}
+                          placeholder="Nome do programa / target"
+                          className="flex-1"
+                        />
+                        <Input
+                          {...register(`aba_programs.${i}.trials` as const)}
+                          placeholder="Tentativas"
+                          inputMode="numeric"
+                          className="w-32"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeProgram(i)}
+                          disabled={abaProgramFields.length <= 1}
+                          aria-label="Remover programa"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-sm font-semibold">
+                    Nível de ajuda predominante (%)
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    <Field label="Física">
+                      <Input {...register("prompt_physical")} inputMode="numeric" placeholder="0" />
+                    </Field>
+                    <Field label="Gestual">
+                      <Input {...register("prompt_gestural")} inputMode="numeric" placeholder="0" />
+                    </Field>
+                    <Field label="Verbal">
+                      <Input {...register("prompt_verbal")} inputMode="numeric" placeholder="0" />
+                    </Field>
+                    <Field label="Independente">
+                      <Input {...register("prompt_independent")} inputMode="numeric" placeholder="0" />
+                    </Field>
+                  </div>
+                </div>
+
+                <Field
+                  label="Análise da sessão e conduta"
+                  error={errors.aba_session_analysis?.message}
+                >
+                  <textarea
+                    {...register("aba_session_analysis")}
+                    rows={4}
+                    className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="Manejos comportamentais, uso de reforçadores e análise geral da sessão..."
+                  />
+                </Field>
+                <Field label="Avaliação de evolução" error={errors.evolution_assessment?.message}>
+                  <Controller
+                    control={control}
+                    name="evolution_assessment"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(evolutionAssessmentLabels).map(([v, label]) => (
+                            <SelectItem key={v} value={v}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+              </CardContent>
+            </Card>
+          )}
+
+          {isMedical && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Stethoscope className="h-5 w-5 text-brand-blue-light" />
+                  Evolução médica
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Field
+                  label="Anamnese e evolução clínica"
+                  error={errors.med_anamnesis?.message}
+                >
+                  <textarea
+                    {...register("med_anamnesis")}
+                    rows={4}
+                    className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="Padrão de sono, apetite, relatos dos pais e eficácia das terapias vigentes..."
+                  />
+                </Field>
+                <Field label="Exame clínico / comportamental">
+                  <textarea
+                    {...register("med_clinical_exam")}
+                    rows={3}
+                    className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="Contato visual, agitação psicomotora, nível de interação no consultório..."
+                  />
+                </Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Diagnóstico CID-11">
+                    <Controller
+                      control={control}
+                      name="med_cid11"
+                      render={({ field }) => (
+                        <Cid11Combobox
+                          value={field.value ?? ""}
+                          onChange={(v) => {
+                            field.onChange(v);
+                            const mapped = cid10ForCid11(v);
+                            if (mapped) setValue("med_cid10", mapped, { shouldDirty: true });
+                          }}
+                          placeholder="Selecione o CID-11"
+                        />
+                      )}
+                    />
+                  </Field>
+                  <Field label="CID-10 (compatibilidade)">
+                    <Controller
+                      control={control}
+                      name="med_cid10"
+                      render={({ field }) => (
+                        <CidCombobox
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          placeholder="Selecione o CID-10"
+                        />
+                      )}
+                    />
+                  </Field>
+                </div>
+                <Field
+                  label="Conduta terapêutica e medicamentosa"
+                  error={errors.med_therapeutic_conduct?.message}
+                >
+                  <textarea
+                    {...register("med_therapeutic_conduct")}
+                    rows={4}
+                    className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    placeholder="Ajustes de dosagem, introdução/descontinuação de fármacos e prazo de retorno..."
+                  />
+                </Field>
+                <Field label="Avaliação de evolução" error={errors.evolution_assessment?.message}>
+                  <Controller
+                    control={control}
+                    name="evolution_assessment"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(evolutionAssessmentLabels).map(([v, label]) => (
+                            <SelectItem key={v} value={v}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+                {isEdit && existing && (
+                  <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleEmitMedicalDoc("receita")}>
+                      <Pill className="h-4 w-4" /> Emitir receita
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => handleEmitMedicalDoc("atestado")}>
+                      <FileText className="h-4 w-4" /> Emitir atestado
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={handleEmitLaudo}>
+                      <FileText className="h-4 w-4" /> Emitir laudo (atualiza validade)
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {isClinical && (
             <>
           <Card>
             <CardHeader>
@@ -982,7 +1541,23 @@ export default function DailyEvolutionForm() {
               <Printer className="h-4 w-4" /> Imprimir Devolutiva (PDF)
             </Button>
           )}
-          {isEdit && existing && !signed && !locked && (
+          {isEdit && existing && isAt && !signed && !locked && (
+            <Button
+              type="button"
+              variant="accent"
+              onClick={onSubmitForValidation}
+              disabled={submitForValidation.isPending}
+            >
+              {submitForValidation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <ShieldCheck className="h-4 w-4" /> Encerrar e enviar para validação
+                </>
+              )}
+            </Button>
+          )}
+          {isEdit && existing && !isAt && !signed && !locked && (
             <>
               <Button
                 type="button"
@@ -1007,6 +1582,15 @@ export default function DailyEvolutionForm() {
               </Button>
             </>
           )}
+          {canHomologate && (
+            <Button
+              type="button"
+              variant="brand"
+              onClick={() => setSupSigOpen(true)}
+            >
+              <BadgeCheck className="h-4 w-4" /> Homologar e assinar (supervisor)
+            </Button>
+          )}
           {!locked && (
             <Button type="submit" variant="brand" disabled={isSubmitting}>
               {isSubmitting ? (
@@ -1026,6 +1610,14 @@ export default function DailyEvolutionForm() {
           open={sigOpen}
           onOpenChange={setSigOpen}
           evolution={existing}
+        />
+      )}
+      {isEdit && existing && (
+        <SupervisorSignatureDialog
+          open={supSigOpen}
+          onOpenChange={setSupSigOpen}
+          evolution={existing}
+          onSigned={() => navigate("/evolucoes")}
         />
       )}
     </div>

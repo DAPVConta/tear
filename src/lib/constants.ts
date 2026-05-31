@@ -24,7 +24,24 @@ export const COUNCIL_TYPES = [
   "CRFa", // Fonoaudiologia
   "CREFITO", // Terapia Ocupacional / Fisioterapia
   "CRM", // Medicina
+  "CRN", // Nutrição
   "CRESS", // Serviço Social
   "CREF", // Educação Física
+  "CBO", // Áreas sem conselho federal (registro por ocupação/associação)
   "Outro",
 ] as const;
+
+export type CouncilType = (typeof COUNCIL_TYPES)[number];
+
+// Descrição por extenso de cada conselho (legenda/tooltip).
+export const COUNCIL_LABELS: Record<CouncilType, string> = {
+  CRP: "Conselho Regional de Psicologia",
+  CRFa: "Conselho Regional de Fonoaudiologia",
+  CREFITO: "Conselho Regional de Fisioterapia e Terapia Ocupacional",
+  CRM: "Conselho Regional de Medicina",
+  CRN: "Conselho Regional de Nutrição",
+  CRESS: "Conselho Regional de Serviço Social",
+  CREF: "Conselho Regional de Educação Física",
+  CBO: "Classificação Brasileira de Ocupações / registro da associação",
+  Outro: "Outro registro",
+};

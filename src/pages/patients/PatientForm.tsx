@@ -24,6 +24,8 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/form/Field";
 import { FormSection } from "@/components/form/FormSection";
 import { CidCombobox } from "@/components/form/CidCombobox";
+import { Cid11Combobox } from "@/components/form/Cid11Combobox";
+import { cid10ForCid11, findCid11 } from "@/lib/cid11";
 import {
   Select,
   SelectContent,
@@ -64,6 +66,8 @@ const schema = z.object({
   payment_type: z.enum(["operadora", "particular"]),
   health_plan_name: z.string().optional(),
   health_plan_card: z.string().optional(),
+  cid11_primary: z.string().optional(),
+  cid11_secondary: z.string().optional(),
   cid10_primary: z.string().min(1, "Informe o CID-10 principal"),
   cid10_secondary: z.string().optional(),
   diagnosis: z.string().optional(),
@@ -87,6 +91,8 @@ const defaults: FormValues = {
   payment_type: "operadora",
   health_plan_name: "",
   health_plan_card: "",
+  cid11_primary: "",
+  cid11_secondary: "",
   cid10_primary: "",
   cid10_secondary: "",
   diagnosis: "",
@@ -143,6 +149,8 @@ export default function PatientForm() {
         payment_type: existing.payment_type,
         health_plan_name: existing.health_plan_name ?? "",
         health_plan_card: existing.health_plan_card ?? "",
+        cid11_primary: existing.cid11_primary ?? "",
+        cid11_secondary: existing.cid11_secondary ?? "",
         cid10_primary: existing.cid10_primary,
         cid10_secondary: existing.cid10_secondary ?? "",
         diagnosis: existing.diagnosis ?? "",
@@ -157,6 +165,8 @@ export default function PatientForm() {
 
   const paymentType = watch("payment_type");
   const reportValidity = watch("report_validity_date");
+  const cid11Primary = watch("cid11_primary");
+  const cid11PrimaryInfo = cid11Primary ? findCid11(cid11Primary) : undefined;
   const [cep, setCep] = useState("");
   const { loading: cepLoading, lookup: lookupCepInfo } = useCepLookup();
   const [reportFile, setReportFile] = useState<File | null>(null);
@@ -215,6 +225,20 @@ export default function PatientForm() {
     });
   }
 
+  // De-Para CID-11 → CID-10: ao escolher o código CID-11, preenche o CID-10
+  // equivalente (faturamento/operadoras), que permanece editável.
+  function onChangeCid11(
+    field: "cid11_primary" | "cid11_secondary",
+    code: string,
+  ) {
+    setValue(field, code, { shouldDirty: true });
+    const mapped = cid10ForCid11(code);
+    if (mapped) {
+      const target = field === "cid11_primary" ? "cid10_primary" : "cid10_secondary";
+      setValue(target, mapped, { shouldDirty: true, shouldValidate: true });
+    }
+  }
+
   async function onSubmit(values: FormValues) {
     let reportPath = existing?.report_path ?? null;
     try {
@@ -242,6 +266,8 @@ export default function PatientForm() {
         values.payment_type === "operadora" ? values.health_plan_name || null : null,
       health_plan_card:
         values.payment_type === "operadora" ? values.health_plan_card || null : null,
+      cid11_primary: values.cid11_primary || null,
+      cid11_secondary: values.cid11_secondary || null,
       cid10_primary: values.cid10_primary,
       cid10_secondary: values.cid10_secondary || null,
       diagnosis: values.diagnosis || null,
@@ -410,6 +436,51 @@ export default function PatientForm() {
         </FormSection>
 
         <FormSection icon={Stethoscope} title="Diagnóstico / Condição de Saúde">
+            <Field
+              label="CID-11 principal (opcional)"
+              error={errors.cid11_primary?.message}
+            >
+              <Controller
+                control={control}
+                name="cid11_primary"
+                render={({ field }) => (
+                  <Cid11Combobox
+                    value={field.value ?? ""}
+                    onChange={(v) => onChangeCid11("cid11_primary", v)}
+                    placeholder="Selecione o CID-11 (OMS)"
+                  />
+                )}
+              />
+              {cid11PrimaryInfo ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    {cid11PrimaryInfo.code}
+                  </span>{" "}
+                  — {cid11PrimaryInfo.description}
+                  {cid11PrimaryInfo.cid10 && (
+                    <> · CID-10: {cid11PrimaryInfo.cid10}</>
+                  )}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Ao escolher o CID-11, o CID-10 equivalente é preenchido
+                  automaticamente para compatibilidade com operadoras.
+                </p>
+              )}
+            </Field>
+            <Field label="CID-11 secundário (opcional)">
+              <Controller
+                control={control}
+                name="cid11_secondary"
+                render={({ field }) => (
+                  <Cid11Combobox
+                    value={field.value ?? ""}
+                    onChange={(v) => onChangeCid11("cid11_secondary", v)}
+                    placeholder="Selecione o CID-11 (opcional)"
+                  />
+                )}
+              />
+            </Field>
             <Field label="CID-10 principal" error={errors.cid10_primary?.message}>
               <Controller
                 control={control}

@@ -35,11 +35,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { attendanceTypeLabels } from "@/lib/labels";
+import { attendanceTypeLabels, specialtyLabels } from "@/lib/labels";
 import { usePatientOptions } from "@/features/patients/api";
+import { useMyProfessional } from "@/features/professionals/api";
 import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
 import {
   useDailyEvolutions,
+  useEvolutionsPendingValidation,
   isLocked,
   getDigitalSignature,
   EVOLUTIONS_PAGE_SIZE,
@@ -47,6 +49,18 @@ import {
 } from "@/features/dailyEvolutions/api";
 
 function statusBadge(e: EvolutionRow) {
+  if (e.validation_status === "homologada")
+    return (
+      <Badge variant="success">
+        <BadgeCheck className="h-3 w-3" /> Homologada
+      </Badge>
+    );
+  if (e.validation_status === "pendente_validacao")
+    return (
+      <Badge variant="warning">
+        <CircleDashed className="h-3 w-3" /> Pendente validação
+      </Badge>
+    );
   if (getDigitalSignature(e))
     return (
       <Badge variant="success">
@@ -76,6 +90,7 @@ export default function DailyEvolutionsList() {
   const navigate = useNavigate();
   const [page, setPage] = useUrlNumber("page", 1);
   const [patientId, setPatientId] = useUrlState("patient", "all");
+  const [specialty, setSpecialty] = useUrlState("specialty", "all");
   const [from, setFrom] = useUrlState(
     "from",
     format(subDays(new Date(), 14), "yyyy-MM-dd"),
@@ -83,9 +98,12 @@ export default function DailyEvolutionsList() {
   const [to, setTo] = useUrlState("to", format(new Date(), "yyyy-MM-dd"));
 
   const { data: patients } = usePatientOptions();
+  const { data: myProfessional } = useMyProfessional();
+  const { data: pending } = useEvolutionsPendingValidation(myProfessional?.id);
   const { data, isLoading, isError } = useDailyEvolutions({
     page,
     patientId: patientId === "all" ? undefined : Number(patientId),
+    specialty: specialty === "all" ? undefined : specialty,
     from,
     to,
   });
@@ -117,8 +135,30 @@ export default function DailyEvolutionsList() {
         }
       />
 
+      {(pending?.length ?? 0) > 0 && (
+        <div className="mb-4 rounded-2xl border border-warning/40 bg-warning/10 p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-warning-text">
+            <BadgeCheck className="h-4 w-4" />
+            Aguardando sua homologação ({pending!.length})
+          </div>
+          <ul className="space-y-1 text-sm">
+            {pending!.map((e) => (
+              <li key={e.id}>
+                <Link
+                  to={`/evolucoes/${e.id}`}
+                  className="text-brand-blue-light underline-offset-2 hover:underline"
+                >
+                  {format(parseISO(e.session_date), "dd/MM/yyyy")} ·{" "}
+                  {e.patient?.name ?? "—"} · {e.professional?.name ?? "—"}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-border bg-card shadow-soft">
-        <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-[1fr_auto_auto]">
+        <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto]">
           <Select
             value={patientId}
             onValueChange={(v) => {
@@ -134,6 +174,25 @@ export default function DailyEvolutionsList() {
               {patients?.map((p) => (
                 <SelectItem key={p.id} value={String(p.id)}>
                   {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={specialty}
+            onValueChange={(v) => {
+              setSpecialty(v);
+              resetPage();
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Todas as especialidades" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as especialidades</SelectItem>
+              {Object.entries(specialtyLabels).map(([v, label]) => (
+                <SelectItem key={v} value={v}>
+                  {label}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -39,9 +39,11 @@ export const keys = {
       clinicId: number | undefined,
       page: number,
       patientId: number | undefined,
+      specialty: string | undefined,
       from: string | undefined,
       to: string | undefined,
-    ) => ["daily-evolutions", clinicId, page, patientId, from, to] as const,
+    ) =>
+      ["daily-evolutions", clinicId, page, patientId, specialty, from, to] as const,
     byId: (id: number | undefined) => ["daily-evolution", id] as const,
   },
   attendances: {
