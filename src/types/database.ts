@@ -732,6 +732,15 @@ export type Database = {
       is_clinic_admin: { Args: { cid: number }; Returns: boolean };
       is_clinic_member: { Args: { cid: number }; Returns: boolean };
       is_platform_admin: { Args: Record<string, never>; Returns: boolean };
+      save_correction: {
+        Args: {
+          p_clinic_id: number;
+          p_description: string;
+          p_link?: string | null;
+          p_images?: string[];
+        };
+        Returns: Database["public"]["Tables"]["corrections"]["Row"];
+      };
     };
     Enums: {
       attendance_status:
