@@ -412,8 +412,11 @@ Todas as correções da tabela public.corrections foram resolvidas.
   user_id. useSetProfessionalActive sincroniza o membro: inativar o
   profissional vinculado revoga o acesso (clinic_members.active=false);
   reativar restaura. Só admin sincroniza (RLS) e há proteção do último admin.
-- [PENDENTE — Fase 4] Gate preciso do Coordenador na aprovação mensal
-  (substituir o stand-in clinic_admin) via vínculo + coordinator_specialty.
+- [FEITO — Fase 4] Gate preciso do Coordenador na aprovação mensal:
+  `useMyProfessional` (profissional vinculado ao usuário logado); em
+  MonthlyDetail, `canReview` libera Aprovar/Recusar para clinic_admin OU para o
+  coordenador cuja `coordinator_specialty` casa com a especialidade do
+  profissional da evolução. `reviewer_id` gravado na aprovação.
 
 Fase 2 restante: Asaas billing.
 

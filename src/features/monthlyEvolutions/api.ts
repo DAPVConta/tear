@@ -293,7 +293,11 @@ export function useReviewMonthly(id: number) {
   const { clinic } = useClinic();
   const { user, profile } = useAuth();
   return useMutation({
-    mutationFn: async (input: { decision: "approve" | "reject"; reason?: string }) => {
+    mutationFn: async (input: {
+      decision: "approve" | "reject";
+      reason?: string;
+      reviewerId?: number | null;
+    }) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
       const reviewerName = profile?.name ?? user?.email ?? null;
       const now = new Date().toISOString();
@@ -304,6 +308,7 @@ export function useReviewMonthly(id: number) {
               approved: true,
               approved_at: now,
               reviewed_at: now,
+              reviewer_id: input.reviewerId ?? null,
               reviewer_name: reviewerName,
               rejection_reason: null,
             }
