@@ -1,9 +1,10 @@
-import { Database, Lock, Palette } from "lucide-react";
+import { Bug, Database, Lock, Palette } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutTab } from "./tabs/LayoutTab";
 import { PrivacyTab } from "./tabs/PrivacyTab";
 import { TestDataTab } from "./tabs/TestDataTab";
+import { CorrectionsTab } from "./tabs/CorrectionsTab";
 
 export default function SettingsPage() {
   return (
@@ -18,6 +19,9 @@ export default function SettingsPage() {
           <TabsTrigger value="layout">
             <Palette className="mr-1 h-4 w-4" /> Layout
           </TabsTrigger>
+          <TabsTrigger value="corrections">
+            <Bug className="mr-1 h-4 w-4" /> Correções
+          </TabsTrigger>
           <TabsTrigger value="privacy">
             <Lock className="mr-1 h-4 w-4" /> Privacidade (LGPD)
           </TabsTrigger>
@@ -28,6 +32,10 @@ export default function SettingsPage() {
 
         <TabsContent value="layout">
           <LayoutTab />
+        </TabsContent>
+
+        <TabsContent value="corrections">
+          <CorrectionsTab />
         </TabsContent>
 
         <TabsContent value="privacy">

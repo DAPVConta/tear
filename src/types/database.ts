@@ -258,6 +258,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      corrections: {
+        Row: {
+          clinic_id: number;
+          created_at: string;
+          created_by: string | null;
+          created_by_name: string | null;
+          description: string;
+          id: number;
+          images: string[];
+          link: string | null;
+          status: Database["public"]["Enums"]["correction_status"];
+          updated_at: string;
+        };
+        Insert: {
+          clinic_id: number;
+          created_at?: string;
+          created_by?: string | null;
+          created_by_name?: string | null;
+          description: string;
+          id?: never;
+          images?: string[];
+          link?: string | null;
+          status?: Database["public"]["Enums"]["correction_status"];
+          updated_at?: string;
+        };
+        Update: {
+          clinic_id?: number;
+          created_at?: string;
+          created_by?: string | null;
+          created_by_name?: string | null;
+          description?: string;
+          id?: never;
+          images?: string[];
+          link?: string | null;
+          status?: Database["public"]["Enums"]["correction_status"];
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       daily_evolutions: {
         Row: {
           addendum: Json | null;
@@ -706,6 +745,7 @@ export type Database = {
       authorization_status: "ativa" | "vencida" | "cancelada" | "esgotada";
       clinic_plan: "trial" | "basic" | "professional" | "enterprise";
       clinic_plan_status: "active" | "past_due" | "canceled" | "trialing";
+      correction_status: "aberto" | "em_andamento" | "resolvido" | "cancelado";
       evolution_assessment:
         | "evolucao_significativa"
         | "evolucao_leve"
