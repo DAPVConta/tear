@@ -9,16 +9,20 @@ const features = [
     icon: Brain,
     title: "Inteligência clínica",
     desc: "Evolução mensal gerada automaticamente a partir dos atendimentos diários.",
+    // Cor TEA por card (azul/amarelo/vermelho = diversidade da marca)
+    iconClass: "bg-brand-blue-light/12 text-brand-blue-light",
   },
   {
     icon: ShieldCheck,
     title: "Blindagem para auditoria",
     desc: "Regras que garantem prontuários completos e prontos para faturamento.",
+    iconClass: "bg-brand-yellow/15 text-warning-text",
   },
   {
     icon: HeartPulse,
     title: "Cuidado no centro",
     desc: "Fluxos pensados para a rotina de clínicas especializadas em TEA.",
+    iconClass: "bg-brand-red/12 text-brand-red",
   },
 ];
 
@@ -38,16 +42,21 @@ export default function Landing() {
       </header>
 
       <main>
-        {/* Hero */}
+        {/* Hero — mesh multicor da paleta + grid com máscara radial */}
         <section className="relative overflow-hidden">
-          <div className="absolute inset-0 -z-10 bg-grid opacity-[0.4]" />
-          <div className="absolute left-1/2 top-0 -z-10 h-[28rem] w-[48rem] -translate-x-1/2 rounded-full bg-accent/10 blur-3xl" />
+          <div className="absolute inset-0 -z-10 bg-grid opacity-[0.35] [mask-image:radial-gradient(80%_60%_at_50%_0%,black,transparent)]" />
+          <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+            <div className="absolute left-1/2 top-[-6rem] h-[26rem] w-[42rem] -translate-x-1/2 rounded-full bg-brand-blue-light/20 blur-3xl" />
+            <div className="absolute left-[12%] top-10 h-72 w-72 rounded-full bg-brand-cyan/15 blur-3xl" />
+            <div className="absolute right-[10%] top-24 h-72 w-72 rounded-full bg-brand-yellow/12 blur-3xl" />
+            <div className="absolute right-1/4 top-44 h-56 w-56 rounded-full bg-brand-red/10 blur-3xl" />
+          </div>
           <div className="mx-auto max-w-4xl px-6 py-24 text-center lg:py-32">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-sm font-semibold text-muted-foreground shadow-soft">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-4 py-1.5 text-sm font-semibold text-muted-foreground shadow-soft backdrop-blur">
               <span className="h-2 w-2 rounded-full bg-accent" />
               Tecnologia · Empatia · Acompanhamento · Registro
             </span>
-            <h1 className="mt-6 text-balance text-4xl font-extrabold tracking-tight lg:text-6xl">
+            <h1 className="mt-6 text-balance text-[2.75rem] font-extrabold leading-[1.05] tracking-tight lg:text-6xl">
               O prontuário inteligente para{" "}
               <span className="bg-brand-gradient bg-clip-text text-transparent">
                 clínicas de TEA
@@ -78,13 +87,15 @@ export default function Landing() {
               return (
                 <div
                   key={f.title}
-                  className="rounded-2xl border border-border bg-card p-7 shadow-soft transition-all hover:-translate-y-1 hover:shadow-elevated"
+                  className="group rounded-2xl border border-border bg-card p-7 shadow-soft transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-elevated"
                 >
-                  <span className="grid h-12 w-12 place-items-center rounded-xl bg-brand-gradient text-white shadow-glow">
+                  <span
+                    className={`grid h-12 w-12 place-items-center rounded-xl transition-transform duration-200 ease-out group-hover:scale-105 ${f.iconClass}`}
+                  >
                     <Icon className="h-6 w-6" />
                   </span>
-                  <h3 className="mt-5 text-lg font-bold">{f.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">{f.desc}</p>
+                  <h3 className="mt-5 text-h3">{f.title}</h3>
+                  <p className="mt-2 text-body text-muted-foreground">{f.desc}</p>
                 </div>
               );
             })}
