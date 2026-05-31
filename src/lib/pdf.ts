@@ -10,6 +10,7 @@ import {
   getAddenda,
   getDigitalSignature,
   getParentFeedback,
+  getStructuredData,
   type DailyEvolution,
 } from "@/features/dailyEvolutions/api";
 import {
@@ -421,6 +422,47 @@ export function exportDailyEvolutionPDF(
       : "Não validada",
   );
 
+  // Dados estruturados do Aplicador ABA / AT (programas e níveis de ajuda).
+  const structured = getStructuredData(evo);
+  if (structured?.kind === "aba_at") {
+    if (structured.target_behaviors)
+      section("Comportamentos-alvo e barreiras", structured.target_behaviors);
+    if (structured.programs.length) {
+      ensureSpace(40 + structured.programs.length * 16);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(...BRAND_DARK);
+      doc.text("Programas de ensino aplicados", margin, y);
+      y += 8;
+      autoTable(doc, {
+        startY: y,
+        head: [["Programa / Target", "Tentativas"]],
+        body: structured.programs.map((p) => [
+          p.program,
+          p.trials != null ? String(p.trials) : "—",
+        ]),
+        theme: "grid",
+        headStyles: { fillColor: BRAND_ACCENT, textColor: 255, fontStyle: "bold" },
+        styles: { fontSize: 9 },
+        margin: { left: margin, right: margin },
+      });
+      y =
+        (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
+          .finalY + 16;
+    }
+    const pm = structured.prompting;
+    const pmParts = [
+      pm.physical != null ? `Física ${pm.physical}%` : null,
+      pm.gestural != null ? `Gestual ${pm.gestural}%` : null,
+      pm.verbal != null ? `Verbal ${pm.verbal}%` : null,
+      pm.independent != null ? `Independente ${pm.independent}%` : null,
+    ].filter(Boolean);
+    if (pmParts.length)
+      section("Nível de ajuda predominante", pmParts.join("   ·   "));
+    if (structured.session_analysis)
+      section("Análise da sessão e conduta", structured.session_analysis);
+  }
+
   // Adendos / notas de retificação
   const addenda = getAddenda(evo);
   if (addenda.length) {
@@ -471,6 +513,44 @@ export function exportDailyEvolutionPDF(
     );
   } else {
     doc.text("Documento ainda não assinado.", margin, sy);
+  }
+
+  // Bloco de homologação do supervisor (evoluções de Aplicador ABA / AT).
+  const supSig = getDigitalSignature({ digital_signature: evo.supervisor_signature });
+  if (supSig || evo.validation_status) {
+    ensureSpace(110);
+    sy += 16;
+    doc.setDrawColor(120);
+    doc.line(margin, sy, margin + 260, sy);
+    sy += 14;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    doc.text(
+      `Homologação do supervisor: ${supSig?.signer_name ?? "—"}`,
+      margin,
+      sy,
+    );
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(90);
+    sy += 13;
+    if (supSig) {
+      const rows = [
+        "Homologado e assinado digitalmente — ICP-Brasil (A1)",
+        supSig.signer_cpf ? `CPF ${supSig.signer_cpf}` : null,
+        `Emissor: ${supSig.certificate_issuer}`,
+        `Hash SHA-256: ${supSig.content_hash}`,
+        `Data/hora: ${new Date(supSig.signed_at).toLocaleString("pt-BR")}`,
+      ].filter(Boolean) as string[];
+      rows.forEach((r) => {
+        ensureSpace(13);
+        doc.text(doc.splitTextToSize(r, contentWidth), margin, sy);
+        sy += 12;
+      });
+    } else {
+      doc.text("Pendente de validação técnica.", margin, sy);
+    }
   }
 
   // Rodapé
@@ -622,5 +702,149 @@ export function exportParentFeedbackPDF(
   renderVia("Via dos Pais");
 
   const file = `devolutiva-${patient?.name?.replace(/\s+/g, "_") ?? "paciente"}-${evo.session_date}.pdf`;
+  doc.save(file);
+}
+
+export type MedicalDocKind = "receita" | "atestado" | "laudo";
+
+const MEDICAL_DOC_TITLES: Record<MedicalDocKind, string> = {
+  receita: "Receituário / Prescrição",
+  atestado: "Atestado Médico",
+  laudo: "Laudo Médico",
+};
+
+// Documentos médicos emitidos a partir da evolução (correção #12): receita,
+// atestado e laudo, em folha timbrada da clínica e com bloco de assinatura.
+export function exportMedicalDocumentPDF(
+  kind: MedicalDocKind,
+  evo: DailyEvolution,
+  patient: Pick<Tables<"patients">, "name" | "cpf" | "birth_date"> | null,
+  professional: Pick<
+    Tables<"professionals">,
+    "name" | "specialty" | "council_type" | "council_number" | "council_state"
+  > | null,
+  clinicName: string,
+) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  const contentWidth = pageWidth - margin * 2;
+
+  // Cabeçalho institucional
+  doc.setFillColor(...BRAND_DARK);
+  doc.rect(0, 0, pageWidth, 60, "F");
+  doc.setTextColor(255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("TEAR", margin, 38);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text("Prontuário Inteligente para Clínicas de TEA", margin, 52);
+  doc.setFontSize(11);
+  doc.text(clinicName, pageWidth - margin, 38, { align: "right" });
+  doc.setFontSize(9);
+  doc.text(`Emitido em ${new Date().toLocaleString("pt-BR")}`, pageWidth - margin, 52, {
+    align: "right",
+  });
+
+  // Título
+  doc.setTextColor(...BRAND_DARK);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text(MEDICAL_DOC_TITLES[kind], margin, 96);
+
+  // Identificação
+  doc.setDrawColor(220);
+  doc.line(margin, 108, pageWidth - margin, 108);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80);
+  doc.text("Paciente:", margin, 128);
+  doc.setTextColor(0);
+  doc.setFont("helvetica", "bold");
+  const patientLine = [
+    patient?.name ?? "—",
+    patient?.cpf ? `CPF ${patient.cpf}` : null,
+    patient?.birth_date ? `Nasc. ${formatDateBR(patient.birth_date)}` : null,
+  ]
+    .filter(Boolean)
+    .join("  ·  ");
+  doc.text(patientLine, margin + 64, 128);
+  doc.setFont("helvetica", "normal");
+
+  // Corpo do documento conforme o tipo.
+  const med = getStructuredData(evo);
+  const medical = med?.kind === "medical" ? med : null;
+  let body = "";
+  if (kind === "receita") {
+    body =
+      medical?.therapeutic_conduct?.trim() ||
+      evo.next_session_plan ||
+      "Conforme conduta terapêutica registrada na evolução.";
+  } else if (kind === "atestado") {
+    body =
+      `Atesto, para os devidos fins, que o(a) paciente acima esteve em ` +
+      `atendimento nesta clínica no dia ${formatDateBR(evo.session_date)}, ` +
+      `no horário de ${evo.start_time.slice(0, 5)} às ${evo.end_time.slice(0, 5)}.`;
+  } else {
+    const cidParts = [
+      medical?.cid11 ? `CID-11: ${medical.cid11}` : null,
+      medical?.cid10 ? `CID-10: ${medical.cid10}` : null,
+    ]
+      .filter(Boolean)
+      .join("   ");
+    body = [
+      medical?.anamnesis?.trim() || evo.session_summary,
+      medical?.clinical_exam?.trim() ? `\nExame: ${medical.clinical_exam.trim()}` : "",
+      cidParts ? `\n${cidParts}` : "",
+      medical?.therapeutic_conduct?.trim()
+        ? `\nConduta: ${medical.therapeutic_conduct.trim()}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  doc.setFontSize(11);
+  doc.setTextColor(20);
+  const lines = doc.splitTextToSize(body, contentWidth);
+  doc.text(lines, margin, 168);
+
+  // Bloco de assinatura física do profissional.
+  const councilParts = [
+    professional?.council_type,
+    professional?.council_number,
+    professional?.council_state,
+  ].filter(Boolean);
+  const sigY = pageHeight - 120;
+  doc.setDrawColor(120);
+  doc.line(margin, sigY, margin + 280, sigY);
+  doc.setFontSize(10);
+  doc.setTextColor(0);
+  doc.setFont("helvetica", "bold");
+  doc.text(professional?.name ?? "—", margin, sigY + 16);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(90);
+  doc.setFontSize(9);
+  const profMeta = [
+    professional?.specialty ? specialtyLabels[professional.specialty] : null,
+    councilParts.length ? councilParts.join(" ") : null,
+  ]
+    .filter(Boolean)
+    .join("  ·  ");
+  if (profMeta) doc.text(profMeta, margin, sigY + 30);
+
+  doc.setDrawColor(220);
+  doc.line(margin, pageHeight - 32, pageWidth - margin, pageHeight - 32);
+  doc.setFontSize(8);
+  doc.setTextColor(120);
+  doc.text(
+    `${MEDICAL_DOC_TITLES[kind]} — Documento gerado pelo TEAR.`,
+    margin,
+    pageHeight - 18,
+  );
+
+  const file = `${kind}-${patient?.name?.replace(/\s+/g, "_") ?? "paciente"}-${evo.session_date}.pdf`;
   doc.save(file);
 }

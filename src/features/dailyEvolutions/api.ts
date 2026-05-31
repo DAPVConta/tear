@@ -3,8 +3,9 @@ import { supabase } from "@/lib/supabase";
 import { keys } from "@/lib/queryKeys";
 import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
-import type { Json, Tables, TablesInsert, TablesUpdate } from "@/types/database";
+import type { Enums, Json, Tables, TablesInsert, TablesUpdate } from "@/types/database";
 import type { DigitalSignature } from "@/lib/digitalSignature";
+import type { StructuredData } from "@/features/dailyEvolutions/formTypes";
 
 export type DailyEvolution = Tables<"daily_evolutions">;
 export const EVOLUTIONS_PAGE_SIZE = 15;
@@ -55,6 +56,25 @@ export function getParentFeedback(
   };
 }
 
+// Dados estruturados por tipo de formulário (ABA / médico) — correção #12.
+export function getStructuredData(
+  e: Pick<DailyEvolution, "structured_data"> | null | undefined,
+): StructuredData | null {
+  const s = e?.structured_data;
+  if (!s || typeof s !== "object" || Array.isArray(s)) return null;
+  return s as unknown as StructuredData;
+}
+
+// Assinatura digital A1 do supervisor (homologação técnica da evolução do AT).
+export function getSupervisorSignature(
+  e: Pick<DailyEvolution, "supervisor_signature"> | null | undefined,
+): DigitalSignature | null {
+  const s = e?.supervisor_signature;
+  return s && typeof s === "object" && !Array.isArray(s)
+    ? (s as unknown as DigitalSignature)
+    : null;
+}
+
 // String canônica assinada digitalmente — vincula a assinatura ao conteúdo
 // clínico exato da evolução no momento da finalização.
 export function buildEvolutionSignaturePayload(e: DailyEvolution): string {
@@ -74,33 +94,57 @@ export function buildEvolutionSignaturePayload(e: DailyEvolution): string {
   ].join("\n");
 }
 
+// String canônica para a homologação do supervisor (vincula a assinatura A1 do
+// supervisor ao conteúdo e ao AT que registrou a evolução).
+export function buildSupervisorSignaturePayload(e: DailyEvolution): string {
+  return [
+    `Homologação técnica da evolução #${e.id}`,
+    `Paciente: ${e.patient_id}`,
+    `Aplicador (AT): ${e.professional_id}`,
+    `Supervisor: ${e.supervisor_id ?? "—"}`,
+    `Data da sessão: ${e.session_date} ${e.start_time}–${e.end_time}`,
+    `Síntese: ${e.session_summary}`,
+    `Avaliação: ${e.evolution_assessment}`,
+  ].join("\n");
+}
+
 export type EvolutionRow = DailyEvolution & {
   patient: { name: string } | null;
-  professional: { name: string } | null;
+  professional: { name: string; specialty?: Enums<"specialty"> } | null;
 };
 
 type ListParams = {
   page: number;
   patientId?: number;
+  specialty?: string;
   from?: string;
   to?: string;
 };
 
-export function useDailyEvolutions({ page, patientId, from, to }: ListParams) {
+export function useDailyEvolutions({
+  page,
+  patientId,
+  specialty,
+  from,
+  to,
+}: ListParams) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
 
   return useQuery({
-    queryKey: keys.evolutions.list(clinicId, page, patientId, from, to),
+    queryKey: keys.evolutions.list(clinicId, page, patientId, specialty, from, to),
     enabled: !!clinicId,
     queryFn: async () => {
       const fromRange = (page - 1) * EVOLUTIONS_PAGE_SIZE;
       const toRange = fromRange + EVOLUTIONS_PAGE_SIZE - 1;
 
+      // Join interno com professionals para permitir filtro por especialidade
+      // (timeline filtrável — correção #12). Toda evolução tem professional_id,
+      // então o inner join não descarta linhas.
       let query = supabase
         .from("daily_evolutions")
         .select(
-          "*, patient:patients(name), professional:professionals(name)",
+          "*, patient:patients(name), professional:professionals!inner(name, specialty)",
           { count: "exact" },
         )
         .eq("clinic_id", clinicId!)
@@ -109,6 +153,7 @@ export function useDailyEvolutions({ page, patientId, from, to }: ListParams) {
         .range(fromRange, toRange);
 
       if (patientId) query = query.eq("patient_id", patientId);
+      if (specialty) query = query.eq("professional.specialty", specialty);
       if (from) query = query.gte("session_date", from);
       if (to) query = query.lte("session_date", to);
 
@@ -361,6 +406,99 @@ export function useAddAddendum(id: number) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.evolutions.all });
       queryClient.invalidateQueries({ queryKey: keys.evolutions.byId(id) });
+    },
+  });
+}
+
+// AT/Aplicador ABA: encerra a evolução com assinatura eletrônica simples
+// (autenticado pela sessão) e a envia para validação técnica do supervisor.
+// Inicia o contador de 24h via signed_at, como a assinatura comum.
+export function useSubmitForTechnicalValidation(id: number) {
+  const queryClient = useQueryClient();
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: async () => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      const { error } = await supabase
+        .from("daily_evolutions")
+        .update({
+          professional_signature: true,
+          signed_at: new Date().toISOString(),
+          validation_status: "pendente_validacao",
+        } as never)
+        .eq("id", id)
+        .eq("clinic_id", clinic.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.all });
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.byId(id) });
+    },
+  });
+}
+
+// Supervisor homologa e assina (certificado A1 local) a evolução do AT.
+export function useHomologateEvolution(id: number) {
+  const queryClient = useQueryClient();
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: async (signature: DigitalSignature) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      const { error } = await supabase
+        .from("daily_evolutions")
+        .update({
+          validation_status: "homologada",
+          supervisor_signature: signature as unknown as Json,
+          supervisor_signed_at: signature.signed_at,
+        } as never)
+        .eq("id", id)
+        .eq("clinic_id", clinic.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.all });
+      queryClient.invalidateQueries({ queryKey: keys.evolutions.byId(id) });
+    },
+  });
+}
+
+// Fila de homologação: evoluções pendentes de validação técnica atribuídas a
+// um supervisor (painel de pendências).
+export function useEvolutionsPendingValidation(supervisorId: number | undefined) {
+  const { clinic } = useClinic();
+  return useQuery({
+    queryKey: ["evolutions-pending-validation", clinic?.id, supervisorId],
+    enabled: !!clinic?.id && !!supervisorId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("daily_evolutions")
+        .select("*, patient:patients(name), professional:professionals(name)")
+        .eq("clinic_id", clinic!.id)
+        .eq("supervisor_id", supervisorId!)
+        .eq("validation_status", "pendente_validacao")
+        .order("session_date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as EvolutionRow[];
+    },
+  });
+}
+
+// Supervisores elegíveis (supervisor de AT ou coordenador de Psicologia/ABA).
+export function useAtSupervisors() {
+  const { clinic } = useClinic();
+  return useQuery({
+    queryKey: ["at-supervisors", clinic?.id],
+    enabled: !!clinic?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("professionals")
+        .select("id, name, is_at_supervisor, coordinator_specialty")
+        .eq("clinic_id", clinic!.id)
+        .eq("active", true)
+        .or("is_at_supervisor.eq.true,coordinator_specialty.eq.psicologia_aba")
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
     },
   });
 }

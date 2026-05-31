@@ -128,7 +128,6 @@ export const specialtyLabels: Record<Enums<"specialty">, string> = {
   psicomotricidade_relacional: "Psicomotricidade Relacional",
   aplicador_aba_domiciliar: "Aplicador ABA — Domiciliar",
   aplicador_aba_escolar: "Aplicador ABA — Escolar",
-  at_is: "AT — Integração Sensorial",
 };
 
 // Conselho de classe obrigatório por especialidade (correção #11).
@@ -152,5 +151,4 @@ export const specialtyCouncil: Record<Enums<"specialty">, CouncilType> = {
   psicomotricidade_relacional: "CBO",
   aplicador_aba_domiciliar: "CBO",
   aplicador_aba_escolar: "CBO",
-  at_is: "CBO",
 };

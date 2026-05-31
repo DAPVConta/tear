@@ -381,7 +381,14 @@ export type Database = {
           signed_at: string | null;
           skills_worked: Json;
           start_time: string;
+          structured_data: Json | null;
+          supervisor_id: number | null;
+          supervisor_signature: Json | null;
+          supervisor_signed_at: string | null;
           updated_at: string;
+          validation_status:
+            | Database["public"]["Enums"]["technical_validation_status"]
+            | null;
         };
         Insert: {
           addendum?: Json | null;
@@ -418,7 +425,14 @@ export type Database = {
           signed_at?: string | null;
           skills_worked?: Json;
           start_time: string;
+          structured_data?: Json | null;
+          supervisor_id?: number | null;
+          supervisor_signature?: Json | null;
+          supervisor_signed_at?: string | null;
           updated_at?: string;
+          validation_status?:
+            | Database["public"]["Enums"]["technical_validation_status"]
+            | null;
         };
         Update: {
           addendum?: Json | null;
@@ -455,7 +469,14 @@ export type Database = {
           signed_at?: string | null;
           skills_worked?: Json;
           start_time?: string;
+          structured_data?: Json | null;
+          supervisor_id?: number | null;
+          supervisor_signature?: Json | null;
+          supervisor_signed_at?: string | null;
           updated_at?: string;
+          validation_status?:
+            | Database["public"]["Enums"]["technical_validation_status"]
+            | null;
         };
         Relationships: [];
       };
@@ -936,8 +957,8 @@ export type Database = {
         | "psicomotricidade_funcional"
         | "psicomotricidade_relacional"
         | "aplicador_aba_domiciliar"
-        | "aplicador_aba_escolar"
-        | "at_is";
+        | "aplicador_aba_escolar";
+      technical_validation_status: "pendente_validacao" | "homologada";
     };
     CompositeTypes: {
       [_ in never]: never;
