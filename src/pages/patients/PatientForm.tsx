@@ -21,13 +21,8 @@ import {
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "@/components/ui/card";
 import { Field } from "@/components/form/Field";
-import { SectionTitle } from "@/components/form/SectionTitle";
+import { FormSection } from "@/components/form/FormSection";
 import { CidCombobox } from "@/components/form/CidCombobox";
 import {
   Select,
@@ -291,11 +286,7 @@ export default function PatientForm() {
       />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <SectionTitle icon={User}>Dados do Paciente</SectionTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
+        <FormSection icon={User} title="Dados do Paciente">
             <Field label="Nome completo" error={errors.name?.message} className="sm:col-span-2">
               <Input {...register("name")} placeholder="Nome do paciente" />
             </Field>
@@ -346,14 +337,9 @@ export default function PatientForm() {
                 )}
               />
             </Field>
-          </CardContent>
-        </Card>
+        </FormSection>
 
-        <Card>
-          <CardHeader>
-            <SectionTitle icon={Users}>Responsável Legal</SectionTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
+        <FormSection icon={Users} title="Responsável Legal">
             <Field label="Nome do responsável" error={errors.guardian_name?.message} className="sm:col-span-2">
               <Input {...register("guardian_name")} placeholder="Nome do responsável" />
             </Field>
@@ -388,14 +374,9 @@ export default function PatientForm() {
             <Field label="E-mail (opcional)" error={errors.guardian_email?.message} className="sm:col-span-2">
               <Input {...register("guardian_email")} placeholder="responsavel@email.com" />
             </Field>
-          </CardContent>
-        </Card>
+        </FormSection>
 
-        <Card>
-          <CardHeader>
-            <SectionTitle icon={CreditCard}>Tipo de Atendimento</SectionTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
+        <FormSection icon={CreditCard} title="Tipo de Atendimento">
             <Field label="Tipo de pagamento" error={errors.payment_type?.message}>
               <Controller
                 control={control}
@@ -426,16 +407,9 @@ export default function PatientForm() {
                 </Field>
               </>
             )}
-          </CardContent>
-        </Card>
+        </FormSection>
 
-        <Card>
-          <CardHeader>
-            <SectionTitle icon={Stethoscope}>
-              Diagnóstico / Condição de Saúde
-            </SectionTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
+        <FormSection icon={Stethoscope} title="Diagnóstico / Condição de Saúde">
             <Field label="CID-10 principal" error={errors.cid10_primary?.message}>
               <Controller
                 control={control}
@@ -500,14 +474,13 @@ export default function PatientForm() {
                 placeholder="Rua, número, bairro, cidade"
               />
             </Field>
-          </CardContent>
-        </Card>
+        </FormSection>
 
-        <Card>
-          <CardHeader>
-            <SectionTitle icon={FileText}>Laudo médico</SectionTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <FormSection
+          icon={FileText}
+          title="Laudo médico"
+          contentClassName="space-y-4"
+        >
             <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
               <Field label="Arquivo do laudo (PDF ou imagem)">
                 <input
@@ -599,8 +572,7 @@ export default function PatientForm() {
                 )}
               </Field>
             </div>
-          </CardContent>
-        </Card>
+        </FormSection>
 
         <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={() => navigate("/pacientes")}>
