@@ -580,6 +580,9 @@ export type Database = {
         Row: {
           active: boolean;
           clinic_id: number;
+          coordinator_specialty:
+            | Database["public"]["Enums"]["specialty"]
+            | null;
           council_number: string;
           council_state: string;
           council_type: string;
@@ -588,6 +591,7 @@ export type Database = {
           created_by: string | null;
           email: string | null;
           id: number;
+          is_at_supervisor: boolean;
           name: string;
           phone: string | null;
           specialty: Database["public"]["Enums"]["specialty"];
@@ -597,6 +601,9 @@ export type Database = {
         Insert: {
           active?: boolean;
           clinic_id: number;
+          coordinator_specialty?:
+            | Database["public"]["Enums"]["specialty"]
+            | null;
           council_number: string;
           council_state: string;
           council_type: string;
@@ -605,6 +612,7 @@ export type Database = {
           created_by?: string | null;
           email?: string | null;
           id?: never;
+          is_at_supervisor?: boolean;
           name: string;
           phone?: string | null;
           specialty: Database["public"]["Enums"]["specialty"];
@@ -614,6 +622,9 @@ export type Database = {
         Update: {
           active?: boolean;
           clinic_id?: number;
+          coordinator_specialty?:
+            | Database["public"]["Enums"]["specialty"]
+            | null;
           council_number?: string;
           council_state?: string;
           council_type?: string;
@@ -622,11 +633,36 @@ export type Database = {
           created_by?: string | null;
           email?: string | null;
           id?: never;
+          is_at_supervisor?: boolean;
           name?: string;
           phone?: string | null;
           specialty?: Database["public"]["Enums"]["specialty"];
           updated_at?: string;
           user_id?: string | null;
+        };
+        Relationships: [];
+      };
+      professional_specialties: {
+        Row: {
+          clinic_id: number;
+          created_at: string;
+          id: number;
+          professional_id: number;
+          specialty: Database["public"]["Enums"]["specialty"];
+        };
+        Insert: {
+          clinic_id: number;
+          created_at?: string;
+          id?: never;
+          professional_id: number;
+          specialty: Database["public"]["Enums"]["specialty"];
+        };
+        Update: {
+          clinic_id?: number;
+          created_at?: string;
+          id?: never;
+          professional_id?: number;
+          specialty?: Database["public"]["Enums"]["specialty"];
         };
         Relationships: [];
       };
@@ -823,7 +859,16 @@ export type Database = {
         | "fisioterapia"
         | "psicopedagogia"
         | "musicoterapia"
-        | "neuropsicologia";
+        | "neuropsicologia"
+        | "terapia_ocupacional"
+        | "neuropediatria"
+        | "psiquiatria"
+        | "nutricao"
+        | "psicomotricidade_funcional"
+        | "psicomotricidade_relacional"
+        | "aplicador_aba_domiciliar"
+        | "aplicador_aba_escolar"
+        | "at_is";
     };
     CompositeTypes: {
       [_ in never]: never;

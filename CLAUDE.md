@@ -358,11 +358,24 @@ operadora; restrição editar/excluir só pelo criador.
     - DEFER: gating de exportação de faturamento por "presença confirmada"
       (integrar ao módulo de auditoria/BILLING_RULES, #10).
 
+25. [FEITO — Correção #6] Especialidades multi-seleção + papéis de gestão.
+    - Novos valores do enum specialty (terapia_ocupacional, neuropediatria,
+      psiquiatria, nutricao, psicomotricidade_funcional/relacional,
+      aplicador_aba_domiciliar/escolar, at_is).
+    - Tabela N:N `professional_specialties` (RLS por clinic_id + audit) com
+      backfill da especialidade atual; `professionals.specialty` permanece como
+      PRINCIPAL (compat. com listas/PDF/seletores). Migração 0019.
+    - Papéis como campos no profissional (decisão do dono): `coordinator_
+      specialty` (coordenador → poderá aprovar a evolução mensal do #3/#4) e
+      `is_at_supervisor`.
+    - ProfessionalForm: grade de checkboxes de especialidades (principal = 1ª),
+      reconciliação N:N ao salvar (useSaveProfessionalSpecialties), card
+      "Papéis de gestão" (coordenador + especialidade coordenada + supervisor
+      de AT).
+
 Backlog de correções abertas: #3 evolução mensal (workflow coordenador + trava
-22 dias + assinatura + PDF), #4 aprovação do coordenador (parte do #3), #6
-especialidades multi-select + papéis de gestão (coordenador/supervisor) — esta
-tem decisão de arquitetura (enum→array + novo modelo de papéis) e destrava
-#3/#4.
+22 dias + assinatura + PDF) e #4 aprovação do coordenador (parte do #3). Agora
+destravadas: o papel "Coordenador de especialidade" já existe (#6).
 
 Fase 2 restante: Asaas billing.
 

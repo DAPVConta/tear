@@ -105,4 +105,13 @@ export const specialtyLabels: Record<Enums<"specialty">, string> = {
   psicopedagogia: "Psicopedagogia",
   musicoterapia: "Musicoterapia",
   neuropsicologia: "Neuropsicologia",
+  terapia_ocupacional: "Terapia Ocupacional",
+  neuropediatria: "Neuropediatria",
+  psiquiatria: "Psiquiatria",
+  nutricao: "Nutrição",
+  psicomotricidade_funcional: "Psicomotricidade Funcional",
+  psicomotricidade_relacional: "Psicomotricidade Relacional",
+  aplicador_aba_domiciliar: "Aplicador ABA — Domiciliar",
+  aplicador_aba_escolar: "Aplicador ABA — Escolar",
+  at_is: "AT — Integração Sensorial",
 };
