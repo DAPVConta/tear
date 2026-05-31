@@ -33,13 +33,23 @@
     --info: 198 100% 64%;
     --info-foreground: 223 64% 12%;
 
-    /* Amarelo #FFC400 */
+    /* Amarelo #FFC400 — só fundo/ícone. Para texto sobre claro, use
+       --warning-text (âmbar escuro, contraste AA). */
     --warning: 46 100% 50%;
     --warning-foreground: 223 64% 12%;
+    --warning-text: 38 92% 33%;
 
-    /* Vermelho #FF2D2D */
+    /* Vermelho #FF2D2D — vibrante p/ ícone/badge. --destructive-text é
+       escurecido p/ mensagens de erro pequenas (AA). */
     --destructive: 0 100% 59%;
     --destructive-foreground: 0 0% 100%;
+    --destructive-text: 0 72% 45%;
+
+    /* Positivo/sucesso — ciano-esverdeado derivado da paleta (verde não está
+       no manual; ancora no ciano da marca). */
+    --success: 168 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --success-text: 168 80% 28%;
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
@@ -76,14 +86,21 @@
     --accent: 212 100% 56%;
     --accent-foreground: 224 47% 8%;
 
-    --info: 198 100% 64%;
+    --info: 198 90% 60%;
     --info-foreground: 224 47% 8%;
 
-    --warning: 46 100% 50%;
+    /* Dark: amarelo/vermelho levemente dessaturados p/ não "vibrar". */
+    --warning: 46 92% 52%;
     --warning-foreground: 224 47% 8%;
+    --warning-text: 46 92% 60%;
 
-    --destructive: 0 100% 59%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
+    --destructive-text: 0 84% 70%;
+
+    --success: 168 70% 42%;
+    --success-foreground: 224 47% 8%;
+    --success-text: 168 65% 55%;
 
     --border: 223 30% 20%;
     --input: 223 30% 20%;
