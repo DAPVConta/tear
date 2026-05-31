@@ -553,6 +553,8 @@ export type Database = {
           birth_date: string;
           cid10_primary: string;
           cid10_secondary: string | null;
+          cid11_primary: string | null;
+          cid11_secondary: string | null;
           clinic_id: number;
           cpf: string | null;
           created_at: string;
@@ -581,6 +583,8 @@ export type Database = {
           birth_date: string;
           cid10_primary: string;
           cid10_secondary?: string | null;
+          cid11_primary?: string | null;
+          cid11_secondary?: string | null;
           clinic_id: number;
           cpf?: string | null;
           created_at?: string;
@@ -609,6 +613,8 @@ export type Database = {
           birth_date?: string;
           cid10_primary?: string;
           cid10_secondary?: string | null;
+          cid11_primary?: string | null;
+          cid11_secondary?: string | null;
           clinic_id?: number;
           cpf?: string | null;
           created_at?: string;
