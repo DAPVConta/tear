@@ -49,6 +49,7 @@ import {
   type GoalProgress,
 } from "@/features/monthlyEvolutions/api";
 import { useGenerateMonthlyAnalysis } from "@/features/ai/api";
+import { useMyProfessional } from "@/features/professionals/api";
 import { useClinic } from "@/providers/ClinicProvider";
 import { exportMonthlyEvolutionPDF } from "@/lib/pdf";
 import { specialtyLabels, monthlyStatusLabels } from "@/lib/labels";
@@ -74,6 +75,7 @@ export default function MonthlyDetail() {
   const submitMonthly = useSubmitMonthly(monthlyId);
   const review = useReviewMonthly(monthlyId);
   const generateAI = useGenerateMonthlyAnalysis();
+  const { data: myProfessional } = useMyProfessional();
   const [sigOpen, setSigOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -132,7 +134,10 @@ export default function MonthlyDetail() {
 
   async function onApprove() {
     try {
-      await review.mutateAsync({ decision: "approve" });
+      await review.mutateAsync({
+        decision: "approve",
+        reviewerId: myProfessional?.id ?? null,
+      });
       toast.success("Aprovada — aguardando assinatura do profissional");
     } catch (e) {
       toast.error("Falha ao aprovar", {
@@ -224,7 +229,14 @@ export default function MonthlyDetail() {
 
   const wf = data.workflow_status;
   const isDraft = wf === "rascunho" || wf === "ajustes_solicitados";
-  const canReview = wf === "pendente_aprovacao" && role === "clinic_admin";
+  // Coordenador da especialidade do profissional desta evolução pode aprovar;
+  // clinic_admin segue como supervisor geral.
+  const isCoordinatorForThis =
+    !!myProfessional?.coordinator_specialty &&
+    myProfessional.coordinator_specialty === data.professional?.specialty;
+  const canReview =
+    wf === "pendente_aprovacao" &&
+    (role === "clinic_admin" || isCoordinatorForThis);
   const canSign = wf === "aguardando_assinatura";
   const digitalSig = getMonthlyDigitalSignature(data);
   const statusVariant: "muted" | "warning" | "accent" | "success" =

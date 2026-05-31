@@ -149,6 +149,26 @@ export function useProfessionalOptions() {
   });
 }
 
+// Profissional vinculado ao usuário logado (para checar papel de coordenador).
+export function useMyProfessional() {
+  const { clinic } = useClinic();
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["my-professional", clinic?.id, user?.id],
+    enabled: !!clinic?.id && !!user?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("professionals")
+        .select("id, name, specialty, coordinator_specialty, is_at_supervisor")
+        .eq("clinic_id", clinic!.id)
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useProfessional(id: number | undefined) {
   const { clinic } = useClinic();
   return useQuery({
