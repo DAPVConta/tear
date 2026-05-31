@@ -79,6 +79,27 @@ export async function fetchPaginatedList<T>({
   return { rows: (data ?? []) as unknown as T[], total: count ?? 0 };
 }
 
+// Options para seletores (Combobox): registros ativos da clínica, ordenados
+// por nome. Usado por usePatientOptions/useProfessionalOptions.
+export async function fetchActiveOptions<T>({
+  table,
+  clinicId,
+  columns,
+}: {
+  table: string;
+  clinicId: number;
+  columns: string;
+}): Promise<T[]> {
+  const { data, error } = await supabase
+    .from(table as never)
+    .select(columns)
+    .eq("clinic_id", clinicId)
+    .eq("active", true)
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as unknown as T[];
+}
+
 export async function fetchRecordById<T>({
   table,
   id,
