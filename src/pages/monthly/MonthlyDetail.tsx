@@ -21,6 +21,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { FormLoadingSkeleton } from "@/components/form/FormLoadingSkeleton";
 import { Field } from "@/components/form/Field";
 import {
@@ -343,8 +344,24 @@ export default function MonthlyDetail() {
                       <TableCell className="text-sm text-muted-foreground">
                         {g.category}
                       </TableCell>
-                      <TableCell className="tabular-nums">
-                        {g.current_progress}%
+                      <TableCell>
+                        <div className="flex items-center gap-2.5">
+                          <Progress
+                            value={g.current_progress}
+                            tone={
+                              g.current_progress >= 100
+                                ? "success"
+                                : g.current_progress > 0
+                                  ? "brand"
+                                  : "warning"
+                            }
+                            className="w-24"
+                            aria-label={`Progresso da meta: ${g.current_progress}%`}
+                          />
+                          <span className="tabular-nums text-sm text-muted-foreground">
+                            {g.current_progress}%
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-sm">
                         {g.status.replace(/_/g, " ")}

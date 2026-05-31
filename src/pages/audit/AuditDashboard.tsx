@@ -11,6 +11,7 @@ import { format, parseISO, subDays } from "date-fns";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
@@ -179,12 +180,18 @@ export default function AuditDashboard() {
                             {pct}% ok
                           </Badge>
                         </div>
-                        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full bg-brand-gradient transition-all"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
+                        <Progress
+                          value={pct}
+                          tone={
+                            fails === 0
+                              ? "success"
+                              : fails / Math.max(total, 1) > 0.3
+                                ? "destructive"
+                                : "warning"
+                          }
+                          className="mt-3"
+                          aria-label={`Conformidade: ${pct}%`}
+                        />
                         {fails > 0 && (
                           <p className="mt-2 text-xs text-muted-foreground">
                             {fails} sessã{fails === 1 ? "o" : "es"} pendente
