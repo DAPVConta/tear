@@ -1,4 +1,5 @@
 import type { Enums } from "@/types/database";
+import type { CouncilType } from "@/lib/constants";
 
 export const memberRoleLabels: Record<Enums<"member_role">, string> = {
   clinic_admin: "Administrador",
@@ -128,4 +129,28 @@ export const specialtyLabels: Record<Enums<"specialty">, string> = {
   aplicador_aba_domiciliar: "Aplicador ABA — Domiciliar",
   aplicador_aba_escolar: "Aplicador ABA — Escolar",
   at_is: "AT — Integração Sensorial",
+};
+
+// Conselho de classe obrigatório por especialidade (correção #11).
+// Áreas sem conselho federal próprio caem em CBO (registro por ocupação /
+// associação), permanecendo editável caso o profissional tenha graduação base
+// vinculada a outro conselho.
+export const specialtyCouncil: Record<Enums<"specialty">, CouncilType> = {
+  psicologia_aba: "CRP",
+  neuropsicologia: "CRP",
+  fonoaudiologia: "CRFa",
+  terapia_ocupacional: "CREFITO",
+  terapia_ocupacional_is: "CREFITO",
+  terapia_ocupacional_avds: "CREFITO",
+  fisioterapia: "CREFITO",
+  neuropediatria: "CRM",
+  psiquiatria: "CRM",
+  nutricao: "CRN",
+  psicopedagogia: "CBO",
+  musicoterapia: "CBO",
+  psicomotricidade_funcional: "CBO",
+  psicomotricidade_relacional: "CBO",
+  aplicador_aba_domiciliar: "CBO",
+  aplicador_aba_escolar: "CBO",
+  at_is: "CBO",
 };

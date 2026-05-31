@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -39,8 +39,8 @@ import {
 } from "@/components/ui/select";
 import { FormLoadingSkeleton } from "@/components/form/FormLoadingSkeleton";
 import { maskCPF, maskPhone, unmask, isValidCPF } from "@/lib/masks";
-import { specialtyLabels } from "@/lib/labels";
-import { BR_STATES, COUNCIL_TYPES } from "@/lib/constants";
+import { specialtyLabels, specialtyCouncil } from "@/lib/labels";
+import { BR_STATES, COUNCIL_TYPES, COUNCIL_LABELS } from "@/lib/constants";
 import {
   useProfessional,
   useCreateProfessional,
@@ -156,8 +156,18 @@ export default function ProfessionalForm() {
   const selectedSpecialties = watch("specialties");
   const isCoordinator = watch("is_coordinator");
 
+  // Especialidade principal (1ª marcada) → conselho sugerido (correção #11).
+  const principalSpecialty = selectedSpecialties[0] as Specialty | undefined;
+  const suggestedCouncil = principalSpecialty
+    ? specialtyCouncil[principalSpecialty]
+    : undefined;
+  // Não sobrescreve o conselho depois que o usuário ajusta manualmente nem o
+  // valor já gravado de um profissional existente.
+  const councilTouched = useRef(false);
+
   useEffect(() => {
     if (existing) {
+      councilTouched.current = true;
       reset({
         name: existing.name,
         cpf: maskCPF(existing.cpf),
@@ -181,6 +191,13 @@ export default function ProfessionalForm() {
       setValue("specialties", existingSpecialties);
     }
   }, [existingSpecialties, setValue]);
+
+  // Sugere o conselho correspondente à especialidade principal enquanto o
+  // usuário não tiver escolhido um manualmente (evita erros de digitação).
+  useEffect(() => {
+    if (!suggestedCouncil || councilTouched.current) return;
+    setValue("council_type", suggestedCouncil, { shouldValidate: true });
+  }, [suggestedCouncil, setValue]);
 
   function toggleSpecialty(s: Specialty, checked: boolean) {
     const set = new Set(selectedSpecialties);
@@ -431,20 +448,36 @@ export default function ProfessionalForm() {
                 control={control}
                 name="council_type"
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) => {
+                      councilTouched.current = true;
+                      field.onChange(v);
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {COUNCIL_TYPES.map((c) => (
                         <SelectItem key={c} value={c}>
-                          {c}
+                          {c} — {COUNCIL_LABELS[c]}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 )}
               />
+              {suggestedCouncil && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Sugerido para {specialtyLabels[principalSpecialty!]}:{" "}
+                  <span className="font-medium text-foreground">
+                    {suggestedCouncil}
+                  </span>
+                  {suggestedCouncil === "CBO" &&
+                    " (área sem conselho federal — use o registro da associação/CBO ou o conselho da sua graduação base)"}
+                </p>
+              )}
             </Field>
             <Field label="Número do registro" error={errors.council_number?.message}>
               <Input {...register("council_number")} placeholder="Ex: 06/12345" />
