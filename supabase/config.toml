@@ -1,0 +1,10 @@
+# Configuração versionada do projeto Supabase (TEAR).
+# Garante que as Edge Functions exijam JWT mesmo após (re)deploy — antes isso
+# só estava em comentário e dependia da flag manual no painel.
+project_id = "kfjsyeopooxipnnxcdkz"
+
+[functions.claude-analysis]
+verify_jwt = true
+
+[functions.claude-extract-laudo]
+verify_jwt = true

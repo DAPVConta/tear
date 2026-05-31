@@ -1,16 +1,16 @@
 // Edge Function: claude-extract-laudo
 // OCR/IA do laudo médico via Claude (vision/PDF). Extrai médico assistente,
 // CRM/UF, data de emissão e validade. A chave (CLAUDE_KEY) fica no servidor;
-// requer JWT (verify_jwt). O arquivo é enviado em base64 e NÃO é persistido
-// pela função — só processado para extração.
+// requer JWT (verify_jwt + checagem em código). O arquivo é enviado em base64 e
+// NÃO é persistido pela função — só processado para extração.
+// ATENÇÃO LGPD: diferente de claude-analysis, esta função envia o documento
+// completo (PHI identificável) ao provedor externo (Anthropic). Uso opt-in;
+// cobrir em política de privacidade + DPA.
 import Anthropic from "npm:@anthropic-ai/sdk@0.69.0";
+import { corsHeaders, getAuthedUser } from "../_shared/auth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// ~10 MB de arquivo → ~13,5 MB em base64. Limite defensivo (custo/DoS).
+const MAX_BASE64_CHARS = 14_000_000;
 
 type Payload = { fileBase64?: string; mediaType?: string };
 
@@ -58,17 +58,22 @@ function parseJson(text: string): Extracted | null {
 }
 
 Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: cors });
   }
 
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
       status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
 
   if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
+
+  // Defesa em profundidade: exige sessão válida mesmo se verify_jwt cair.
+  const user = await getAuthedUser(req);
+  if (!user) return json({ error: "Não autenticado." }, 401);
 
   const apiKey = Deno.env.get("CLAUDE_KEY");
   if (!apiKey) return json({ error: "CLAUDE_KEY não configurada." }, 500);
@@ -81,6 +86,9 @@ Deno.serve(async (req: Request) => {
   }
   if (!payload.fileBase64 || !payload.mediaType) {
     return json({ error: "Arquivo do laudo ausente." }, 400);
+  }
+  if (payload.fileBase64.length > MAX_BASE64_CHARS) {
+    return json({ error: "Arquivo muito grande (máx. ~10 MB)." }, 413);
   }
 
   const isPdf = payload.mediaType === "application/pdf";
@@ -153,7 +161,7 @@ Deno.serve(async (req: Request) => {
 
     return json({ ...extracted, validity_source });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Falha ao ler o laudo.";
-    return json({ error: msg }, 502);
+    console.error("claude-extract-laudo error:", e);
+    return json({ error: "Falha ao ler o laudo." }, 502);
   }
 });
