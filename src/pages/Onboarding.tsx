@@ -22,7 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/form/Field";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { maskCNPJ, maskCEP, maskPhone, unmask } from "@/lib/masks";
-import { fetchCep, fetchCnpj } from "@/lib/brasilapi";
+import { fetchCnpj } from "@/lib/brasilapi";
+import { useCepLookup } from "@/hooks/useCepLookup";
 
 const schema = z.object({
   name: z.string().min(2, "Informe o nome da clínica"),
@@ -43,7 +44,7 @@ export default function Onboarding() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [cnpjLoading, setCnpjLoading] = useState(false);
-  const [cepLoading, setCepLoading] = useState(false);
+  const { loading: cepLoading, lookup: lookupCepInfo } = useCepLookup();
   const [submitting, setSubmitting] = useState(false);
   const [inviteCode, setInviteCode] = useState(
     (searchParams.get("invite") ?? "").toUpperCase(),
@@ -116,31 +117,13 @@ export default function Onboarding() {
     }
   }
 
-  async function lookupCep() {
-    const cep = unmask(getValues("zip_code") ?? "");
-    if (cep.length !== 8) {
-      toast.error("Digite os 8 dígitos do CEP");
-      return;
-    }
-    setCepLoading(true);
-    try {
-      const info = await fetchCep(cep);
-      if (!info) {
-        toast.error("CEP não encontrado");
-        return;
-      }
+  function lookupCep() {
+    lookupCepInfo(getValues("zip_code") ?? "", (info) => {
       setValue("state", info.state, { shouldDirty: true });
       setValue("city", info.city, { shouldDirty: true });
       const street = [info.street, info.neighborhood].filter(Boolean).join(", ");
       if (street) setValue("address", street, { shouldDirty: true });
-      toast.success("Endereço preenchido");
-    } catch (e) {
-      toast.error("Falha ao consultar CEP", {
-        description: e instanceof Error ? e.message : undefined,
-      });
-    } finally {
-      setCepLoading(false);
-    }
+    });
   }
 
   async function onSubmit(values: FormValues) {
