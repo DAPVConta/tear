@@ -12,6 +12,8 @@ import {
 import {
   Area,
   AreaChart,
+  CartesianGrid,
+  Cell,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
@@ -94,25 +96,28 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Métricas */}
+      {/* Métricas — acento TEA por cartão (diversidade da marca) */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
           label="Pacientes ativos"
           icon={Users}
           value={metrics?.patientsActive}
           loading={loadingMetrics}
+          accent="blue"
         />
         <Metric
           label="Sessões na semana"
           icon={ClipboardList}
           value={metrics?.sessionsThisWeek}
           loading={loadingMetrics}
+          accent="cyan"
         />
         <Metric
           label="Guias vigentes"
           icon={FileCheck2}
           value={metrics?.activeGuides}
           loading={loadingMetrics}
+          accent="yellow"
         />
         <Metric
           label="Taxa de presença (30d)"
@@ -121,6 +126,7 @@ export default function Dashboard() {
           suffix={metrics?.attendanceRate == null ? "" : "%"}
           fallback="—"
           loading={loadingMetrics}
+          accent="red"
         />
       </section>
 
@@ -129,7 +135,7 @@ export default function Dashboard() {
         <div className="rounded-2xl border border-border bg-card p-6 shadow-soft lg:col-span-2">
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold">Sessões nos últimos 14 dias</h2>
+              <h2 className="text-h2">Sessões nos últimos 14 dias</h2>
               <p className="text-sm text-muted-foreground">
                 Volume de atendimentos por dia
               </p>
@@ -150,6 +156,11 @@ export default function Dashboard() {
                       <stop offset="100%" stopColor="#1E88FF" stopOpacity={0} />
                     </linearGradient>
                   </defs>
+                  <CartesianGrid
+                    vertical={false}
+                    stroke="hsl(var(--border))"
+                    strokeOpacity={0.5}
+                  />
                   <XAxis
                     dataKey="label"
                     tickLine={false}
@@ -183,7 +194,7 @@ export default function Dashboard() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
-          <h2 className="text-lg font-bold">Avaliações (30 dias)</h2>
+          <h2 className="text-h2">Avaliações (30 dias)</h2>
           <p className="mb-4 text-sm text-muted-foreground">
             Distribuição das sessões
           </p>
@@ -223,11 +234,11 @@ export default function Dashboard() {
                       fontSize: 12,
                     }}
                   />
-                  <Bar
-                    dataKey="value"
-                    fill="#1E88FF"
-                    radius={[6, 6, 6, 6]}
-                  />
+                  <Bar dataKey="value" radius={[6, 6, 6, 6]}>
+                    {assessments!.map((_, i) => (
+                      <Cell key={i} fill={CHART_PALETTE[i % CHART_PALETTE.length]} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -239,7 +250,7 @@ export default function Dashboard() {
       <section className="rounded-2xl border border-border bg-card p-6 shadow-soft">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold">Guias a vencer (30 dias)</h2>
+            <h2 className="text-h2">Guias a vencer (30 dias)</h2>
             <p className="text-sm text-muted-foreground">
               Acompanhe as autorizações próximas do vencimento
             </p>
@@ -270,8 +281,8 @@ export default function Dashboard() {
                     <span
                       className={`grid h-10 w-10 place-items-center rounded-xl ${
                         days <= 7
-                          ? "bg-destructive/10 text-destructive"
-                          : "bg-warning/15 text-amber-600"
+                          ? "bg-destructive/10 text-destructive-text"
+                          : "bg-warning/15 text-warning-text"
                       }`}
                     >
                       <AlertTriangle className="h-5 w-5" />
@@ -304,6 +315,20 @@ export default function Dashboard() {
   );
 }
 
+// Paleta categórica oficial para data-viz (séries/categorias).
+const CHART_PALETTE = ["#1E88FF", "#45C7FF", "#FFC400", "#FF2D2D", "#0A2E8C"];
+
+type MetricAccent = "blue" | "cyan" | "yellow" | "red";
+const ACCENT: Record<
+  MetricAccent,
+  { bar: string; icon: string; iconBg: string }
+> = {
+  blue: { bar: "bg-brand-blue-light", icon: "text-brand-blue-light", iconBg: "bg-brand-blue-light/12" },
+  cyan: { bar: "bg-brand-cyan", icon: "text-brand-cyan-700", iconBg: "bg-brand-cyan/15" },
+  yellow: { bar: "bg-brand-yellow", icon: "text-warning-text", iconBg: "bg-brand-yellow/15" },
+  red: { bar: "bg-brand-red", icon: "text-brand-red", iconBg: "bg-brand-red/12" },
+};
+
 function Metric({
   label,
   icon: Icon,
@@ -311,6 +336,7 @@ function Metric({
   suffix = "",
   fallback = "0",
   loading,
+  accent = "blue",
 }: {
   label: string;
   icon: LucideIcon;
@@ -318,20 +344,28 @@ function Metric({
   suffix?: string;
   fallback?: string;
   loading?: boolean;
+  accent?: MetricAccent;
 }) {
   const display =
     value === undefined || value === null ? fallback : `${value}${suffix}`;
+  const a = ACCENT[accent];
   return (
-    <div className="group rounded-2xl border border-border bg-card p-5 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-elevated">
+    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-soft transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevated">
+      {/* Barra de acento superior (cor TEA) */}
+      <span
+        className={`absolute inset-x-0 top-0 h-1 ${a.bar} opacity-80 transition-opacity group-hover:opacity-100`}
+      />
       <div className="flex items-center justify-between">
-        <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground shadow-soft transition-all group-hover:bg-brand-gradient group-hover:shadow-glow">
+        <span
+          className={`grid h-11 w-11 place-items-center rounded-xl ${a.iconBg} ${a.icon} transition-transform duration-200 ease-out group-hover:scale-105`}
+        >
           <Icon className="h-5 w-5" />
         </span>
       </div>
-      <p className="mt-4 text-3xl font-bold tracking-tight">
+      <p className="mt-4 text-[1.75rem] font-extrabold tabular-nums leading-none tracking-tight">
         {loading ? <Skeleton className="inline-block h-8 w-16" /> : display}
       </p>
-      <p className="mt-1 text-sm text-muted-foreground">{label}</p>
+      <p className="mt-2 text-caption text-muted-foreground">{label}</p>
     </div>
   );
 }
