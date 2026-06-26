@@ -21,7 +21,12 @@ export function useBillingChecklist({ from, to, patientId }: Range) {
     queryFn: async () => {
       let q = supabase
         .from("daily_evolutions")
-        .select("*, patient:patients(name), professional:professionals(name)")
+        // Hint do FK professional_id: daily_evolutions tem duas relações com
+        // professionals (professional_id e supervisor_id); sem desambiguação o
+        // embed quebra (PGRST201).
+        .select(
+          "*, patient:patients(name), professional:professionals!professional_id(name)",
+        )
         .eq("clinic_id", clinicId!)
         .gte("session_date", from)
         .lte("session_date", to)

@@ -143,8 +143,11 @@ export function useDailyEvolutions({
       // então o inner join não descarta linhas.
       let query = supabase
         .from("daily_evolutions")
+        // Hint explícito do FK (professional_id) é obrigatório: daily_evolutions
+        // tem duas relações com professionals (professional_id e supervisor_id),
+        // então um embed `professionals` sem desambiguação quebra a query (PGRST201).
         .select(
-          "*, patient:patients(name), professional:professionals!inner(name, specialty)",
+          "*, patient:patients(name), professional:professionals!professional_id!inner(name, specialty)",
           { count: "exact" },
         )
         .eq("clinic_id", clinicId!)
@@ -472,7 +475,11 @@ export function useEvolutionsPendingValidation(supervisorId: number | undefined)
     queryFn: async () => {
       const { data, error } = await supabase
         .from("daily_evolutions")
-        .select("*, patient:patients(name), professional:professionals(name)")
+        // Desambiguação do FK (ver nota em useDailyEvolutions): aqui o embed do
+        // profissional é o autor (professional_id), não o supervisor.
+        .select(
+          "*, patient:patients(name), professional:professionals!professional_id(name)",
+        )
         .eq("clinic_id", clinic!.id)
         .eq("supervisor_id", supervisorId!)
         .eq("validation_status", "pendente_validacao")
