@@ -115,11 +115,13 @@ export function DatePicker({
           locale={ptBR}
           selected={valid ? selected : undefined}
           defaultMonth={valid ? selected : undefined}
-          onSelect={(d) => {
-            if (d) {
-              onChange(format(d, "yyyy-MM-dd"));
-              setOpen(false);
-            }
+          // onDayClick (e não onSelect) garante o disparo a cada clique no
+          // calendário: o onSelect do modo "single" só dispara na transição de
+          // estado interna do RDP, o que é frágil neste picker controlado (o
+          // valor volta via estado externo). Captura sempre o dia clicado.
+          onDayClick={(day) => {
+            onChange(format(day, "yyyy-MM-dd"));
+            setOpen(false);
           }}
           showOutsideDays
           style={rdpStyle}
