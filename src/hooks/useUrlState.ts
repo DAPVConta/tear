@@ -10,14 +10,24 @@ export function useUrlState(
   const [params, setParams] = useSearchParams();
   const value = params.get(key) ?? defaultValue;
 
+  // Atualizador funcional: lê sempre o estado mais recente (prev) em vez de
+  // capturar `params` por closure. Sem isso, dois setters disparados no mesmo
+  // handler (ex.: setFrom + resetPage nos filtros) usavam o mesmo `params`
+  // defasado e o último sobrescrevia a alteração do primeiro — o filtro de
+  // datas não era aplicado.
   const setValue = useCallback(
     (next: string) => {
-      const updated = new URLSearchParams(params);
-      if (!next || next === defaultValue) updated.delete(key);
-      else updated.set(key, next);
-      setParams(updated, { replace: true });
+      setParams(
+        (prev) => {
+          const updated = new URLSearchParams(prev);
+          if (!next || next === defaultValue) updated.delete(key);
+          else updated.set(key, next);
+          return updated;
+        },
+        { replace: true },
+      );
     },
-    [key, defaultValue, params, setParams],
+    [key, defaultValue, setParams],
   );
 
   return [value, setValue];
