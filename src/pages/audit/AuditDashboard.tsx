@@ -8,6 +8,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { format, parseISO, subDays } from "date-fns";
+import { parseDateOnly } from "@/lib/date";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
@@ -233,7 +234,7 @@ export default function AuditDashboard() {
                           >
                             <TableCell className="font-semibold">
                               {format(
-                                parseISO(a.evolution.session_date),
+                                parseDateOnly(a.evolution.session_date),
                                 "dd/MM/yyyy",
                               )}
                             </TableCell>

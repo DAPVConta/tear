@@ -7,9 +7,13 @@ import {
   Pencil,
   Trash2,
   MoreHorizontal,
+  AlertTriangle,
+  CheckCircle2,
+  FileMinus2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { differenceInYears, parseISO } from "date-fns";
+import { differenceInYears } from "date-fns";
+import { parseDateOnly, daysUntil } from "@/lib/date";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +49,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
 import { maskCPF, maskPhone } from "@/lib/masks";
@@ -54,14 +65,69 @@ import {
   useDeactivatePatient,
   PATIENTS_PAGE_SIZE,
   type Patient,
+  type ReportStatusFilter,
 } from "@/features/patients/api";
+
+const reportStatusLabels: Record<ReportStatusFilter, string> = {
+  all: "Todos",
+  expired: "Laudo vencido",
+  expiring: "Laudo a vencer (30 dias)",
+  valid: "Laudo válido",
+  missing: "Sem laudo",
+};
+
+function isReportStatusFilter(v: string): v is ReportStatusFilter {
+  return v === "all" || v === "expired" || v === "expiring" || v === "valid" || v === "missing";
+}
 
 function age(birth: string) {
   try {
-    return `${differenceInYears(new Date(), parseISO(birth))} anos`;
+    return `${differenceInYears(new Date(), parseDateOnly(birth))} anos`;
   } catch {
     return "—";
   }
+}
+
+type ReportStatus = "valid" | "expiring" | "expired" | "missing";
+
+function reportStatus(p: Patient): ReportStatus {
+  if (!p.report_validity_date) return "missing";
+  const days = daysUntil(p.report_validity_date);
+  if (days < 0) return "expired";
+  if (days <= 30) return "expiring";
+  return "valid";
+}
+
+function ReportBadge({ patient }: { patient: Patient }) {
+  const s = reportStatus(patient);
+  if (s === "expired") {
+    return (
+      <Badge variant="destructive">
+        <AlertTriangle className="h-3 w-3" /> Laudo vencido
+      </Badge>
+    );
+  }
+  if (s === "expiring") {
+    const days = daysUntil(patient.report_validity_date!);
+    return (
+      <Badge variant="warning">
+        <AlertTriangle className="h-3 w-3" /> Vence em {days}{" "}
+        {days === 1 ? "dia" : "dias"}
+      </Badge>
+    );
+  }
+  if (s === "valid") {
+    return (
+      <Badge variant="success">
+        <CheckCircle2 className="h-3 w-3" /> Em dia
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="muted">
+      <FileMinus2 className="h-3 w-3" /> Sem laudo
+    </Badge>
+  );
 }
 
 export default function PatientsList() {
@@ -71,6 +137,10 @@ export default function PatientsList() {
   const [sortBy, setSortBy] = useUrlState("sortBy", "name");
   const [sortDirRaw, setSortDirRaw] = useUrlState("sortDir", "asc");
   const sortDir = (sortDirRaw === "desc" ? "desc" : "asc") as SortDir;
+  const [reportFilterRaw, setReportFilterRaw] = useUrlState("laudo", "all");
+  const reportFilter: ReportStatusFilter = isReportStatusFilter(reportFilterRaw)
+    ? reportFilterRaw
+    : "all";
   const [searchInput, setSearchInput] = useState(urlSearch);
   const search = useDebounce(searchInput);
   const [toDelete, setToDelete] = useState<Patient | null>(null);
@@ -84,6 +154,7 @@ export default function PatientsList() {
     page,
     sortBy,
     sortDir,
+    reportStatus: reportFilter,
   });
   const deactivate = useDeactivatePatient();
 
@@ -140,8 +211,8 @@ export default function PatientsList() {
       />
 
       <div className="rounded-2xl border border-border bg-card shadow-soft">
-        <div className="border-b border-border p-4">
-          <div className="relative max-w-sm">
+        <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-[1fr_220px]">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchInput}
@@ -150,6 +221,26 @@ export default function PatientsList() {
               className="pl-9"
             />
           </div>
+          <Select
+            value={reportFilter}
+            onValueChange={(v) => {
+              setReportFilterRaw(v);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger aria-label="Filtrar por status do laudo">
+              <SelectValue placeholder="Status do laudo" />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.entries(reportStatusLabels) as [ReportStatusFilter, string][]).map(
+                ([v, label]) => (
+                  <SelectItem key={v} value={v}>
+                    {label}
+                  </SelectItem>
+                ),
+              )}
+            </SelectContent>
+          </Select>
         </div>
 
         <Table>
@@ -164,12 +255,13 @@ export default function PatientsList() {
               <SortableHead sortKey="payment_type" currentKey={sortBy} currentDir={sortDir} onSort={onSort}>
                 Pagamento
               </SortableHead>
+              <TableHead>Laudo</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && <TableSkeletonRows columns={5} />}
+            {isLoading && <TableSkeletonRows columns={6} />}
             {!isLoading &&
               data?.rows.map((p) => (
                 <TableRow
@@ -194,6 +286,9 @@ export default function PatientsList() {
                     <Badge variant={p.payment_type === "particular" ? "accent" : "muted"}>
                       {paymentTypeLabels[p.payment_type]}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <ReportBadge patient={p} />
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {p.guardian_email || "—"}

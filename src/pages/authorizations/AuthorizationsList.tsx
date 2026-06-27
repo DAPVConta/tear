@@ -10,7 +10,8 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { format } from "date-fns";
+import { parseDateOnly, daysUntil } from "@/lib/date";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,8 +61,7 @@ type Effective = "ativa" | "vencida" | "esgotada" | "cancelada";
 function effectiveStatus(a: AuthorizationRow): Effective {
   if (a.status === "cancelada") return "cancelada";
   if (a.used_quantity >= a.authorized_quantity) return "esgotada";
-  if (differenceInCalendarDays(parseISO(a.expiration_date), new Date()) < 0)
-    return "vencida";
+  if (daysUntil(a.expiration_date) < 0) return "vencida";
   return "ativa";
 }
 
@@ -162,10 +162,7 @@ export default function AuthorizationsList() {
             {!isLoading &&
               data?.rows.map((a) => {
                 const eff = effectiveStatus(a);
-                const days = differenceInCalendarDays(
-                  parseISO(a.expiration_date),
-                  new Date(),
-                );
+                const days = daysUntil(a.expiration_date);
                 const expiringSoon = eff === "ativa" && days <= 30;
                 return (
                   <TableRow
@@ -189,7 +186,7 @@ export default function AuthorizationsList() {
                       {a.used_quantity}/{a.authorized_quantity}
                     </TableCell>
                     <TableCell className="text-sm">
-                      <div>{format(parseISO(a.expiration_date), "dd/MM/yyyy")}</div>
+                      <div>{format(parseDateOnly(a.expiration_date), "dd/MM/yyyy")}</div>
                       {expiringSoon && (
                         <div className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-amber-600">
                           <AlertTriangle className="h-3 w-3" />

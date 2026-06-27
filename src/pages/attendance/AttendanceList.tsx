@@ -8,7 +8,8 @@ import {
   Trash2,
   MoreHorizontal,
 } from "lucide-react";
-import { format, parseISO, subDays } from "date-fns";
+import { format, subDays } from "date-fns";
+import { parseDateOnly } from "@/lib/date";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -199,7 +200,7 @@ export default function AttendanceList() {
                   onClick={() => navigate(`/frequencia/${a.id}`)}
                 >
                   <TableCell className="font-semibold">
-                    {format(parseISO(a.session_date), "dd/MM/yyyy")}
+                    {format(parseDateOnly(a.session_date), "dd/MM/yyyy")}
                   </TableCell>
                   <TableCell>{a.patient?.name ?? "—"}</TableCell>
                   <TableCell>{a.professional?.name ?? "—"}</TableCell>

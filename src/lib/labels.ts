@@ -24,6 +24,7 @@ export const genderLabels: Record<Enums<"gender">, string> = {
 export const paymentTypeLabels: Record<Enums<"payment_type">, string> = {
   operadora: "Operadora de Saúde (Convênio)",
   particular: "Particular",
+  liminar: "Liminar (Judicial)",
 };
 
 export const authorizationStatusLabels: Record<

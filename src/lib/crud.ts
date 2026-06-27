@@ -12,7 +12,7 @@ export type ListResult<T> = { rows: T[]; total: number };
 export type OrderConfig = { column: string; ascending: boolean };
 export type FilterConfig = {
   column: string;
-  op: "eq" | "neq" | "gte" | "lte" | "in";
+  op: "eq" | "neq" | "gte" | "lte" | "gt" | "lt" | "in" | "is";
   value: unknown;
 };
 
@@ -33,7 +33,10 @@ type AnyBuilder = {
   neq: (c: string, v: unknown) => AnyBuilder;
   gte: (c: string, v: unknown) => AnyBuilder;
   lte: (c: string, v: unknown) => AnyBuilder;
+  gt: (c: string, v: unknown) => AnyBuilder;
+  lt: (c: string, v: unknown) => AnyBuilder;
   in: (c: string, v: unknown) => AnyBuilder;
+  is: (c: string, v: unknown) => AnyBuilder;
   order: (c: string, opts: { ascending: boolean }) => AnyBuilder;
   range: (from: number, to: number) => AnyBuilder;
   or: (expr: string) => AnyBuilder;

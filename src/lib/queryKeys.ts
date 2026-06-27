@@ -5,8 +5,15 @@
 export const keys = {
   patients: {
     all: ["patients"] as const,
-    list: (clinicId: number | undefined, search: string, page: number, sortBy: string, sortDir: string) =>
-      ["patients", clinicId, search, page, sortBy, sortDir] as const,
+    list: (
+      clinicId: number | undefined,
+      search: string,
+      page: number,
+      sortBy: string,
+      sortDir: string,
+      reportStatus: string,
+    ) =>
+      ["patients", clinicId, search, page, sortBy, sortDir, reportStatus] as const,
     byId: (id: number | undefined) => ["patient", id] as const,
     options: (clinicId: number | undefined) => ["patient-options", clinicId] as const,
   },
