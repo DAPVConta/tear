@@ -22,6 +22,7 @@ import {
   Trash2,
   FileText,
   Pill,
+  ShieldAlert,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,9 @@ import { AddendumSection } from "@/pages/evolutions/AddendumSection";
 import { CidCombobox } from "@/components/form/CidCombobox";
 import { Cid11Combobox } from "@/components/form/Cid11Combobox";
 import { cid10ForCid11 } from "@/lib/cid11";
+import { todayLocalISO } from "@/lib/date";
+import { usePsychologyUnlock } from "@/features/dailyEvolutions/psychologyUnlock";
+import { PsychologyUnlockDialog } from "@/pages/evolutions/PsychologyUnlockDialog";
 
 const MIN_SESSION_MINUTES = 30;
 
@@ -233,7 +237,8 @@ function buildSchema(getFormType: () => EvolutionFormType) {
 const defaults: FormValues = {
   patient_id: undefined as unknown as number,
   professional_id: undefined as unknown as number,
-  session_date: new Date().toISOString().slice(0, 10),
+  // No fuso local — toISOString shifta para UTC e em BR pode virar D-1.
+  session_date: todayLocalISO(),
   start_time: "09:00",
   end_time: "10:00",
   attendance_type: "individual_presencial",
@@ -343,6 +348,10 @@ export default function DailyEvolutionForm() {
 
   const { clinic, role } = useClinic();
   const { user } = useAuth();
+  // Gate de sigilo CFP/LGPD (correção #17). RLS já filtra; este modal exige
+  // reautenticação antes de exibir o conteúdo de psicologia em tela.
+  const { unlocked: psyUnlocked } = usePsychologyUnlock(clinic?.id);
+  const [psyDialogOpen, setPsyDialogOpen] = useState(false);
   const { data: patients } = usePatientOptions();
   const { data: professionals } = useProfessionalOptions();
   const { data: myProfessional } = useMyProfessional();
@@ -533,7 +542,9 @@ export default function DailyEvolutionForm() {
       const raw = localStorage.getItem(draftKey);
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<FormValues>;
-        reset({ ...defaults, ...parsed });
+        // Data sempre é a do dia atual em "novo" (correção #16) — descarta
+        // qualquer session_date que tenha sido salvo no rascunho.
+        reset({ ...defaults, ...parsed, session_date: todayLocalISO() });
       }
     } catch {
       // ignora rascunho corrompido
@@ -766,6 +777,40 @@ export default function DailyEvolutionForm() {
     return <FormLoadingSkeleton />;
   }
 
+  // Sigilo Psicologia: abre o gate antes de revelar o formulário. Se o usuário
+  // cancelar, volta para a lista. RLS já bloqueia para não-autorizados.
+  if (isEdit && existing?.is_confidential && !psyUnlocked) {
+    return (
+      <div>
+        <PageHeader
+          title="Evolução sigilosa (Psicologia)"
+          description="Confirmação de identidade necessária para acessar o conteúdo."
+          actions={
+            <Button variant="outline" onClick={() => navigate("/evolucoes")}>
+              <ArrowLeft className="h-4 w-4" /> Voltar
+            </Button>
+          }
+        />
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+            <ShieldAlert className="h-10 w-10 text-warning-text" />
+            <div className="max-w-md text-sm text-muted-foreground">
+              Este registro está protegido pelo sigilo psicológico (CFP/LGPD).
+              Para visualizar, confirme sua identidade com a sua senha.
+            </div>
+            <Button variant="brand" onClick={() => setPsyDialogOpen(true)}>
+              <ShieldAlert className="h-4 w-4" /> Liberar acesso
+            </Button>
+          </CardContent>
+        </Card>
+        <PsychologyUnlockDialog
+          open={psyDialogOpen}
+          onOpenChange={setPsyDialogOpen}
+        />
+      </div>
+    );
+  }
+
   const fieldsDisabled = locked;
 
   return (
@@ -777,6 +822,11 @@ export default function DailyEvolutionForm() {
           <div className="flex flex-wrap items-center gap-2">
             {!isDevolutiva && (
               <Badge variant="muted">{evolutionFormTypeLabels[formType]}</Badge>
+            )}
+            {existing?.is_confidential && (
+              <Badge variant="warning">
+                <ShieldAlert className="h-3 w-3" /> Sigiloso (Psicologia)
+              </Badge>
             )}
             {validationStatus === "pendente_validacao" && (
               <Badge variant="warning">Pendente de validação técnica</Badge>
@@ -866,9 +916,19 @@ export default function DailyEvolutionForm() {
                       onChange={field.onChange}
                       placeholder="dd/mm/aaaa"
                       clearable={false}
+                      // Correção #16 — na criação, a data é a do dia atual
+                      // (trigger no banco também recusa retroativa/futura).
+                      disabled={!isEdit}
                     />
                   )}
                 />
+                {!isEdit && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    A data é fixa em <strong>hoje</strong> para garantir a
+                    veracidade do registro. Para corrigir após o bloqueio,
+                    use a opção "Incluir adendo".
+                  </p>
+                )}
               </Field>
               <Field label="Tipo de atendimento" error={errors.attendance_type?.message}>
                 <Controller

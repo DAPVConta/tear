@@ -21,7 +21,8 @@ import {
   BarChart,
   YAxis,
 } from "recharts";
-import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { format } from "date-fns";
+import { parseDateOnly, daysUntil } from "@/lib/date";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -277,10 +278,7 @@ export default function Dashboard() {
         ) : (
           <ul className="divide-y divide-border">
             {expiring!.map((g) => {
-              const days = differenceInCalendarDays(
-                parseISO(g.expiration_date),
-                new Date(),
-              );
+              const days = daysUntil(g.expiration_date);
               return (
                 <li key={g.id}>
                   <Link
@@ -302,7 +300,7 @@ export default function Dashboard() {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Guia {g.guide_number} ·{" "}
-                        {format(parseISO(g.expiration_date), "dd/MM/yyyy")}
+                        {format(parseDateOnly(g.expiration_date), "dd/MM/yyyy")}
                       </p>
                     </div>
                     <span className="text-sm font-semibold tabular-nums text-muted-foreground">

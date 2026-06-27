@@ -37,6 +37,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { FormLoadingSkeleton } from "@/components/form/FormLoadingSkeleton";
 import { maskCPF, maskCEP, maskPhone, unmask, isValidCPF } from "@/lib/masks";
 import { useCepLookup } from "@/hooks/useCepLookup";
+import { daysUntil } from "@/lib/date";
 import { genderLabels, paymentTypeLabels } from "@/lib/labels";
 import {
   usePatient,
@@ -63,9 +64,10 @@ const schema = z.object({
     .string()
     .refine((v) => unmask(v).length >= 10, "Telefone inválido"),
   guardian_email: z.string().email("E-mail inválido").or(z.literal("")).optional(),
-  payment_type: z.enum(["operadora", "particular"]),
+  payment_type: z.enum(["operadora", "particular", "liminar"]),
   health_plan_name: z.string().optional(),
   health_plan_card: z.string().optional(),
+  liminar_number: z.string().optional(),
   cid11_primary: z.string().optional(),
   cid11_secondary: z.string().optional(),
   cid10_primary: z.string().min(1, "Informe o CID-10 principal"),
@@ -76,6 +78,21 @@ const schema = z.object({
   report_issue_date: z.string().optional(),
   report_validity_date: z.string().optional(),
   address: z.string().optional(),
+}).superRefine((v, ctx) => {
+  if (v.payment_type === "liminar") {
+    if (!(v.liminar_number ?? "").trim())
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["liminar_number"],
+        message: "Informe o número da liminar / processo",
+      });
+    if (!(v.health_plan_name ?? "").trim())
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["health_plan_name"],
+        message: "Informe a operadora vinculada à liminar",
+      });
+  }
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -91,6 +108,7 @@ const defaults: FormValues = {
   payment_type: "operadora",
   health_plan_name: "",
   health_plan_card: "",
+  liminar_number: "",
   cid11_primary: "",
   cid11_secondary: "",
   cid10_primary: "",
@@ -149,6 +167,7 @@ export default function PatientForm() {
         payment_type: existing.payment_type,
         health_plan_name: existing.health_plan_name ?? "",
         health_plan_card: existing.health_plan_card ?? "",
+        liminar_number: existing.liminar_number ?? "",
         cid11_primary: existing.cid11_primary ?? "",
         cid11_secondary: existing.cid11_secondary ?? "",
         cid10_primary: existing.cid10_primary,
@@ -176,12 +195,7 @@ export default function PatientForm() {
   const { data: reportUrl } = useMedicalReportUrl(existing?.report_path);
 
   // Dias até o vencimento do laudo (negativo = vencido).
-  const validityDays = reportValidity
-    ? Math.ceil(
-        (new Date(`${reportValidity}T00:00:00`).getTime() - Date.now()) /
-          86_400_000,
-      )
-    : null;
+  const validityDays = reportValidity ? daysUntil(reportValidity) : null;
 
   async function onReadLaudo() {
     if (!reportFile) {
@@ -262,10 +276,17 @@ export default function PatientForm() {
       guardian_phone: unmask(values.guardian_phone),
       guardian_email: values.guardian_email || null,
       payment_type: values.payment_type,
+      // Operadora e Liminar (judicial) usam health_plan_name como vínculo com a
+      // operadora; carteirinha só na operadora padrão; liminar_number só na
+      // liminar.
       health_plan_name:
-        values.payment_type === "operadora" ? values.health_plan_name || null : null,
+        values.payment_type === "operadora" || values.payment_type === "liminar"
+          ? values.health_plan_name || null
+          : null,
       health_plan_card:
         values.payment_type === "operadora" ? values.health_plan_card || null : null,
+      liminar_number:
+        values.payment_type === "liminar" ? values.liminar_number || null : null,
       cid11_primary: values.cid11_primary || null,
       cid11_secondary: values.cid11_secondary || null,
       cid10_primary: values.cid10_primary,
@@ -430,6 +451,28 @@ export default function PatientForm() {
                 </Field>
                 <Field label="Número da carteirinha">
                   <Input {...register("health_plan_card")} placeholder="Número da carteirinha" />
+                </Field>
+              </>
+            )}
+            {paymentType === "liminar" && (
+              <>
+                <Field
+                  label="Número da liminar / processo"
+                  error={errors.liminar_number?.message}
+                >
+                  <Input
+                    {...register("liminar_number")}
+                    placeholder="Ex: 1234567-89.2026.8.26.0100"
+                  />
+                </Field>
+                <Field
+                  label="Operadora de saúde vinculada"
+                  error={errors.health_plan_name?.message}
+                >
+                  <Input
+                    {...register("health_plan_name")}
+                    placeholder="Ex: Unimed, Bradesco Saúde"
+                  />
                 </Field>
               </>
             )}

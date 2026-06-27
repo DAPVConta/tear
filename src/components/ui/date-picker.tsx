@@ -1,7 +1,8 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { DayPicker } from "react-day-picker";
 import { ptBR } from "date-fns/locale";
-import { format, parse, parseISO, isValid } from "date-fns";
+import { format, parse, isValid } from "date-fns";
+import { parseDateOnly } from "@/lib/date";
 import { Calendar, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -46,13 +47,13 @@ export function DatePicker({
   clearable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const selected = value ? parseISO(value) : undefined;
+  const selected = value ? parseDateOnly(value) : undefined;
   const valid = !!selected && isValid(selected);
   const [text, setText] = useState(valid ? format(selected!, "dd/MM/yyyy") : "");
 
   // Mantém o texto em sincronia quando o valor externo muda (reset, calendário).
   useEffect(() => {
-    const s = value ? parseISO(value) : undefined;
+    const s = value ? parseDateOnly(value) : undefined;
     setText(s && isValid(s) ? format(s, "dd/MM/yyyy") : "");
   }, [value]);
 

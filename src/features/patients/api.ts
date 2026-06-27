@@ -7,7 +7,9 @@ import {
   insertRecord,
   setActive,
   updateRecord,
+  type FilterConfig,
 } from "@/lib/crud";
+import { todayLocalISO } from "@/lib/date";
 import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Tables, TablesInsert, TablesUpdate } from "@/types/database";
@@ -15,23 +17,59 @@ import type { Tables, TablesInsert, TablesUpdate } from "@/types/database";
 export type Patient = Tables<"patients">;
 export const PATIENTS_PAGE_SIZE = 10;
 
+export type ReportStatusFilter = "all" | "expired" | "expiring" | "valid" | "missing";
+
 type ListParams = {
   search: string;
   page: number;
   sortBy?: string;
   sortDir?: "asc" | "desc";
+  reportStatus?: ReportStatusFilter;
 };
+
+// Filtros server-side por status do laudo (correção #13). Calculados em runtime
+// contra a data atual; mantém RLS por clinic_id intocada.
+function reportStatusFilters(status: ReportStatusFilter): FilterConfig[] {
+  if (status === "all") return [];
+  const today = todayLocalISO();
+  const in30 = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().slice(0, 10);
+  })();
+  if (status === "missing") {
+    return [{ column: "report_validity_date", op: "is", value: null }];
+  }
+  if (status === "expired") {
+    return [{ column: "report_validity_date", op: "lt", value: today }];
+  }
+  if (status === "expiring") {
+    return [
+      { column: "report_validity_date", op: "gte", value: today },
+      { column: "report_validity_date", op: "lte", value: in30 },
+    ];
+  }
+  return [{ column: "report_validity_date", op: "gt", value: in30 }];
+}
 
 export function usePatients({
   search,
   page,
   sortBy = "name",
   sortDir = "asc",
+  reportStatus = "all",
 }: ListParams) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
   return useQuery({
-    queryKey: keys.patients.list(clinicId, search, page, sortBy, sortDir),
+    queryKey: keys.patients.list(
+      clinicId,
+      search,
+      page,
+      sortBy,
+      sortDir,
+      reportStatus,
+    ),
     enabled: !!clinicId,
     queryFn: () =>
       fetchPaginatedList<Patient>({
@@ -42,7 +80,10 @@ export function usePatients({
         search,
         searchColumns: ["name", "guardian_name", "cpf"],
         order: { column: sortBy, ascending: sortDir === "asc" },
-        filters: [{ column: "active", op: "eq", value: true }],
+        filters: [
+          { column: "active", op: "eq", value: true },
+          ...reportStatusFilters(reportStatus),
+        ],
       }),
   });
 }

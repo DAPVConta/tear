@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { format, parseISO, startOfWeek, subDays } from "date-fns";
+import { format, startOfWeek, subDays } from "date-fns";
+import { parseDateOnly } from "@/lib/date";
 import { supabase } from "@/lib/supabase";
 import { keys } from "@/lib/queryKeys";
 import { useClinic } from "@/providers/ClinicProvider";
@@ -113,7 +114,7 @@ export function useSessionsByDay({ days = 14 } = {}) {
       }
       return [...counts.entries()].map(([date, sessoes]) => ({
         date,
-        label: format(parseISO(date), "dd/MM"),
+        label: format(parseDateOnly(date), "dd/MM"),
         sessoes,
       }));
     },

@@ -444,6 +444,37 @@ operadora; restrição editar/excluir só pelo criador.
       já são persistidos de forma estruturada; visualização agregada fica como
       follow-up.
 
+30. [FEITO — Correções #13–#17] Pacote 6.
+    - #13 Laudo vencido em /pacientes: filtro server-side (Todos / Vencido /
+      A vencer 30d / Em dia / Sem laudo) persistido na URL (`?laudo=`) e nova
+      coluna "Laudo" com badge contextual. `fetchPaginatedList` ganha ops
+      `lt/gt/is`. Sem migração nova (usa `report_validity_date` do #5).
+    - #14 "Erro na data" da evolução diária: causa raiz era off-by-one por
+      fuso — `parseISO("yyyy-MM-dd")` em BR cai no dia anterior. Novo helper
+      `lib/date.ts` (`parseDateOnly` / `todayLocalISO` / `daysUntil`)
+      substituindo `parseISO` para colunas `date` em listas (evolutions,
+      patients, authorizations, attendance, dashboard, audit) e no
+      DatePicker. Default de período removido em /evolucoes (mostrava 14d
+      silenciosamente, escondendo sessões antigas).
+    - #15 Novo tipo "Liminar" (Judicial) no enum payment_type (migração 0027)
+      + coluna `patients.liminar_number`. PatientForm: campos condicionais
+      "Número da liminar" e "Operadora vinculada" (obrigatórios, Zod
+      superRefine).
+    - #16 Trava de data atual em nova evolução: trigger BEFORE INSERT
+      `enforce_evolution_session_date` (migração 0028) recusa retroativa e
+      futura. UI: DatePicker desabilitado em "novo", hint na tela e descarte
+      do `session_date` de rascunho ao restaurar.
+    - #17 Sigilo CFP/LGPD da evolução de Psicologia (migração 0029): coluna
+      `is_confidential` + trigger que liga o sigilo à especialidade
+      `psicologia_aba` do profissional; backfill de registros existentes.
+      Helper RLS `is_psychologist_in_clinic` + nova policy SELECT que oculta
+      registros sigilosos de quem não é `clinic_admin`, `platform_admin` ou
+      psicólogo da clínica. Frontend: hook `usePsychologyUnlock` +
+      `PsychologyUnlockDialog` (reauth com `signInWithPassword`, gate por
+      aba via sessionStorage). Listagem mostra badge "Sigiloso (Psicologia)"
+      e máscara para autorizados que ainda não destravaram a aba; o
+      formulário/detalhe abre o gate antes de revelar o conteúdo.
+
 Todas as correções da tabela public.corrections foram resolvidas.
 
 ## Gestão de Membros

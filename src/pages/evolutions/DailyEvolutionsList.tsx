@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -8,8 +8,10 @@ import {
   CheckCircle2,
   CircleDashed,
   BadgeCheck,
+  ShieldAlert,
 } from "lucide-react";
-import { format, parseISO, subDays } from "date-fns";
+import { format } from "date-fns";
+import { parseDateOnly } from "@/lib/date";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -39,6 +41,9 @@ import { attendanceTypeLabels, specialtyLabels } from "@/lib/labels";
 import { usePatientOptions } from "@/features/patients/api";
 import { useMyProfessional } from "@/features/professionals/api";
 import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
+import { useClinic } from "@/providers/ClinicProvider";
+import { usePsychologyUnlock } from "@/features/dailyEvolutions/psychologyUnlock";
+import { PsychologyUnlockDialog } from "@/pages/evolutions/PsychologyUnlockDialog";
 import {
   useDailyEvolutions,
   useEvolutionsPendingValidation,
@@ -47,6 +52,14 @@ import {
   EVOLUTIONS_PAGE_SIZE,
   type EvolutionRow,
 } from "@/features/dailyEvolutions/api";
+
+function ConfidentialBadge() {
+  return (
+    <Badge variant="warning">
+      <ShieldAlert className="h-3 w-3" /> Sigiloso (Psicologia)
+    </Badge>
+  );
+}
 
 function statusBadge(e: EvolutionRow) {
   if (e.validation_status === "homologada")
@@ -91,15 +104,20 @@ export default function DailyEvolutionsList() {
   const [page, setPage] = useUrlNumber("page", 1);
   const [patientId, setPatientId] = useUrlState("patient", "all");
   const [specialty, setSpecialty] = useUrlState("specialty", "all");
-  const [from, setFrom] = useUrlState(
-    "from",
-    format(subDays(new Date(), 14), "yyyy-MM-dd"),
-  );
-  const [to, setTo] = useUrlState("to", format(new Date(), "yyyy-MM-dd"));
+  // Default sem filtro de data: mostrar todas as evoluções da clínica
+  // (paginadas) e deixar o profissional aplicar a janela quando quiser. O
+  // default antigo (últimos 14 dias) escondia silenciosamente registros mais
+  // antigos — origem da reclamação "erro na data" (correção #14).
+  const [from, setFrom] = useUrlState("from", "");
+  const [to, setTo] = useUrlState("to", "");
 
   const { data: patients } = usePatientOptions();
   const { data: myProfessional } = useMyProfessional();
   const { data: pending } = useEvolutionsPendingValidation(myProfessional?.id);
+  const { clinic } = useClinic();
+  const { unlocked: psyUnlocked } = usePsychologyUnlock(clinic?.id);
+  const [psyDialogOpen, setPsyDialogOpen] = useState(false);
+  const [pendingConfidentialId, setPendingConfidentialId] = useState<number | null>(null);
   const { data, isLoading, isError } = useDailyEvolutions({
     page,
     patientId: patientId === "all" ? undefined : Number(patientId),
@@ -119,6 +137,17 @@ export default function DailyEvolutionsList() {
 
   function resetPage() {
     setPage(1);
+  }
+
+  // Gate de sigilo CFP/LGPD (correção #17): linha de psicologia abre o modal
+  // de reautenticação antes de navegar para o detalhe.
+  function openEvolution(e: EvolutionRow) {
+    if (e.is_confidential && !psyUnlocked) {
+      setPendingConfidentialId(e.id);
+      setPsyDialogOpen(true);
+      return;
+    }
+    navigate(`/evolucoes/${e.id}`);
   }
 
   return (
@@ -148,7 +177,7 @@ export default function DailyEvolutionsList() {
                   to={`/evolucoes/${e.id}`}
                   className="text-brand-blue-light underline-offset-2 hover:underline"
                 >
-                  {format(parseISO(e.session_date), "dd/MM/yyyy")} ·{" "}
+                  {format(parseDateOnly(e.session_date), "dd/MM/yyyy")} ·{" "}
                   {e.patient?.name ?? "—"} · {e.professional?.name ?? "—"}
                 </Link>
               </li>
@@ -205,7 +234,6 @@ export default function DailyEvolutionsList() {
                 resetPage();
               }}
               placeholder="De"
-              clearable={false}
             />
           </div>
           <div className="sm:w-44">
@@ -216,7 +244,6 @@ export default function DailyEvolutionsList() {
                 resetPage();
               }}
               placeholder="Até"
-              clearable={false}
             />
           </div>
         </div>
@@ -235,38 +262,56 @@ export default function DailyEvolutionsList() {
           <TableBody>
             {isLoading && <TableSkeletonRows columns={6} />}
             {!isLoading &&
-              data?.rows.map((e) => (
-                <TableRow
-                  key={e.id}
-                  className="cursor-pointer"
-                  onClick={() => navigate(`/evolucoes/${e.id}`)}
-                >
-                  <TableCell>
-                    <div className="font-semibold">
-                      {format(parseISO(e.session_date), "dd/MM/yyyy")}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {e.start_time.slice(0, 5)}–{e.end_time.slice(0, 5)}
-                    </div>
-                  </TableCell>
-                  <TableCell>{e.patient?.name ?? "—"}</TableCell>
-                  <TableCell>{e.professional?.name ?? "—"}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {attendanceTypeLabels[e.attendance_type]}
-                  </TableCell>
-                  <TableCell>{statusBadge(e)}</TableCell>
-                  <TableCell onClick={(ev) => ev.stopPropagation()}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Abrir"
-                      onClick={() => navigate(`/evolucoes/${e.id}`)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              data?.rows.map((e) => {
+                const masked = e.is_confidential && !psyUnlocked;
+                return (
+                  <TableRow
+                    key={e.id}
+                    className="cursor-pointer"
+                    onClick={() => openEvolution(e)}
+                  >
+                    <TableCell>
+                      <div className="font-semibold">
+                        {format(parseDateOnly(e.session_date), "dd/MM/yyyy")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {e.start_time.slice(0, 5)}–{e.end_time.slice(0, 5)}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {masked ? (
+                        <span className="italic text-muted-foreground">
+                          Conteúdo sigiloso
+                        </span>
+                      ) : (
+                        e.patient?.name ?? "—"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {masked ? "—" : (e.professional?.name ?? "—")}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {attendanceTypeLabels[e.attendance_type]}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {e.is_confidential && <ConfidentialBadge />}
+                        {statusBadge(e)}
+                      </div>
+                    </TableCell>
+                    <TableCell onClick={(ev) => ev.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Abrir"
+                        onClick={() => openEvolution(e)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
           </TableBody>
         </Table>
 
@@ -299,6 +344,17 @@ export default function DailyEvolutionsList() {
           />
         )}
       </div>
+
+      <PsychologyUnlockDialog
+        open={psyDialogOpen}
+        onOpenChange={(v) => {
+          setPsyDialogOpen(v);
+          if (!v) setPendingConfidentialId(null);
+        }}
+        onUnlocked={() => {
+          if (pendingConfidentialId) navigate(`/evolucoes/${pendingConfidentialId}`);
+        }}
+      />
     </div>
   );
 }
