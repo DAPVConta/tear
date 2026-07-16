@@ -46,19 +46,19 @@ export function Sidebar({
         )}
       </div>
 
-      <ScrollArea className="flex-1 px-3 py-4">
-        <SidebarNav collapsed={collapsed} />
-      </ScrollArea>
-
       {collapsed && (
         <button
           onClick={onToggle}
           aria-label="Expandir menu"
-          className="mx-auto mb-4 grid h-9 w-9 place-items-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-white/10 hover:text-sidebar-foreground"
+          className="mx-auto mb-1 grid h-9 w-9 place-items-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-white/10 hover:text-sidebar-foreground"
         >
           <ChevronsLeft className="h-5 w-5 rotate-180" />
         </button>
       )}
+
+      <ScrollArea className="flex-1 px-3 py-4">
+        <SidebarNav collapsed={collapsed} />
+      </ScrollArea>
     </aside>
   );
 }
