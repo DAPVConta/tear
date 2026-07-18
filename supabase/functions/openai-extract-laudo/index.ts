@@ -1,7 +1,8 @@
 // Edge Function: openai-extract-laudo
 // Fluxo "Novo paciente com IA". Analisa o laudo (PDF ou imagem) com o modelo
-// gpt-4o-mini da OpenAI e devolve: nome do paciente, lista de terapias +
-// periodicidade e os metadados do laudo (médico, CRM/UF, emissão, validade).
+// gpt-5 da OpenAI (OPENAI_MODEL sobrepõe; fallback gpt-4o se indisponível) e
+// devolve: nome do paciente, lista de terapias + periodicidade e os metadados
+// do laudo (médico, CRM/UF, emissão, validade).
 //
 // O token da OpenAI é POR CLÍNICA (token_gpt), configurado em Configurações →
 // IA e guardado em public.clinic_ai_settings (RLS admin-only). A função resolve
@@ -87,7 +88,7 @@ Regras:
 - TERAPIAS — a parte mais importante. Os laudos costumam trazer uma lista NUMERADA de terapias/intervenções solicitadas (1., 2., 3., ...), muitas vezes continuando na página seguinte. Percorra a lista item a item, até o último número, e transcreva TODOS os itens — omitir um item da lista é ERRO GRAVE. Inclua também terapias citadas fora da lista numerada.
 - "therapies_count": conte quantas terapias o documento pede ANTES de montar o array; "therapies" deve ter exatamente esse número de itens.
 - Cada item de "therapies":
-  - "therapy": nome da terapia COMO ESCRITO no documento, incluindo abordagem/método/certificação citados (ex.: o que estiver entre parênteses). NÃO resuma, NÃO normalize, NÃO agrupe itens diferentes.
+  - "therapy": nome da terapia COMO ESCRITO no documento, incluindo abordagem/método/certificação citados (ex.: o que estiver entre parênteses). NÃO resuma, NÃO normalize, NÃO agrupe itens diferentes. IGNORE logotipos, cabeçalhos e rodapés da clínica — não são terapias.
   - "frequency": periodicidade e duração EXATAMENTE como escritas no documento para aquele item (frequência semanal/mensal, horas, duração mínima da sessão). Se o documento não indicar, use "".
   - Se uma mesma linha trouxer mais de uma modalidade com periodicidades distintas, separe em itens distintos.
   - Se o documento não listar terapias, use [] e therapies_count 0.
@@ -226,19 +227,23 @@ Deno.serve(async (req: Request) => {
         image_url: { url: dataUrl, detail: "high" },
       };
 
-  try {
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+  // Chamada por família de modelo: gpt-5/o* são modelos de raciocínio (usam
+  // max_completion_tokens e não aceitam temperature); gpt-4o/4.1 usam os
+  // parâmetros clássicos.
+  const callModel = (model: string) => {
+    const isReasoning = /^gpt-5/.test(model) || /^o\d/.test(model);
+    const params = isReasoning
+      ? { max_completion_tokens: 8000, reasoning_effort: "low" }
+      : { temperature: 0, max_tokens: 3000 };
+    return fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        // OPENAI_MODEL (secret opcional) permite subir para gpt-4o sem novo
-        // deploy caso o mini leia mal algum scan; padrão segue gpt-4o-mini.
-        model: Deno.env.get("OPENAI_MODEL")?.trim() || "gpt-4o-mini",
-        temperature: 0,
-        max_tokens: 3000,
+        model,
+        ...params,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
@@ -255,14 +260,44 @@ Deno.serve(async (req: Request) => {
         ],
       }),
     });
+  };
 
+  try {
+    // Padrão gpt-5: gerações anteriores (4o-mini e 4o) omitiam/manglavam itens
+    // de laudos escaneados. OPENAI_MODEL (secret) sobrepõe sem novo deploy;
+    // se a chave da clínica não tiver acesso ao modelo, cai para o FALLBACK.
+    const FALLBACK_MODEL = "gpt-4o";
+    const configured = Deno.env.get("OPENAI_MODEL")?.trim() || "gpt-5";
+    let resp = await callModel(configured);
     if (!resp.ok) {
-      const body = await resp.text();
-      console.error("openai-extract-laudo upstream error:", resp.status, body);
+      const errText = await resp.text();
+      console.error(
+        `openai-extract-laudo upstream error (${configured}):`,
+        resp.status,
+        errText,
+      );
       if (resp.status === 401) {
         return json({ error: "Token GPT inválido ou sem permissão." }, 400);
       }
-      return json({ error: "Falha ao consultar a IA." }, 502);
+      const modelUnavailable =
+        (resp.status === 400 || resp.status === 404) && /model/i.test(errText);
+      if (modelUnavailable && configured !== FALLBACK_MODEL) {
+        resp = await callModel(FALLBACK_MODEL);
+        if (!resp.ok) {
+          const fbText = await resp.text();
+          console.error(
+            `openai-extract-laudo fallback error (${FALLBACK_MODEL}):`,
+            resp.status,
+            fbText,
+          );
+          if (resp.status === 401) {
+            return json({ error: "Token GPT inválido ou sem permissão." }, 400);
+          }
+          return json({ error: "Falha ao consultar a IA." }, 502);
+        }
+      } else {
+        return json({ error: "Falha ao consultar a IA." }, 502);
+      }
     }
 
     const data = await resp.json();
