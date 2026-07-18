@@ -339,7 +339,48 @@ Deno.serve(async (req: Request) => {
         `/envelopes/${current.envelope_id}`,
       );
       const envelopeStatus = String(envelope.attributes?.status ?? "");
-      const finished = envelopeStatus === "finished" || envelopeStatus === "closed";
+      // Ground truth para diagnóstico: status e atributos crus do envelope.
+      console.log(
+        `clicksign status envelope=${current.envelope_id} status=${envelopeStatus}`,
+        JSON.stringify(envelope.attributes ?? {}),
+      );
+
+      // Envelope finalizado (todos assinaram + auto_close). Se, por algum
+      // motivo, o envelope ainda constar como "running" mas o signatário já
+      // tiver assinado, também tratamos como concluído (checagem dos
+      // signatários abaixo) — evita ficar preso em "pendente".
+      let finished = envelopeStatus === "closed" || envelopeStatus === "finished";
+      if (!finished && envelopeStatus === "running") {
+        try {
+          const signers = await clicksign(
+            token,
+            "GET",
+            `/envelopes/${current.envelope_id}/signers`,
+          );
+          // A resposta pode vir como lista (data[]) — normaliza e procura por
+          // qualquer indício de assinatura concluída no signatário-alvo.
+          const arr = Array.isArray((signers as unknown as { length?: number }))
+            ? (signers as unknown as JsonApiResource[])
+            : ([signers] as JsonApiResource[]);
+          const target =
+            arr.find((s) => s?.id === current.signer_id) ?? arr[0];
+          const attrs = (target?.attributes ?? {}) as Record<string, unknown>;
+          console.log(
+            `clicksign status signer=${current.signer_id}`,
+            JSON.stringify(attrs),
+          );
+          const signedFlag = Object.entries(attrs).some(([k, v]) => {
+            if (!/sign/i.test(k)) return false;
+            if (typeof v === "boolean") return v;
+            if (typeof v === "string") return v.length > 0 && v !== "pending";
+            return false;
+          });
+          if (signedFlag) finished = true;
+        } catch (e) {
+          console.error("clicksign status: falha ao ler signatários", e);
+        }
+      }
+
       if (!finished || current.status === "signed") {
         return json({ clicksign: current, envelope_status: envelopeStatus });
       }
