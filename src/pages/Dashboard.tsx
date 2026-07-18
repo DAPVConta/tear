@@ -163,8 +163,10 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Métricas — um acento TEA por cartão (diversidade da marca) */}
-      <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Métricas + cartões de ação — um acento TEA por cartão (diversidade da
+          marca). Os dois últimos são clicáveis: montam a lista abaixo e cada
+          item leva para editar o registro. */}
+      <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StaggerItem>
           <Metric
             label="Pacientes ativos"
@@ -207,7 +209,38 @@ export default function Dashboard() {
             accent="red"
           />
         </StaggerItem>
+        <StaggerItem>
+          <ActionCard
+            label="Pendências"
+            hint="Faturamento incompleto (30d)"
+            icon={ClipboardCheck}
+            accent="red"
+            count={pending?.length}
+            loading={loadingPending}
+            open={panel === "pending"}
+            onToggle={() => toggle("pending")}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <ActionCard
+            label="Guias a vencer"
+            hint="Vencendo em até 30 dias"
+            icon={FileClock}
+            accent="yellow"
+            count={expiring?.length}
+            loading={loadingExpiring}
+            open={panel === "guides"}
+            onToggle={() => toggle("guides")}
+          />
+        </StaggerItem>
       </Stagger>
+
+      {panel === "pending" && (
+        <PendingPanel items={pending} loading={loadingPending} />
+      )}
+      {panel === "guides" && (
+        <GuidesPanel items={expiring} loading={loadingExpiring} />
+      )}
 
       {/* Gráficos */}
       <section className="grid gap-6 lg:grid-cols-3">
@@ -387,36 +420,6 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Cartões de ação — clique monta a lista; clique no item vai para editar */}
-      <section className="grid gap-4 sm:grid-cols-2">
-        <ActionCard
-          label="Pendências"
-          hint="Sessões com item de faturamento em falta (30d)"
-          icon={ClipboardCheck}
-          accent="red"
-          count={pending?.length}
-          loading={loadingPending}
-          open={panel === "pending"}
-          onToggle={() => toggle("pending")}
-        />
-        <ActionCard
-          label="Guias a vencer"
-          hint="Autorizações vencendo em até 30 dias"
-          icon={FileClock}
-          accent="yellow"
-          count={expiring?.length}
-          loading={loadingExpiring}
-          open={panel === "guides"}
-          onToggle={() => toggle("guides")}
-        />
-      </section>
-
-      {panel === "pending" && (
-        <PendingPanel items={pending} loading={loadingPending} />
-      )}
-      {panel === "guides" && (
-        <GuidesPanel items={expiring} loading={loadingExpiring} />
-      )}
     </div>
   );
 }
@@ -482,54 +485,55 @@ function ActionCard({
       onClick={onToggle}
       aria-expanded={open}
       className={cn(
-        "group relative w-full overflow-hidden rounded-2xl border p-5 text-left shadow-soft outline-none transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevated focus-visible:ring-2 focus-visible:ring-ring",
+        "group relative h-full w-full overflow-hidden rounded-2xl border p-6 text-left shadow-soft outline-none transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-elevated focus-visible:ring-2 focus-visible:ring-ring",
         a.card,
         open && "ring-2 ring-ring",
       )}
     >
+      {/* Ícone-marca d'água decorativo — consistente com os cartões de métrica */}
+      <Icon className="pointer-events-none absolute -bottom-5 -right-5 h-24 w-24 text-foreground opacity-[0.04] transition-transform duration-300 group-hover:scale-110 group-hover:opacity-[0.06]" />
+      {/* Barra de acento superior (cor TEA) */}
       <span
         className={cn(
           "absolute inset-x-0 top-0 h-1 opacity-80 transition-opacity group-hover:opacity-100",
           a.bar,
         )}
       />
-      <div className="flex items-center gap-4">
-        <span
-          className={cn(
-            "grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br transition-transform duration-200 ease-out group-hover:scale-105",
-            a.chip,
-            a.chipText,
-          )}
-        >
-          <Icon className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="flex items-baseline gap-2">
-            <span className="font-display text-[1.75rem] font-extrabold tabular-nums leading-none tracking-tight">
-              {loading ? (
-                <Skeleton className="inline-block h-7 w-10" />
-              ) : (
-                (count ?? 0)
-              )}
-            </span>
-            <span className="text-sm font-semibold text-foreground">{label}</span>
-          </p>
-          <p className="mt-1 truncate text-caption text-muted-foreground">
-            {hint}
-          </p>
+      <div className="relative">
+        <div className="flex items-start justify-between">
+          <span
+            className={cn(
+              "grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br transition-transform duration-300 ease-out group-hover:scale-105",
+              a.chip,
+              a.chipText,
+            )}
+          >
+            <Icon className="h-5 w-5" />
+          </span>
+          <ChevronDown
+            className={cn(
+              "h-5 w-5 text-muted-foreground transition-transform duration-200",
+              open && "rotate-180",
+            )}
+          />
         </div>
-        <ChevronDown
-          className={cn(
-            "h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200",
-            open && "rotate-180",
-          )}
-        />
-      </div>
-      {empty && (
-        <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-success-text">
-          <CheckCircle2 className="h-3.5 w-3.5" /> Tudo em dia
+        <p className="mt-5 font-display text-[2rem] font-extrabold tabular-nums leading-none tracking-tight">
+          {loading ? <Skeleton className="inline-block h-8 w-16" /> : (count ?? 0)}
         </p>
-      )}
+        <p className="mt-2.5 text-sm font-semibold">{label}</p>
+        <p className="mt-0.5 flex items-center gap-1 text-xs">
+          {empty ? (
+            <>
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success-text" />
+              <span className="truncate font-medium text-success-text">
+                Tudo em dia
+              </span>
+            </>
+          ) : (
+            <span className="truncate text-muted-foreground">{hint}</span>
+          )}
+        </p>
+      </div>
     </button>
   );
 }
