@@ -1,4 +1,4 @@
-import { Bug, Database, Lock, Palette, Users } from "lucide-react";
+import { Bug, Database, Lock, Palette, Sparkles, Users } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutTab } from "./tabs/LayoutTab";
@@ -6,6 +6,7 @@ import { PrivacyTab } from "./tabs/PrivacyTab";
 import { TestDataTab } from "./tabs/TestDataTab";
 import { CorrectionsTab } from "./tabs/CorrectionsTab";
 import { MembersTab } from "./tabs/MembersTab";
+import { AiTab } from "./tabs/AiTab";
 
 export default function SettingsPage() {
   return (
@@ -22,6 +23,9 @@ export default function SettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="members">
             <Users className="mr-1 h-4 w-4" /> Membros
+          </TabsTrigger>
+          <TabsTrigger value="ai">
+            <Sparkles className="mr-1 h-4 w-4" /> IA
           </TabsTrigger>
           <TabsTrigger value="corrections">
             <Bug className="mr-1 h-4 w-4" /> Correções
@@ -40,6 +44,10 @@ export default function SettingsPage() {
 
         <TabsContent value="members">
           <MembersTab />
+        </TabsContent>
+
+        <TabsContent value="ai">
+          <AiTab />
         </TabsContent>
 
         <TabsContent value="corrections">

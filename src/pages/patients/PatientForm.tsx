@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -17,10 +17,14 @@ import {
   Sparkles,
   ExternalLink,
   AlertTriangle,
+  ListChecks,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Field } from "@/components/form/Field";
 import { FormSection } from "@/components/form/FormSection";
 import { CidCombobox } from "@/components/form/CidCombobox";
@@ -46,12 +50,17 @@ import {
   useUploadMedicalReport,
   useMedicalReportUrl,
 } from "@/features/patients/api";
-import { useExtractLaudo } from "@/features/ai/api";
+import { useExtractLaudoAI, type TherapyItem } from "@/features/ai/api";
 
 const optionalCpf = z
   .string()
   .optional()
   .refine((v) => !v || isValidCPF(v), "CPF inválido");
+
+const therapySchema = z.object({
+  therapy: z.string(),
+  frequency: z.string(),
+});
 
 const schema = z.object({
   name: z.string().min(3, "Informe o nome do paciente"),
@@ -73,6 +82,7 @@ const schema = z.object({
   cid10_primary: z.string().min(1, "Informe o CID-10 principal"),
   cid10_secondary: z.string().optional(),
   diagnosis: z.string().optional(),
+  therapies: z.array(therapySchema),
   report_doctor: z.string().optional(),
   report_crm: z.string().optional(),
   report_issue_date: z.string().optional(),
@@ -114,6 +124,7 @@ const defaults: FormValues = {
   cid10_primary: "",
   cid10_secondary: "",
   diagnosis: "",
+  therapies: [],
   report_doctor: "",
   report_crm: "",
   report_issue_date: "",
@@ -153,6 +164,13 @@ export default function PatientForm() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: defaults });
 
+  const {
+    fields: therapyFields,
+    append: appendTherapy,
+    remove: removeTherapy,
+    replace: replaceTherapies,
+  } = useFieldArray({ control, name: "therapies" });
+
   useEffect(() => {
     if (existing) {
       reset({
@@ -173,6 +191,12 @@ export default function PatientForm() {
         cid10_primary: existing.cid10_primary,
         cid10_secondary: existing.cid10_secondary ?? "",
         diagnosis: existing.diagnosis ?? "",
+        therapies: Array.isArray(existing.therapies)
+          ? (existing.therapies as TherapyItem[]).map((t) => ({
+              therapy: t?.therapy ?? "",
+              frequency: t?.frequency ?? "",
+            }))
+          : [],
         report_doctor: existing.report_doctor ?? "",
         report_crm: existing.report_crm ?? "",
         report_issue_date: existing.report_issue_date ?? "",
@@ -191,12 +215,14 @@ export default function PatientForm() {
   const [reportFile, setReportFile] = useState<File | null>(null);
 
   const uploadReport = useUploadMedicalReport();
-  const extractLaudo = useExtractLaudo();
+  const extractLaudo = useExtractLaudoAI();
   const { data: reportUrl } = useMedicalReportUrl(existing?.report_path);
 
   // Dias até o vencimento do laudo (negativo = vencido).
   const validityDays = reportValidity ? daysUntil(reportValidity) : null;
 
+  // IA lê o laudo (OpenAI gpt-4o-mini) e preenche nome, terapias + periodicidade
+  // e os metadados do laudo. Todos os campos permanecem editáveis.
   async function onReadLaudo() {
     if (!reportFile) {
       toast.error("Selecione o arquivo do laudo primeiro");
@@ -206,17 +232,31 @@ export default function PatientForm() {
       const fileBase64 = await fileToBase64(reportFile);
       const mediaType = reportFile.type || "application/pdf";
       const r = await extractLaudo.mutateAsync({ fileBase64, mediaType });
+
+      if (r.patient_name) setValue("name", r.patient_name, { shouldDirty: true });
+      if (r.therapies && r.therapies.length > 0) {
+        replaceTherapies(
+          r.therapies.map((t) => ({
+            therapy: t.therapy ?? "",
+            frequency: t.frequency ?? "",
+          })),
+        );
+      }
       if (r.doctor) setValue("report_doctor", r.doctor, { shouldDirty: true });
       if (r.crm_uf) setValue("report_crm", r.crm_uf, { shouldDirty: true });
       if (r.issue_date)
         setValue("report_issue_date", r.issue_date, { shouldDirty: true });
       if (r.validity_date)
         setValue("report_validity_date", r.validity_date, { shouldDirty: true });
+
+      const foundTherapies = r.therapies?.length ?? 0;
       toast.success("Laudo lido pela IA — confira e ajuste os campos", {
         description:
-          r.validity_source === "computed"
-            ? "Validade estimada (emissão + 1 ano), pois não havia data explícita."
-            : undefined,
+          foundTherapies > 0
+            ? `${foundTherapies} terapia(s) identificada(s).`
+            : r.validity_source === "computed"
+              ? "Validade estimada (emissão + 1 ano), pois não havia data explícita."
+              : undefined,
       });
     } catch (e) {
       toast.error("Não foi possível ler o laudo", {
@@ -266,6 +306,11 @@ export default function PatientForm() {
       return;
     }
 
+    // Descarta linhas de terapia totalmente vazias antes de gravar.
+    const therapies = values.therapies
+      .map((t) => ({ therapy: t.therapy.trim(), frequency: t.frequency.trim() }))
+      .filter((t) => t.therapy || t.frequency);
+
     const payload = {
       name: values.name,
       cpf: values.cpf ? unmask(values.cpf) : null,
@@ -292,6 +337,7 @@ export default function PatientForm() {
       cid10_primary: values.cid10_primary,
       cid10_secondary: values.cid10_secondary || null,
       diagnosis: values.diagnosis || null,
+      therapies,
       report_path: reportPath,
       report_doctor: values.report_doctor || null,
       report_crm: values.report_crm || null,
@@ -333,6 +379,192 @@ export default function PatientForm() {
       />
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Primeira ação no novo paciente: enviar o laudo e deixar a IA
+            preencher nome e terapias. */}
+        <FormSection
+          icon={FileText}
+          title="Laudo médico"
+          contentClassName="space-y-4"
+        >
+            {!isEdit && (
+              <div className="flex items-start gap-3 rounded-xl border border-brand-blue-light/30 bg-gradient-to-br from-brand-blue-light/10 to-accent/5 px-4 py-3">
+                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-blue-light/15 text-brand-blue-light">
+                  <Sparkles className="h-4 w-4" />
+                </span>
+                <div className="text-sm">
+                  <p className="font-semibold text-foreground">
+                    Comece pelo laudo
+                  </p>
+                  <p className="text-muted-foreground">
+                    Envie o documento (PDF ou imagem) e clique em{" "}
+                    <span className="font-medium text-foreground">
+                      Analisar com IA
+                    </span>
+                    . O nome do paciente e as terapias recomendadas são
+                    preenchidos automaticamente — você confere e ajusta.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+              <Field label="Arquivo do laudo (PDF ou imagem)">
+                <input
+                  type="file"
+                  accept={REPORT_ACCEPT}
+                  onChange={(e) => setReportFile(e.target.files?.[0] ?? null)}
+                  className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-secondary/70"
+                />
+              </Field>
+              <Button
+                type="button"
+                variant="brand"
+                onClick={onReadLaudo}
+                disabled={!reportFile || extractLaudo.isPending}
+              >
+                {extractLaudo.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Analisar com IA
+              </Button>
+            </div>
+
+            {existing?.report_path && (
+              <p className="text-xs text-muted-foreground">
+                Laudo atual:{" "}
+                {reportUrl ? (
+                  <a
+                    href={reportUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-accent hover:underline"
+                  >
+                    abrir documento <ExternalLink className="h-3 w-3" />
+                  </a>
+                ) : (
+                  "carregando…"
+                )}
+                {reportFile && " — será substituído ao salvar."}
+              </p>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Médico assistente">
+                <Input
+                  {...register("report_doctor")}
+                  placeholder="Nome do médico que assina o laudo"
+                />
+              </Field>
+              <Field label="CRM/UF">
+                <Input {...register("report_crm")} placeholder="Ex: CRM/SP 123456" />
+              </Field>
+              <Field label="Data de emissão do laudo">
+                <Controller
+                  control={control}
+                  name="report_issue_date"
+                  render={({ field }) => (
+                    <DatePicker
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="dd/mm/aaaa"
+                    />
+                  )}
+                />
+              </Field>
+              <Field label="Data de validade do laudo">
+                <Controller
+                  control={control}
+                  name="report_validity_date"
+                  render={({ field }) => (
+                    <DatePicker
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="dd/mm/aaaa"
+                    />
+                  )}
+                />
+                {validityDays !== null && validityDays < 0 && (
+                  <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-destructive">
+                    <AlertTriangle className="h-3 w-3" /> Laudo vencido
+                  </p>
+                )}
+                {validityDays !== null && validityDays >= 0 && validityDays <= 15 && (
+                  <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[hsl(38_92%_42%)]">
+                    <AlertTriangle className="h-3 w-3" /> Vence em {validityDays}{" "}
+                    {validityDays === 1 ? "dia" : "dias"}
+                  </p>
+                )}
+              </Field>
+            </div>
+        </FormSection>
+
+        <FormSection
+          icon={ListChecks}
+          title="Terapias recomendadas"
+          contentClassName="space-y-3"
+        >
+            <p className="text-sm text-muted-foreground sm:col-span-2">
+              Terapias e periodicidade indicadas no laudo. Preenchidas pela IA e
+              editáveis; adicione ou remova conforme necessário.
+            </p>
+
+            {therapyFields.length === 0 && (
+              <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground sm:col-span-2">
+                Nenhuma terapia cadastrada ainda. Analise o laudo com IA ou
+                adicione manualmente.
+              </div>
+            )}
+
+            {therapyFields.map((row, index) => (
+              <div
+                key={row.id}
+                className="grid gap-3 sm:grid-cols-[1fr_minmax(0,14rem)_auto] sm:items-end"
+              >
+                <div>
+                  {index === 0 && (
+                    <Label className="mb-1.5 block">Terapia</Label>
+                  )}
+                  <Input
+                    {...register(`therapies.${index}.therapy` as const)}
+                    aria-label="Terapia"
+                    placeholder="Ex: Terapia ABA, Fonoaudiologia (CAA)"
+                  />
+                </div>
+                <div>
+                  {index === 0 && (
+                    <Label className="mb-1.5 block">Periodicidade</Label>
+                  )}
+                  <Input
+                    {...register(`therapies.${index}.frequency` as const)}
+                    aria-label="Periodicidade"
+                    placeholder="Ex: 2 vezes por semana"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => removeTherapy(index)}
+                  aria-label="Remover terapia"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+
+            <div className="sm:col-span-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => appendTherapy({ therapy: "", frequency: "" })}
+              >
+                <Plus className="h-4 w-4" /> Adicionar terapia
+              </Button>
+            </div>
+        </FormSection>
+
         <FormSection icon={User} title="Dados do Paciente">
             <Field label="Nome completo" error={errors.name?.message} className="sm:col-span-2">
               <Input {...register("name")} placeholder="Nome do paciente" />
@@ -588,104 +820,6 @@ export default function PatientForm() {
                 placeholder="Rua, número, bairro, cidade"
               />
             </Field>
-        </FormSection>
-
-        <FormSection
-          icon={FileText}
-          title="Laudo médico"
-          contentClassName="space-y-4"
-        >
-            <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-              <Field label="Arquivo do laudo (PDF ou imagem)">
-                <input
-                  type="file"
-                  accept={REPORT_ACCEPT}
-                  onChange={(e) => setReportFile(e.target.files?.[0] ?? null)}
-                  className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-secondary/70"
-                />
-              </Field>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onReadLaudo}
-                disabled={!reportFile || extractLaudo.isPending}
-              >
-                {extractLaudo.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4 text-brand-blue-light" />
-                )}
-                Ler com IA
-              </Button>
-            </div>
-
-            {existing?.report_path && (
-              <p className="text-xs text-muted-foreground">
-                Laudo atual:{" "}
-                {reportUrl ? (
-                  <a
-                    href={reportUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 font-medium text-accent hover:underline"
-                  >
-                    abrir documento <ExternalLink className="h-3 w-3" />
-                  </a>
-                ) : (
-                  "carregando…"
-                )}
-                {reportFile && " — será substituído ao salvar."}
-              </p>
-            )}
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Médico assistente">
-                <Input
-                  {...register("report_doctor")}
-                  placeholder="Nome do médico que assina o laudo"
-                />
-              </Field>
-              <Field label="CRM/UF">
-                <Input {...register("report_crm")} placeholder="Ex: CRM/SP 123456" />
-              </Field>
-              <Field label="Data de emissão do laudo">
-                <Controller
-                  control={control}
-                  name="report_issue_date"
-                  render={({ field }) => (
-                    <DatePicker
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      placeholder="dd/mm/aaaa"
-                    />
-                  )}
-                />
-              </Field>
-              <Field label="Data de validade do laudo">
-                <Controller
-                  control={control}
-                  name="report_validity_date"
-                  render={({ field }) => (
-                    <DatePicker
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      placeholder="dd/mm/aaaa"
-                    />
-                  )}
-                />
-                {validityDays !== null && validityDays < 0 && (
-                  <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-destructive">
-                    <AlertTriangle className="h-3 w-3" /> Laudo vencido
-                  </p>
-                )}
-                {validityDays !== null && validityDays >= 0 && validityDays <= 15 && (
-                  <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[hsl(38_92%_42%)]">
-                    <AlertTriangle className="h-3 w-3" /> Vence em {validityDays}{" "}
-                    {validityDays === 1 ? "dia" : "dias"}
-                  </p>
-                )}
-              </Field>
-            </div>
         </FormSection>
 
         <div className="flex justify-end gap-3">
