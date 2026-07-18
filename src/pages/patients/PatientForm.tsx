@@ -51,6 +51,7 @@ import {
   useMedicalReportUrl,
 } from "@/features/patients/api";
 import { useExtractLaudoAI, type TherapyItem } from "@/features/ai/api";
+import { pdfFileToImages } from "@/lib/pdfToImages";
 
 const optionalCpf = z
   .string()
@@ -221,17 +222,26 @@ export default function PatientForm() {
   // Dias até o vencimento do laudo (negativo = vencido).
   const validityDays = reportValidity ? daysUntil(reportValidity) : null;
 
-  // IA lê o laudo (OpenAI gpt-4o-mini) e preenche nome, terapias + periodicidade
-  // e os metadados do laudo. Todos os campos permanecem editáveis.
+  // IA lê o laudo e preenche nome, terapias + periodicidade e os metadados.
+  // PDFs são renderizados em imagens de alta resolução no navegador
+  // (lib/pdfToImages) para OCR fiel; todos os campos permanecem editáveis.
   async function onReadLaudo() {
     if (!reportFile) {
       toast.error("Selecione o arquivo do laudo primeiro");
       return;
     }
     try {
-      const fileBase64 = await fileToBase64(reportFile);
-      const mediaType = reportFile.type || "application/pdf";
-      const r = await extractLaudo.mutateAsync({ fileBase64, mediaType });
+      const pages =
+        reportFile.type === "application/pdf" ||
+        reportFile.name.toLowerCase().endsWith(".pdf")
+          ? await pdfFileToImages(reportFile)
+          : [
+              {
+                base64: await fileToBase64(reportFile),
+                mediaType: reportFile.type || "image/jpeg",
+              },
+            ];
+      const r = await extractLaudo.mutateAsync({ pages });
 
       if (r.patient_name) setValue("name", r.patient_name, { shouldDirty: true });
       if (r.therapies && r.therapies.length > 0) {

@@ -60,11 +60,20 @@ function userClient(req: Request) {
   });
 }
 
+type PageImage = { base64?: string; mediaType?: string };
+
 type Payload = {
+  // Formato preferido: páginas do documento renderizadas em alta resolução no
+  // navegador (JPEG/PNG). Evita a rasterização de PDF do provedor, que sai em
+  // resolução baixa e tornava scans ilegíveis para o modelo.
+  pages?: PageImage[];
+  // Formato legado (arquivo único em base64) — mantido por compatibilidade.
   fileBase64?: string;
   mediaType?: string;
   clinicId?: number;
 };
+
+const MAX_PAGES = 10;
 
 type Therapy = { therapy: string; frequency: string };
 
@@ -149,6 +158,11 @@ function addOneYear(iso: string): string | null {
   return d.toISOString().slice(0, 10);
 }
 
+// Remove marcadores [ilegível] para decidir se um item tem conteúdo real.
+function legibleText(s: string): string {
+  return s.replace(/\[ileg[íi]vel\]/gi, "").replace(/[\s,.;:-]+/g, " ").trim();
+}
+
 function normalizeTherapies(value: unknown): Therapy[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -158,7 +172,8 @@ function normalizeTherapies(value: unknown): Therapy[] {
       const therapy = typeof o.therapy === "string" ? o.therapy.trim() : "";
       const frequency =
         typeof o.frequency === "string" ? o.frequency.trim() : "";
-      if (!therapy && !frequency) return null;
+      // Descarta itens sem nenhum conteúdo legível ([ilegível] puro).
+      if (!legibleText(therapy) && !legibleText(frequency)) return null;
       return { therapy, frequency };
     })
     .filter((t): t is Therapy => t !== null)
@@ -212,13 +227,25 @@ Deno.serve(async (req: Request) => {
   } catch {
     return json({ error: "Corpo inválido." }, 400);
   }
-  if (!payload.fileBase64 || !payload.mediaType) {
+  const pages = (payload.pages ?? []).filter(
+    (p): p is { base64: string; mediaType: string } =>
+      !!p && typeof p.base64 === "string" && p.base64.length > 0 &&
+      typeof p.mediaType === "string" && p.mediaType.startsWith("image/"),
+  );
+  const hasLegacyFile = !!payload.fileBase64 && !!payload.mediaType;
+  if (pages.length === 0 && !hasLegacyFile) {
     return json({ error: "Arquivo do laudo ausente." }, 400);
   }
   if (!payload.clinicId) {
     return json({ error: "Clínica não informada." }, 400);
   }
-  if (payload.fileBase64.length > MAX_BASE64_CHARS) {
+  if (pages.length > MAX_PAGES) {
+    return json({ error: `Documento com páginas demais (máx. ${MAX_PAGES}).` }, 413);
+  }
+  const totalChars =
+    pages.reduce((acc, p) => acc + p.base64.length, 0) +
+    (payload.fileBase64?.length ?? 0);
+  if (totalChars > MAX_BASE64_CHARS) {
     return json({ error: "Arquivo muito grande (máx. ~10 MB)." }, 413);
   }
 
@@ -258,17 +285,32 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const isPdf = payload.mediaType === "application/pdf";
-  const dataUrl = `data:${payload.mediaType};base64,${payload.fileBase64}`;
-  const documentBlock = isPdf
-    ? {
-        type: "file",
-        file: { filename: "laudo.pdf", file_data: dataUrl },
-      }
-    : {
-        type: "image_url",
-        image_url: { url: dataUrl, detail: "high" },
-      };
+  // Blocos do documento: preferimos as páginas em alta resolução vindas do
+  // navegador; o caminho legado (arquivo único) permanece para compat.
+  let documentBlocks: unknown[];
+  if (pages.length > 0) {
+    documentBlocks = pages.map((p) => ({
+      type: "image_url",
+      image_url: {
+        url: `data:${p.mediaType};base64,${p.base64}`,
+        detail: "high",
+      },
+    }));
+  } else {
+    const isPdf = payload.mediaType === "application/pdf";
+    const dataUrl = `data:${payload.mediaType};base64,${payload.fileBase64}`;
+    documentBlocks = [
+      isPdf
+        ? {
+            type: "file",
+            file: { filename: "laudo.pdf", file_data: dataUrl },
+          }
+        : {
+            type: "image_url",
+            image_url: { url: dataUrl, detail: "high" },
+          },
+    ];
+  }
 
   // Chamada por família de modelo: gpt-5/o* são modelos de raciocínio (usam
   // max_completion_tokens e não aceitam temperature); gpt-4o/4.1 usam os
@@ -325,11 +367,11 @@ Deno.serve(async (req: Request) => {
     // PASSO 1 — transcrição OCR literal do documento (com fallback de modelo
     // quando a chave da clínica não tem acesso ao configurado).
     const transcribeUser = [
-      documentBlock,
+      ...documentBlocks,
       {
         type: "text",
         text:
-          "Transcreva fielmente TODO o texto do documento acima, incluindo a lista numerada completa de terapias.",
+          "Transcreva fielmente TODO o texto das páginas acima, na ordem, incluindo a lista numerada completa de terapias.",
       },
     ];
     let resp = await chat(model, TRANSCRIBE_PROMPT, transcribeUser, {
@@ -399,9 +441,9 @@ Deno.serve(async (req: Request) => {
     if (!extracted) {
       return json({ error: "Não foi possível interpretar o laudo." }, 422);
     }
-    // Telemetria sem PHI: modelo, tamanho da transcrição e nº de terapias.
+    // Telemetria sem PHI: modelo, nº de páginas, transcrição e terapias.
     console.log(
-      `openai-extract-laudo ok (${model}): transcript=${transcript.length} chars, therapies=${extracted.therapies.length}`,
+      `openai-extract-laudo ok (${model}): pages=${pages.length || "legacy"}, transcript=${transcript.length} chars, therapies=${extracted.therapies.length}`,
     );
 
     // Cenário B: sem validade explícita mas com emissão → emissão + 1 ano.
