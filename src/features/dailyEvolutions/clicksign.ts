@@ -110,12 +110,16 @@ export function useRefreshClickSignStatus() {
   return useMutation({
     mutationFn: async (evolutionId: number) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const data = await invokeEdge<{ clicksign?: ClickSignEnvelope }>(
-        "clicksign-signature",
-        { action: "status", evolutionId, clinicId: clinic.id },
-      );
+      const data = await invokeEdge<{
+        clicksign?: ClickSignEnvelope;
+        envelope_status?: string;
+      }>("clicksign-signature", {
+        action: "status",
+        evolutionId,
+        clinicId: clinic.id,
+      });
       if (!data?.clicksign) throw new Error("Resposta vazia da ClickSign.");
-      return data.clicksign;
+      return { ...data.clicksign, envelope_status: data.envelope_status };
     },
     onSuccess: (_data, evolutionId) => {
       queryClient.invalidateQueries({ queryKey: keys.evolutions.all });

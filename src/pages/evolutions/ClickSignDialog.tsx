@@ -100,8 +100,11 @@ export function ClickSignDialog({ open, onOpenChange, evolution }: Props) {
           description: `Assinada por ${result.signer_name}.`,
         });
       } else {
+        const envStatus = (result as { envelope_status?: string }).envelope_status;
         toast.info("Ainda aguardando assinatura", {
-          description: `O link permanece ativo no e-mail ${result.signer_email}.`,
+          description: `Situação do envelope na ClickSign: ${
+            envStatus || "desconhecida"
+          }. O link permanece ativo no e-mail ${result.signer_email}.`,
         });
       }
     } catch (e) {
