@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Users,
   ClipboardList,
@@ -7,7 +8,11 @@ import {
   Plus,
   CalendarDays,
   ChevronRight,
+  ChevronDown,
   AlertTriangle,
+  ClipboardCheck,
+  FileClock,
+  CheckCircle2,
 } from "lucide-react";
 import {
   Area,
@@ -25,6 +30,7 @@ import { format } from "date-fns";
 import { parseDateOnly, daysUntil } from "@/lib/date";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Stagger, StaggerItem } from "@/components/motion/motion";
 import { useClinic } from "@/providers/ClinicProvider";
@@ -33,6 +39,9 @@ import {
   useSessionsByDay,
   useExpiringAuthorizations,
   useAssessmentDistribution,
+  usePendingSessions,
+  type ExpiringAuthorization,
+  type PendingSession,
 } from "@/features/dashboard/api";
 
 function todayPt() {
@@ -45,14 +54,22 @@ function todayPt() {
 
 export default function Dashboard() {
   const { clinic } = useClinic();
+  const [panel, setPanel] = useState<"pending" | "guides" | null>(null);
   const { data: metrics, isLoading: loadingMetrics } = useDashboardMetrics();
   const { data: sessions, isLoading: loadingSessions } = useSessionsByDay({
     days: 14,
   });
   const { data: expiring, isLoading: loadingExpiring } =
     useExpiringAuthorizations({ withinDays: 30 });
+  const { data: pending, isLoading: loadingPending } = usePendingSessions({
+    days: 30,
+  });
   const { data: assessments, isLoading: loadingAssessments } =
     useAssessmentDistribution({ days: 30 });
+
+  function toggle(next: "pending" | "guides") {
+    setPanel((prev) => (prev === next ? null : next));
+  }
 
   return (
     <div className="space-y-8">
@@ -256,69 +273,276 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Guias a vencer */}
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-soft">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-h2">Guias a vencer (30 dias)</h2>
-            <p className="text-sm text-muted-foreground">
-              Acompanhe as autorizações próximas do vencimento
-            </p>
-          </div>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/guias">Ver todas</Link>
-          </Button>
-        </div>
-        {loadingExpiring ? (
-          <Skeleton className="h-32 w-full rounded-xl" />
-        ) : (expiring?.length ?? 0) === 0 ? (
-          <div className="rounded-xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
-            Nenhuma guia vencendo no período. ✔
-          </div>
-        ) : (
-          <ul className="divide-y divide-border">
-            {expiring!.map((g) => {
-              const days = daysUntil(g.expiration_date);
-              return (
-                <li key={g.id}>
-                  <Link
-                    to={`/guias/${g.id}`}
-                    className="flex items-center gap-4 py-3 transition-colors hover:bg-secondary/40"
-                  >
-                    <span
-                      className={`grid h-10 w-10 place-items-center rounded-xl ${
-                        days <= 7
-                          ? "bg-destructive/10 text-destructive-text"
-                          : "bg-warning/15 text-warning-text"
-                      }`}
-                    >
-                      <AlertTriangle className="h-5 w-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold">
-                        {g.patient?.name ?? "—"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Guia {g.guide_number} ·{" "}
-                        {format(parseDateOnly(g.expiration_date), "dd/MM/yyyy")}
-                      </p>
-                    </div>
-                    <span className="text-sm font-semibold tabular-nums text-muted-foreground">
-                      {days === 0
-                        ? "vence hoje"
-                        : days === 1
-                          ? "1 dia"
-                          : `${days} dias`}
-                    </span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+      {/* Cartões de ação — clique monta a lista; clique no item vai para editar */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <ActionCard
+          label="Pendências"
+          hint="Sessões com item de faturamento em falta (30d)"
+          icon={ClipboardCheck}
+          accent="red"
+          count={pending?.length}
+          loading={loadingPending}
+          open={panel === "pending"}
+          onToggle={() => toggle("pending")}
+        />
+        <ActionCard
+          label="Guias a vencer"
+          hint="Autorizações vencendo em até 30 dias"
+          icon={FileClock}
+          accent="yellow"
+          count={expiring?.length}
+          loading={loadingExpiring}
+          open={panel === "guides"}
+          onToggle={() => toggle("guides")}
+        />
       </section>
+
+      {panel === "pending" && (
+        <PendingPanel items={pending} loading={loadingPending} />
+      )}
+      {panel === "guides" && (
+        <GuidesPanel items={expiring} loading={loadingExpiring} />
+      )}
     </div>
+  );
+}
+
+// ————————————————————————————————————————————————————————————————
+// Cartão de ação clicável (abre/fecha o painel de lista correspondente).
+type ActionAccent = "red" | "yellow";
+const ACTION_ACCENT: Record<
+  ActionAccent,
+  { bar: string; icon: string; iconBg: string; ring: string }
+> = {
+  red: {
+    bar: "bg-brand-red",
+    icon: "text-brand-red",
+    iconBg: "bg-brand-red/12",
+    ring: "focus-visible:ring-brand-red/40",
+  },
+  yellow: {
+    bar: "bg-brand-yellow",
+    icon: "text-warning-text",
+    iconBg: "bg-brand-yellow/15",
+    ring: "focus-visible:ring-brand-yellow/40",
+  },
+};
+
+function ActionCard({
+  label,
+  hint,
+  icon: Icon,
+  accent,
+  count,
+  loading,
+  open,
+  onToggle,
+}: {
+  label: string;
+  hint: string;
+  icon: LucideIcon;
+  accent: ActionAccent;
+  count: number | undefined;
+  loading?: boolean;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const a = ACTION_ACCENT[accent];
+  const empty = !loading && (count ?? 0) === 0;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className={`group relative w-full overflow-hidden rounded-2xl border bg-card p-5 text-left shadow-soft outline-none transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevated focus-visible:ring-2 ${a.ring} ${
+        open ? "border-primary/40 ring-2 ring-primary/20" : "border-border"
+      }`}
+    >
+      <span
+        className={`absolute inset-x-0 top-0 h-1 ${a.bar} opacity-80 transition-opacity group-hover:opacity-100`}
+      />
+      <div className="flex items-center gap-4">
+        <span
+          className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${a.iconBg} ${a.icon} transition-transform duration-200 ease-out group-hover:scale-105`}
+        >
+          <Icon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-baseline gap-2">
+            <span className="text-[1.75rem] font-extrabold tabular-nums leading-none tracking-tight">
+              {loading ? (
+                <Skeleton className="inline-block h-7 w-10" />
+              ) : (
+                (count ?? 0)
+              )}
+            </span>
+            <span className="text-sm font-semibold text-foreground">{label}</span>
+          </p>
+          <p className="mt-1 truncate text-caption text-muted-foreground">
+            {hint}
+          </p>
+        </div>
+        <ChevronDown
+          className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </div>
+      {empty && (
+        <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-success-text">
+          <CheckCircle2 className="h-3.5 w-3.5" /> Tudo em dia
+        </p>
+      )}
+    </button>
+  );
+}
+
+function PanelShell({
+  title,
+  linkTo,
+  linkLabel,
+  children,
+}: {
+  title: string;
+  linkTo: string;
+  linkLabel: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="animate-in fade-in slide-in-from-top-2 rounded-2xl border border-border bg-card p-6 shadow-soft duration-300">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-h2">{title}</h2>
+        <Button asChild variant="outline" size="sm">
+          <Link to={linkTo}>{linkLabel}</Link>
+        </Button>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function PendingPanel({
+  items,
+  loading,
+}: {
+  items: PendingSession[] | undefined;
+  loading: boolean;
+}) {
+  const navigate = useNavigate();
+  return (
+    <PanelShell
+      title="Sessões com pendências"
+      linkTo="/auditoria"
+      linkLabel="Abrir auditoria"
+    >
+      {loading ? (
+        <Skeleton className="h-32 w-full rounded-xl" />
+      ) : (items?.length ?? 0) === 0 ? (
+        <div className="rounded-xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+          Nenhuma sessão com pendências. ✔
+        </div>
+      ) : (
+        <ul className="divide-y divide-border">
+          {items!.map((s) => (
+            <li key={s.id}>
+              <button
+                type="button"
+                onClick={() => navigate(`/evolucoes/${s.id}`)}
+                className="flex w-full items-center gap-4 py-3 text-left transition-colors hover:bg-secondary/40"
+              >
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-red/12 text-brand-red">
+                  <AlertTriangle className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">
+                    {s.patient?.name ?? "—"}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {format(parseDateOnly(s.session_date), "dd/MM/yyyy")}
+                    {s.professional?.name ? ` · ${s.professional.name}` : ""}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {s.failed.map((r) => (
+                      <Badge key={r.id} variant="warning">
+                        {r.label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </PanelShell>
+  );
+}
+
+function GuidesPanel({
+  items,
+  loading,
+}: {
+  items: ExpiringAuthorization[] | undefined;
+  loading: boolean;
+}) {
+  const navigate = useNavigate();
+  return (
+    <PanelShell
+      title="Guias a vencer (30 dias)"
+      linkTo="/guias"
+      linkLabel="Ver todas"
+    >
+      {loading ? (
+        <Skeleton className="h-32 w-full rounded-xl" />
+      ) : (items?.length ?? 0) === 0 ? (
+        <div className="rounded-xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+          Nenhuma guia vencendo no período. ✔
+        </div>
+      ) : (
+        <ul className="divide-y divide-border">
+          {items!.map((g) => {
+            const days = daysUntil(g.expiration_date);
+            return (
+              <li key={g.id}>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/guias/${g.id}`)}
+                  className="flex w-full items-center gap-4 py-3 text-left transition-colors hover:bg-secondary/40"
+                >
+                  <span
+                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
+                      days <= 7
+                        ? "bg-destructive/10 text-destructive-text"
+                        : "bg-warning/15 text-warning-text"
+                    }`}
+                  >
+                    <AlertTriangle className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">
+                      {g.patient?.name ?? "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Guia {g.guide_number} ·{" "}
+                      {format(parseDateOnly(g.expiration_date), "dd/MM/yyyy")}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold tabular-nums text-muted-foreground">
+                    {days === 0
+                      ? "vence hoje"
+                      : days === 1
+                        ? "1 dia"
+                        : `${days} dias`}
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </PanelShell>
   );
 }
 
