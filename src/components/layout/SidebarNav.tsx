@@ -1,5 +1,4 @@
 import { NavLink } from "react-router-dom";
-import { Puzzle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navSections, type NavItem } from "@/config/nav";
 import {
@@ -20,16 +19,20 @@ export function SidebarNav({
   const { profile } = useAuth();
   const isPlatformAdmin = profile?.platform_role === "platform_admin";
   return (
-    <nav className="flex flex-col gap-6">
-      {navSections.map((section) => {
+    <nav className="flex flex-col gap-5">
+      {navSections.map((section, index) => {
         const items = section.items.filter(
           (i) => !i.platformAdminOnly || isPlatformAdmin,
         );
         if (items.length === 0) return null;
         return (
           <div key={section.label}>
-            {!collapsed && (
-              <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-sidebar-foreground/55">
+            {collapsed ? (
+              index > 0 && (
+                <div className="mx-auto mb-3 h-px w-8 bg-white/10" />
+              )
+            ) : (
+              <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-sidebar-foreground/50">
                 {section.label}
               </p>
             )}
@@ -72,33 +75,43 @@ function SidebarNavItem({
       style={{ ["--tea" as string]: item.accent }}
       className={({ isActive }) =>
         cn(
-          "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all",
+          "group relative flex items-center gap-3 rounded-xl py-1.5 pl-1.5 pr-3 text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/40",
           collapsed && "justify-center px-0",
           isActive
-            ? "bg-white/15 text-white shadow-soft"
-            : "text-sidebar-foreground/70 hover:bg-white/10 hover:text-white",
+            ? "bg-white/[0.13] text-white shadow-[inset_0_1px_0_0_rgb(255_255_255_/_0.08)]"
+            : "text-sidebar-foreground/65 hover:bg-white/[0.07] hover:text-white",
         )
       }
     >
       {({ isActive }) => (
         <>
-          <Icon
+          {/* Indicador ativo: barra na cor TEA do item, rente à borda */}
+          <span
             className={cn(
-              "h-5 w-5 shrink-0 transition-colors",
-              isActive
-                ? "text-[color:var(--tea)]"
-                : "group-hover:text-[color:var(--tea)]",
+              "absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full transition-all duration-200",
+              isActive ? "opacity-100" : "opacity-0",
             )}
+            style={{
+              backgroundColor: "var(--tea)",
+              boxShadow: isActive ? "0 0 12px var(--tea)" : undefined,
+            }}
           />
-          {!collapsed && <span className="flex-1 truncate">{item.title}</span>}
-          {/* Indicador ativo: peça de quebra-cabeça na cor TEA do item */}
-          {isActive && !collapsed && (
-            <Puzzle
-              className="h-4 w-4 shrink-0"
-              style={{ color: "var(--tea)" }}
-              strokeWidth={2.5}
+          {/* Ícone em chip com a cor TEA (diversidade da marca) */}
+          <span
+            className={cn(
+              "grid h-9 w-9 shrink-0 place-items-center rounded-[0.65rem] transition-all duration-200",
+              isActive
+                ? "bg-[color-mix(in_srgb,var(--tea)_24%,transparent)]"
+                : "bg-white/[0.06] group-hover:bg-[color-mix(in_srgb,var(--tea)_14%,transparent)]",
+            )}
+            style={{ color: "var(--tea)" }}
+          >
+            <Icon
+              className="h-[18px] w-[18px]"
+              strokeWidth={isActive ? 2.4 : 2}
             />
-          )}
+          </span>
+          {!collapsed && <span className="flex-1 truncate">{item.title}</span>}
         </>
       )}
     </NavLink>

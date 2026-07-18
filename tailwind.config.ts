@@ -166,11 +166,20 @@ const config: Config = {
         elevated:
           "0 4px 12px -2px rgb(0 31 107 / 0.10), 0 16px 48px -8px rgb(0 31 107 / 0.16)",
         glow: "0 8px 32px -4px rgb(30 136 255 / 0.35)",
+        "glow-cyan": "0 8px 24px -6px rgb(69 199 255 / 0.45)",
+        "glow-yellow": "0 8px 24px -6px rgb(255 196 0 / 0.40)",
+        "glow-red": "0 8px 24px -6px rgb(255 45 45 / 0.35)",
       },
       backgroundImage: {
         "brand-gradient": "linear-gradient(135deg, #001F6B 0%, #1E88FF 100%)",
         "brand-radial":
           "radial-gradient(120% 120% at 0% 0%, #0A2A80 0%, #001F6B 55%, #001545 100%)",
+        // Hero do dashboard: base navy + auroras suaves nas cores da marca.
+        "hero-aurora":
+          "radial-gradient(70rem 32rem at 108% -12%, rgb(69 199 255 / 0.20) 0%, transparent 55%), radial-gradient(52rem 26rem at -8% 118%, rgb(30 136 255 / 0.28) 0%, transparent 58%), radial-gradient(36rem 20rem at 82% 112%, rgb(255 196 0 / 0.07) 0%, transparent 60%), radial-gradient(120% 120% at 0% 0%, #0A2A80 0%, #001F6B 55%, #001545 100%)",
+        // Sidebar: mesmo navy com aurora ciano discreta no rodapé.
+        "sidebar-aurora":
+          "radial-gradient(30rem 22rem at 120% 104%, rgb(69 199 255 / 0.13) 0%, transparent 60%), radial-gradient(24rem 16rem at -30% -6%, rgb(30 136 255 / 0.20) 0%, transparent 55%), radial-gradient(120% 120% at 0% 0%, #0A2A80 0%, #001F6B 55%, #001545 100%)",
       },
       keyframes: {
         "accordion-down": {

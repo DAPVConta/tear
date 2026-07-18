@@ -84,7 +84,7 @@ function MobileDrawer({
       />
       <aside
         className={cn(
-          "absolute inset-y-0 left-0 flex w-72 flex-col bg-brand-radial text-sidebar-foreground shadow-elevated transition-transform duration-300",
+          "absolute inset-y-0 left-0 flex w-72 flex-col bg-sidebar-aurora text-sidebar-foreground shadow-elevated transition-transform duration-300",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
