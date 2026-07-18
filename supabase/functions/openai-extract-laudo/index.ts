@@ -75,21 +75,27 @@ type Extracted = {
   validity_date: string | null;
 };
 
-const SYSTEM_PROMPT = `Você extrai dados estruturados de laudos e relatórios médicos brasileiros de pacientes com TEA (Transtorno do Espectro Autista) e condições do desenvolvimento. Responda SOMENTE com um objeto JSON válido, sem texto fora dele, no formato:
-{"patient_name": string|null, "therapies": [{"therapy": string, "frequency": string}], "doctor": string|null, "crm_uf": string|null, "issue_date": "YYYY-MM-DD"|null, "validity_date": "YYYY-MM-DD"|null}
+// Prompt calibrado para laudos ESCANEADOS: obriga varrer todas as páginas e
+// transcrever a lista numerada de terapias item a item ("therapies_count"
+// força o modelo a contar antes de listar). Sem exemplos de periodicidade no
+// prompt — em versão anterior o modelo copiava os exemplos para a resposta.
+const SYSTEM_PROMPT = `Você transcreve dados estruturados de laudos e relatórios médicos brasileiros (TEA / desenvolvimento infantil). O documento geralmente é DIGITALIZADO (scan): leia TODAS as páginas, do início ao fim, antes de responder. Responda SOMENTE com um objeto JSON válido, sem texto fora dele, no formato:
+{"patient_name": string|null, "therapies_count": number, "therapies": [{"therapy": string, "frequency": string}], "doctor": string|null, "crm_uf": string|null, "issue_date": "YYYY-MM-DD"|null, "validity_date": "YYYY-MM-DD"|null}
 
 Regras:
 - "patient_name": nome completo do PACIENTE (não do médico nem do responsável). Se não encontrar, null.
-- "therapies": TODAS as terapias/intervenções recomendadas ou prescritas no documento, cada uma com sua periodicidade. Para cada item:
-  - "therapy": o nome/descrição da terapia (ex.: "Terapia ABA", "Fonoaudiologia especializada em CAA", "Terapia Ocupacional com Integração Sensorial", "Psicologia com formação em ABA", "Nutrição / Terapia Alimentar").
-  - "frequency": a periodicidade EXATAMENTE como descrita (ex.: "20 horas semanais", "1 vez por semana", "2 vezes por semana", "3 vezes na semana", "1 vez a cada 15 dias"). Se o documento não indicar periodicidade para o item, use "".
-  - Se houver mais de uma modalidade numa mesma linha (ex.: "psicóloga ABA 3x/semana + psicóloga familiar 1x a cada 15 dias"), separe em itens distintos.
-  - Se o documento não listar terapias, retorne [].
-- "doctor": nome do médico que assina o laudo (sem títulos como "Dr.").
-- "crm_uf": registro do conselho como aparece, incluindo a UF (ex.: "CRM/SP 123456").
+- TERAPIAS — a parte mais importante. Os laudos costumam trazer uma lista NUMERADA de terapias/intervenções solicitadas (1., 2., 3., ...), muitas vezes continuando na página seguinte. Percorra a lista item a item, até o último número, e transcreva TODOS os itens — omitir um item da lista é ERRO GRAVE. Inclua também terapias citadas fora da lista numerada.
+- "therapies_count": conte quantas terapias o documento pede ANTES de montar o array; "therapies" deve ter exatamente esse número de itens.
+- Cada item de "therapies":
+  - "therapy": nome da terapia COMO ESCRITO no documento, incluindo abordagem/método/certificação citados (ex.: o que estiver entre parênteses). NÃO resuma, NÃO normalize, NÃO agrupe itens diferentes.
+  - "frequency": periodicidade e duração EXATAMENTE como escritas no documento para aquele item (frequência semanal/mensal, horas, duração mínima da sessão). Se o documento não indicar, use "".
+  - Se uma mesma linha trouxer mais de uma modalidade com periodicidades distintas, separe em itens distintos.
+  - Se o documento não listar terapias, use [] e therapies_count 0.
+- "doctor": nome do médico que assina o laudo (sem títulos como "Dr." ou "Dra.").
+- "crm_uf": registro do conselho como aparece, incluindo a UF (ex.: "CRM/PE 21.724").
 - "issue_date": data de emissão/assinatura do laudo.
-- "validity_date": validade explícita ("válido até DD/MM/AAAA") se houver; caso contrário null.
-- Datas sempre em YYYY-MM-DD. Se um campo não for encontrado, use null (ou [] em therapies). NUNCA invente dados.`;
+- "validity_date": validade explícita ("válido até ...") se houver; caso contrário null.
+- Datas sempre em YYYY-MM-DD. Se um campo não for encontrado, use null. Transcreva SOMENTE o que está no documento — NUNCA invente nomes, números ou periodicidades.`;
 
 function addOneYear(iso: string): string | null {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -217,7 +223,7 @@ Deno.serve(async (req: Request) => {
       }
     : {
         type: "image_url",
-        image_url: { url: dataUrl },
+        image_url: { url: dataUrl, detail: "high" },
       };
 
   try {
@@ -228,9 +234,11 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        // OPENAI_MODEL (secret opcional) permite subir para gpt-4o sem novo
+        // deploy caso o mini leia mal algum scan; padrão segue gpt-4o-mini.
+        model: Deno.env.get("OPENAI_MODEL")?.trim() || "gpt-4o-mini",
         temperature: 0,
-        max_tokens: 1200,
+        max_tokens: 3000,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
@@ -240,7 +248,7 @@ Deno.serve(async (req: Request) => {
               documentBlock,
               {
                 type: "text",
-                text: "Extraia os dados do laudo acima no formato JSON especificado.",
+                text: "Transcreva os dados do laudo acima no formato JSON especificado. Atenção: percorra a lista numerada de terapias até o último item e inclua TODAS, sem omitir nenhuma.",
               },
             ],
           },
