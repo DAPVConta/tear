@@ -1,8 +1,9 @@
 // Edge Function: openai-extract-laudo
-// Fluxo "Novo paciente com IA". Analisa o laudo (PDF ou imagem) com o modelo
-// gpt-5 da OpenAI (OPENAI_MODEL sobrepõe; fallback gpt-4o se indisponível) e
-// devolve: nome do paciente, lista de terapias + periodicidade e os metadados
-// do laudo (médico, CRM/UF, emissão, validade).
+// Fluxo "Novo paciente com IA". Analisa o laudo (PDF ou imagem) em DOIS PASSOS
+// para máxima fidelidade: (1) transcrição OCR literal do documento inteiro;
+// (2) extração estruturada A PARTIR DA TRANSCRIÇÃO, com JSON Schema estrito.
+// Modelo padrão gpt-5 (OPENAI_MODEL sobrepõe; fallback gpt-4o se indisponível).
+// Devolve: nome do paciente, terapias + periodicidade e metadados do laudo.
 //
 // O token da OpenAI é POR CLÍNICA (token_gpt), configurado em Configurações →
 // IA e guardado em public.clinic_ai_settings (RLS admin-only). A função resolve
@@ -11,7 +12,7 @@
 //
 // ATENÇÃO LGPD: como claude-extract-laudo, envia o documento completo (PHI
 // identificável) a um provedor externo (OpenAI). Uso opt-in; cobrir em política
-// de privacidade + DPA.
+// de privacidade + DPA. Logs nunca incluem conteúdo do documento.
 import { createClient } from "npm:@supabase/supabase-js@2.46.1";
 
 // ~10 MB de arquivo → ~13,5 MB em base64. Limite defensivo (custo/DoS).
@@ -76,27 +77,69 @@ type Extracted = {
   validity_date: string | null;
 };
 
-// Prompt calibrado para laudos ESCANEADOS: obriga varrer todas as páginas e
-// transcrever a lista numerada de terapias item a item ("therapies_count"
-// força o modelo a contar antes de listar). Sem exemplos de periodicidade no
-// prompt — em versão anterior o modelo copiava os exemplos para a resposta.
-const SYSTEM_PROMPT = `Você transcreve dados estruturados de laudos e relatórios médicos brasileiros (TEA / desenvolvimento infantil). O documento geralmente é DIGITALIZADO (scan): leia TODAS as páginas, do início ao fim, antes de responder. Responda SOMENTE com um objeto JSON válido, sem texto fora dele, no formato:
-{"patient_name": string|null, "therapies_count": number, "therapies": [{"therapy": string, "frequency": string}], "doctor": string|null, "crm_uf": string|null, "issue_date": "YYYY-MM-DD"|null, "validity_date": "YYYY-MM-DD"|null}
+// PASSO 1 — OCR literal. Transcrever ≠ interpretar: o modelo copia o texto na
+// ordem de leitura, o que o obriga a passar por TODOS os itens da lista de
+// terapias antes de qualquer extração.
+const TRANSCRIBE_PROMPT = `Você é um sistema de OCR de alta fidelidade para documentos médicos brasileiros digitalizados. Transcreva TODO o texto do documento, palavra por palavra, na ordem de leitura, cobrindo todas as páginas até o fim.
 
 Regras:
-- "patient_name": nome completo do PACIENTE (não do médico nem do responsável). Se não encontrar, null.
-- TERAPIAS — a parte mais importante. Os laudos costumam trazer uma lista NUMERADA de terapias/intervenções solicitadas (1., 2., 3., ...), muitas vezes continuando na página seguinte. Percorra a lista item a item, até o último número, e transcreva TODOS os itens — omitir um item da lista é ERRO GRAVE. Inclua também terapias citadas fora da lista numerada.
-- "therapies_count": conte quantas terapias o documento pede ANTES de montar o array; "therapies" deve ter exatamente esse número de itens.
-- Cada item de "therapies":
-  - "therapy": nome da terapia COMO ESCRITO no documento, incluindo abordagem/método/certificação citados (ex.: o que estiver entre parênteses). NÃO resuma, NÃO normalize, NÃO agrupe itens diferentes. IGNORE logotipos, cabeçalhos e rodapés da clínica — não são terapias.
-  - "frequency": periodicidade e duração EXATAMENTE como escritas no documento para aquele item (frequência semanal/mensal, horas, duração mínima da sessão). Se o documento não indicar, use "".
-  - Se uma mesma linha trouxer mais de uma modalidade com periodicidades distintas, separe em itens distintos.
-  - Se o documento não listar terapias, use [] e therapies_count 0.
-- "doctor": nome do médico que assina o laudo (sem títulos como "Dr." ou "Dra.").
-- "crm_uf": registro do conselho como aparece, incluindo a UF (ex.: "CRM/PE 21.724").
-- "issue_date": data de emissão/assinatura do laudo.
-- "validity_date": validade explícita ("válido até ...") se houver; caso contrário null.
-- Datas sempre em YYYY-MM-DD. Se um campo não for encontrado, use null. Transcreva SOMENTE o que está no documento — NUNCA invente nomes, números ou periodicidades.`;
+- NÃO resuma, NÃO omita, NÃO parafraseie, NÃO corrija e NÃO interprete nada.
+- Listas numeradas devem ser transcritas COMPLETAS, do primeiro ao último item, preservando os números.
+- Preserve datas, números de registro profissional (CRM/RQE), CPF, nomes próprios e periodicidades exatamente como escritos.
+- Ignore apenas elementos gráficos sem texto clínico (logotipo, marca d'água, endereço/rodapé da clínica).
+- Se um trecho estiver ilegível, escreva [ilegível] no lugar.
+- Responda SOMENTE com a transcrição, em texto puro.`;
+
+// PASSO 2 — extração estruturada a partir da transcrição (texto → JSON com
+// schema estrito imposto pela API; o formato não depende mais do modelo).
+const EXTRACT_PROMPT = `Você recebe a transcrição literal de um laudo/relatório médico brasileiro (TEA / desenvolvimento infantil) e extrai dados estruturados.
+
+Regras:
+- "patient_name": nome completo do PACIENTE (não do médico nem do responsável). Se não constar, null.
+- TERAPIAS — a parte mais importante. A transcrição costuma trazer uma lista NUMERADA de terapias/intervenções solicitadas (1., 2., 3., ...). Percorra item a item, até o último número, e gere um item de "therapies" para CADA um — omitir é ERRO GRAVE. Inclua também terapias citadas fora da lista numerada. Logotipos/nome da clínica NÃO são terapias.
+- "therapies_count": conte quantas terapias a transcrição pede ANTES de montar o array; "therapies" deve ter exatamente esse número de itens.
+- Em cada item:
+  - "therapy": nome da terapia COMO ESCRITO na transcrição, incluindo abordagem/método/certificação (ex.: o que estiver entre parênteses). Copie fielmente; NÃO resuma nem normalize.
+  - "frequency": periodicidade e duração EXATAMENTE como escritas para aquele item (frequência, horas semanais, duração mínima da sessão). Se não indicada, "".
+  - Se uma mesma linha trouxer modalidades com periodicidades distintas, separe em itens distintos.
+- "doctor": médico que assina (sem "Dr."/"Dra."). "crm_uf": registro como aparece, com UF.
+- "issue_date": data de emissão/assinatura. "validity_date": validade explícita, se houver.
+- Datas em YYYY-MM-DD. Campo não encontrado → null (therapies vazio → [] e therapies_count 0). NUNCA invente dados que não estejam na transcrição.`;
+
+// JSON Schema estrito (Structured Outputs): a API garante o formato.
+const EXTRACTION_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    patient_name: { type: ["string", "null"] },
+    therapies_count: { type: "integer" },
+    therapies: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          therapy: { type: "string" },
+          frequency: { type: "string" },
+        },
+        required: ["therapy", "frequency"],
+      },
+    },
+    doctor: { type: ["string", "null"] },
+    crm_uf: { type: ["string", "null"] },
+    issue_date: { type: ["string", "null"] },
+    validity_date: { type: ["string", "null"] },
+  },
+  required: [
+    "patient_name",
+    "therapies_count",
+    "therapies",
+    "doctor",
+    "crm_uf",
+    "issue_date",
+    "validity_date",
+  ],
+};
 
 function addOneYear(iso: string): string | null {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -230,11 +273,16 @@ Deno.serve(async (req: Request) => {
   // Chamada por família de modelo: gpt-5/o* são modelos de raciocínio (usam
   // max_completion_tokens e não aceitam temperature); gpt-4o/4.1 usam os
   // parâmetros clássicos.
-  const callModel = (model: string) => {
+  const chat = (
+    model: string,
+    system: string,
+    user: unknown[],
+    opts: { maxOut: number; schema?: Record<string, unknown> },
+  ) => {
     const isReasoning = /^gpt-5/.test(model) || /^o\d/.test(model);
     const params = isReasoning
-      ? { max_completion_tokens: 8000, reasoning_effort: "low" }
-      : { temperature: 0, max_tokens: 3000 };
+      ? { max_completion_tokens: opts.maxOut, reasoning_effort: "low" }
+      : { temperature: 0, max_tokens: Math.min(opts.maxOut, 16000) };
     return fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -244,35 +292,53 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         model,
         ...params,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: [
-              documentBlock,
-              {
-                type: "text",
-                text: "Transcreva os dados do laudo acima no formato JSON especificado. Atenção: percorra a lista numerada de terapias até o último item e inclua TODAS, sem omitir nenhuma.",
+        ...(opts.schema
+          ? {
+              response_format: {
+                type: "json_schema",
+                json_schema: {
+                  name: "laudo_extraction",
+                  strict: true,
+                  schema: opts.schema,
+                },
               },
-            ],
-          },
+            }
+          : {}),
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
         ],
       }),
     });
   };
 
+  const content = async (resp: Response): Promise<string> => {
+    const data = await resp.json();
+    return data?.choices?.[0]?.message?.content ?? "";
+  };
+
   try {
-    // Padrão gpt-5: gerações anteriores (4o-mini e 4o) omitiam/manglavam itens
-    // de laudos escaneados. OPENAI_MODEL (secret) sobrepõe sem novo deploy;
-    // se a chave da clínica não tiver acesso ao modelo, cai para o FALLBACK.
     const FALLBACK_MODEL = "gpt-4o";
     const configured = Deno.env.get("OPENAI_MODEL")?.trim() || "gpt-5";
-    let resp = await callModel(configured);
+    let model = configured;
+
+    // PASSO 1 — transcrição OCR literal do documento (com fallback de modelo
+    // quando a chave da clínica não tem acesso ao configurado).
+    const transcribeUser = [
+      documentBlock,
+      {
+        type: "text",
+        text:
+          "Transcreva fielmente TODO o texto do documento acima, incluindo a lista numerada completa de terapias.",
+      },
+    ];
+    let resp = await chat(model, TRANSCRIBE_PROMPT, transcribeUser, {
+      maxOut: 10000,
+    });
     if (!resp.ok) {
       const errText = await resp.text();
       console.error(
-        `openai-extract-laudo upstream error (${configured}):`,
+        `openai-extract-laudo transcribe error (${model}):`,
         resp.status,
         errText,
       );
@@ -281,32 +347,62 @@ Deno.serve(async (req: Request) => {
       }
       const modelUnavailable =
         (resp.status === 400 || resp.status === 404) && /model/i.test(errText);
-      if (modelUnavailable && configured !== FALLBACK_MODEL) {
-        resp = await callModel(FALLBACK_MODEL);
-        if (!resp.ok) {
-          const fbText = await resp.text();
-          console.error(
-            `openai-extract-laudo fallback error (${FALLBACK_MODEL}):`,
-            resp.status,
-            fbText,
-          );
-          if (resp.status === 401) {
-            return json({ error: "Token GPT inválido ou sem permissão." }, 400);
-          }
-          return json({ error: "Falha ao consultar a IA." }, 502);
+      if (!modelUnavailable || model === FALLBACK_MODEL) {
+        return json({ error: "Falha ao consultar a IA." }, 502);
+      }
+      model = FALLBACK_MODEL;
+      resp = await chat(model, TRANSCRIBE_PROMPT, transcribeUser, {
+        maxOut: 10000,
+      });
+      if (!resp.ok) {
+        console.error(
+          `openai-extract-laudo transcribe fallback error (${model}):`,
+          resp.status,
+          await resp.text(),
+        );
+        if (resp.status === 401) {
+          return json({ error: "Token GPT inválido ou sem permissão." }, 400);
         }
-      } else {
         return json({ error: "Falha ao consultar a IA." }, 502);
       }
     }
+    const transcript = (await content(resp)).trim();
+    if (transcript.length < 50) {
+      console.error(
+        `openai-extract-laudo transcript too short (${model}): ${transcript.length} chars`,
+      );
+      return json({ error: "Não foi possível ler o documento." }, 422);
+    }
 
-    const data = await resp.json();
-    const text: string =
-      data?.choices?.[0]?.message?.content ?? "";
-    const extracted = parseJson(text);
+    // PASSO 2 — extração estruturada a partir da transcrição (schema estrito).
+    const extractResp = await chat(
+      model,
+      EXTRACT_PROMPT,
+      [
+        {
+          type: "text",
+          text: `TRANSCRIÇÃO DO LAUDO:\n\n${transcript}`,
+        },
+      ],
+      { maxOut: 4000, schema: EXTRACTION_SCHEMA },
+    );
+    if (!extractResp.ok) {
+      console.error(
+        `openai-extract-laudo extract error (${model}):`,
+        extractResp.status,
+        await extractResp.text(),
+      );
+      return json({ error: "Falha ao consultar a IA." }, 502);
+    }
+
+    const extracted = parseJson(await content(extractResp));
     if (!extracted) {
       return json({ error: "Não foi possível interpretar o laudo." }, 422);
     }
+    // Telemetria sem PHI: modelo, tamanho da transcrição e nº de terapias.
+    console.log(
+      `openai-extract-laudo ok (${model}): transcript=${transcript.length} chars, therapies=${extracted.therapies.length}`,
+    );
 
     // Cenário B: sem validade explícita mas com emissão → emissão + 1 ano.
     let validity_source: "explicit" | "computed" | null = null;
