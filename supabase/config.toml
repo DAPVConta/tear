@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.openai-extract-laudo]
 verify_jwt = true
+
+[functions.clicksign-signature]
+verify_jwt = true

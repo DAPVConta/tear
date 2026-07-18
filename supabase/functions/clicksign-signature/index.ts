@@ -1,0 +1,366 @@
+// Edge Function: clicksign-signature
+// Assinatura digital da evolução diária via ClickSign (API v3 — Envelopes).
+// O front gera o PDF da evolução (jsPDF) e envia aqui em base64; esta função
+// cria o envelope na ClickSign, anexa o documento, cadastra o signatário,
+// adiciona os requisitos (qualificação de assinatura + autenticação por
+// e-mail), ativa o envelope e dispara a notificação com o link de assinatura.
+//
+// O token da API (CLICKSIGN_TOKEN) fica apenas nos Secrets do servidor —
+// nunca chega ao navegador. O acesso à evolução é validado pelo JWT do
+// usuário: todas as leituras/escritas no banco usam o client com o token da
+// sessão, então a RLS por clínica continua valendo.
+//
+// Ações:
+//   { action: "request", evolutionId, clinicId, filename, contentBase64,
+//     signer: { name, email, documentation? } }
+//     → cria o envelope e grava os metadados em daily_evolutions.clicksign
+//   { action: "status", evolutionId, clinicId }
+//     → consulta o envelope; se finalizado, marca a evolução como assinada
+//
+// Referência: https://developers.clicksign.com/ (API v3 — JSON:API).
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.46.1";
+
+// PDF de uma evolução é pequeno; 10 MB de folga cobre anexos futuros.
+const MAX_BODY_BYTES = 10 * 1024 * 1024;
+
+const CLICKSIGN_BASE_URL = (
+  Deno.env.get("CLICKSIGN_BASE_URL") ?? "https://app.clicksign.com/api/v3"
+).replace(/\/$/, "");
+
+// --- Helpers compartilhados (inline para deploy independente de layout) ---
+function corsHeaders(req: Request): Record<string, string> {
+  const list = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const origin = req.headers.get("Origin") ?? "";
+  const allow =
+    list.length === 0 ? "*" : list.includes(origin) ? origin : list[0];
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
+
+function getUserClient(req: Request): SupabaseClient | null {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return null;
+  const url = Deno.env.get("SUPABASE_URL");
+  const anon = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!url || !anon) return null;
+  return createClient(url, anon, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+// --- Cliente mínimo da API v3 da ClickSign (JSON:API) ---------------------
+type JsonApiResource = {
+  id: string;
+  type: string;
+  attributes?: Record<string, unknown>;
+};
+
+async function clicksign(
+  token: string,
+  method: "GET" | "POST" | "PATCH",
+  path: string,
+  body?: unknown,
+): Promise<JsonApiResource> {
+  const res = await fetch(`${CLICKSIGN_BASE_URL}${path}`, {
+    method,
+    headers: {
+      Authorization: token,
+      Accept: "application/vnd.api+json",
+      "Content-Type": "application/vnd.api+json",
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await res.text();
+  let parsed: { data?: JsonApiResource; errors?: unknown } = {};
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch {
+    // resposta não-JSON tratada abaixo pelo status
+  }
+  if (!res.ok) {
+    console.error(
+      `clicksign ${method} ${path} → ${res.status}:`,
+      text.slice(0, 2000),
+    );
+    throw new Error(`ClickSign respondeu ${res.status} em ${method} ${path}.`);
+  }
+  return parsed.data ?? { id: "", type: "" };
+}
+
+type Signer = { name?: string; email?: string; documentation?: string };
+
+type Payload = {
+  action?: "request" | "status";
+  evolutionId?: number;
+  clinicId?: number;
+  filename?: string;
+  contentBase64?: string;
+  signer?: Signer;
+};
+
+type ClickSignEnvelope = {
+  envelope_id: string;
+  document_id: string;
+  signer_id: string;
+  signer_name: string;
+  signer_email: string;
+  status: "pending" | "signed";
+  requested_at: string;
+  finished_at: string | null;
+};
+
+Deno.serve(async (req: Request) => {
+  const cors = corsHeaders(req);
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: cors });
+  }
+
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+
+  if (req.method !== "POST") {
+    return json({ error: "Método não permitido." }, 405);
+  }
+
+  // Defesa em profundidade: exige sessão válida mesmo se verify_jwt cair.
+  const db = getUserClient(req);
+  const { data: userData } = (await db?.auth.getUser()) ?? { data: null };
+  if (!db || !userData?.user) {
+    return json({ error: "Não autenticado." }, 401);
+  }
+
+  const token = Deno.env.get("CLICKSIGN_TOKEN");
+  if (!token) {
+    return json({ error: "CLICKSIGN_TOKEN não configurado no servidor." }, 500);
+  }
+
+  const raw = await req.text();
+  if (raw.length > MAX_BODY_BYTES) {
+    return json({ error: "Requisição muito grande." }, 413);
+  }
+  let payload: Payload;
+  try {
+    payload = JSON.parse(raw) as Payload;
+  } catch {
+    return json({ error: "Corpo inválido." }, 400);
+  }
+
+  const { action, evolutionId, clinicId } = payload;
+  if (!evolutionId || !clinicId) {
+    return json({ error: "evolutionId e clinicId são obrigatórios." }, 400);
+  }
+
+  // A leitura via client do usuário garante (RLS) que ele pertence à clínica
+  // dona da evolução — sem isso a linha simplesmente não é visível.
+  const { data: evolution, error: evoError } = await db
+    .from("daily_evolutions")
+    .select("id, clicksign, signed_at, professional_signature")
+    .eq("id", evolutionId)
+    .eq("clinic_id", clinicId)
+    .maybeSingle();
+  if (evoError) {
+    console.error("clicksign-signature: leitura da evolução falhou", evoError);
+    return json({ error: "Falha ao carregar a evolução." }, 500);
+  }
+  if (!evolution) {
+    return json({ error: "Evolução não encontrada." }, 404);
+  }
+  const current = (evolution.clicksign ?? null) as ClickSignEnvelope | null;
+
+  try {
+    if (action === "request") {
+      const { filename, contentBase64, signer } = payload;
+      if (!filename || !contentBase64 || !signer?.name || !signer?.email) {
+        return json(
+          { error: "filename, contentBase64 e signer (nome/e-mail) são obrigatórios." },
+          400,
+        );
+      }
+      if (current?.status === "pending") {
+        return json(
+          { error: "Já existe uma solicitação de assinatura pendente para esta evolução." },
+          409,
+        );
+      }
+      if (current?.status === "signed") {
+        return json({ error: "Esta evolução já foi assinada via ClickSign." }, 409);
+      }
+
+      // 1) Envelope (pasta digital do processo de assinatura).
+      const envelope = await clicksign(token, "POST", "/envelopes", {
+        data: {
+          type: "envelopes",
+          attributes: {
+            name: filename,
+            locale: "pt-BR",
+            auto_close: true,
+          },
+        },
+      });
+
+      // 2) Documento (PDF gerado no front, como data URI base64).
+      const document = await clicksign(
+        token,
+        "POST",
+        `/envelopes/${envelope.id}/documents`,
+        {
+          data: {
+            type: "documents",
+            attributes: { filename, content_base64: contentBase64 },
+          },
+        },
+      );
+
+      // 3) Signatário (o profissional responsável pela evolução).
+      const documentation = signer.documentation?.trim() || null;
+      const signerRes = await clicksign(
+        token,
+        "POST",
+        `/envelopes/${envelope.id}/signers`,
+        {
+          data: {
+            type: "signers",
+            attributes: {
+              name: signer.name,
+              email: signer.email,
+              refusable: false,
+              has_documentation: !!documentation,
+              ...(documentation ? { documentation } : {}),
+              communicate_events: {
+                signature_request: "email",
+                signature_reminder: "email",
+                document_signed: "email",
+              },
+            },
+          },
+        },
+      );
+
+      // 4) Requisitos: qualificação (assinar) + evidência de autenticação
+      // por e-mail, ligando signatário e documento.
+      const relationships = {
+        document: { data: { type: "documents", id: document.id } },
+        signer: { data: { type: "signers", id: signerRes.id } },
+      };
+      await clicksign(token, "POST", `/envelopes/${envelope.id}/requirements`, {
+        data: {
+          type: "requirements",
+          attributes: { action: "agree", role: "sign" },
+          relationships,
+        },
+      });
+      await clicksign(token, "POST", `/envelopes/${envelope.id}/requirements`, {
+        data: {
+          type: "requirements",
+          attributes: { action: "provide_evidence", auth: "email" },
+          relationships,
+        },
+      });
+
+      // 5) Ativa o envelope (draft → running) e 6) dispara a notificação
+      // com o link de assinatura para o e-mail do signatário.
+      await clicksign(token, "PATCH", `/envelopes/${envelope.id}`, {
+        data: {
+          id: envelope.id,
+          type: "envelopes",
+          attributes: { status: "running" },
+        },
+      });
+      await clicksign(token, "POST", `/envelopes/${envelope.id}/notifications`, {
+        data: {
+          type: "notifications",
+          attributes: {
+            message:
+              "Você recebeu um relatório de evolução diária do TEAR para assinatura digital.",
+          },
+        },
+      });
+
+      const record: ClickSignEnvelope = {
+        envelope_id: envelope.id,
+        document_id: document.id,
+        signer_id: signerRes.id,
+        signer_name: signer.name,
+        signer_email: signer.email,
+        status: "pending",
+        requested_at: new Date().toISOString(),
+        finished_at: null,
+      };
+      const { error: updateError } = await db
+        .from("daily_evolutions")
+        .update({ clicksign: record })
+        .eq("id", evolutionId)
+        .eq("clinic_id", clinicId);
+      if (updateError) {
+        console.error("clicksign-signature: gravação do envelope falhou", updateError);
+        return json(
+          { error: "Envelope criado na ClickSign, mas houve falha ao gravar na evolução." },
+          500,
+        );
+      }
+      return json({ clicksign: record });
+    }
+
+    if (action === "status") {
+      if (!current) {
+        return json(
+          { error: "Nenhuma solicitação de assinatura ClickSign para esta evolução." },
+          404,
+        );
+      }
+      const envelope = await clicksign(
+        token,
+        "GET",
+        `/envelopes/${current.envelope_id}`,
+      );
+      const envelopeStatus = String(envelope.attributes?.status ?? "");
+      const finished = envelopeStatus === "finished" || envelopeStatus === "closed";
+      if (!finished || current.status === "signed") {
+        return json({ clicksign: current, envelope_status: envelopeStatus });
+      }
+
+      const record: ClickSignEnvelope = {
+        ...current,
+        status: "signed",
+        finished_at: new Date().toISOString(),
+      };
+      // Marca a evolução como assinada; preserva signed_at existente para não
+      // reiniciar o contador da trava de 24h.
+      const { error: updateError } = await db
+        .from("daily_evolutions")
+        .update({
+          clicksign: record,
+          professional_signature: true,
+          ...(evolution.signed_at ? {} : { signed_at: record.finished_at }),
+        })
+        .eq("id", evolutionId)
+        .eq("clinic_id", clinicId);
+      if (updateError) {
+        console.error("clicksign-signature: atualização de status falhou", updateError);
+        return json({ error: "Falha ao atualizar o status da assinatura." }, 500);
+      }
+      return json({ clicksign: record, envelope_status: envelopeStatus });
+    }
+
+    return json({ error: "Ação inválida." }, 400);
+  } catch (e) {
+    // Loga o detalhe no servidor; ao cliente, mensagem enxuta.
+    console.error("clicksign-signature error:", e);
+    return json(
+      { error: e instanceof Error ? e.message : "Falha na integração com a ClickSign." },
+      502,
+    );
+  }
+});

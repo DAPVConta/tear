@@ -498,6 +498,7 @@ export type Database = {
           authorization_id: number | null
           behavioral_intervention: string | null
           behavioral_notes: string | null
+          clicksign: Json | null
           clinic_id: number
           created_at: string
           created_by: string | null
@@ -543,6 +544,7 @@ export type Database = {
           authorization_id?: number | null
           behavioral_intervention?: string | null
           behavioral_notes?: string | null
+          clicksign?: Json | null
           clinic_id: number
           created_at?: string
           created_by?: string | null
@@ -588,6 +590,7 @@ export type Database = {
           authorization_id?: number | null
           behavioral_intervention?: string | null
           behavioral_notes?: string | null
+          clicksign?: Json | null
           clinic_id?: number
           created_at?: string
           created_by?: string | null
