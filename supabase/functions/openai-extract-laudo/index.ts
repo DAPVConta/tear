@@ -1,7 +1,8 @@
 // Edge Function: openai-extract-laudo
 // Fluxo "Novo paciente com IA". Analisa o laudo (PDF ou imagem) com o modelo
-// gpt-4o-mini da OpenAI e devolve: nome do paciente, lista de terapias +
-// periodicidade e os metadados do laudo (médico, CRM/UF, emissão, validade).
+// gpt-4o da OpenAI (OPENAI_MODEL sobrepõe) e devolve: nome do paciente, lista
+// de terapias + periodicidade e os metadados do laudo (médico, CRM/UF,
+// emissão, validade).
 //
 // O token da OpenAI é POR CLÍNICA (token_gpt), configurado em Configurações →
 // IA e guardado em public.clinic_ai_settings (RLS admin-only). A função resolve
@@ -234,9 +235,10 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        // OPENAI_MODEL (secret opcional) permite subir para gpt-4o sem novo
-        // deploy caso o mini leia mal algum scan; padrão segue gpt-4o-mini.
-        model: Deno.env.get("OPENAI_MODEL")?.trim() || "gpt-4o-mini",
+        // Padrão gpt-4o: o gpt-4o-mini omitia/manglava itens de laudos
+        // escaneados mesmo com prompt reforçado (visão fraca em scans densos).
+        // OPENAI_MODEL (secret opcional) troca o modelo sem novo deploy.
+        model: Deno.env.get("OPENAI_MODEL")?.trim() || "gpt-4o",
         temperature: 0,
         max_tokens: 3000,
         response_format: { type: "json_object" },
