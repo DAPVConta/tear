@@ -16,5 +16,6 @@ dist/
 # logs
 *.log
 
-# Claude Code (worktrees de agentes, local)
-.claude/
+# Claude Code (worktrees de agentes, local) — exceto skills versionadas
+.claude/*
+!.claude/skills/
