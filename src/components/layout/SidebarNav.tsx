@@ -72,14 +72,17 @@ function SidebarNavItem({
       onMouseEnter={prefetch}
       onFocus={prefetch}
       onTouchStart={prefetch}
-      style={{ ["--tea" as string]: item.accent }}
+      style={{
+        ["--tea" as string]: item.accent,
+        ["--tea-ink" as string]: item.onAccent ?? "#FFFFFF",
+      }}
       className={({ isActive }) =>
         cn(
           "group relative flex items-center gap-3 rounded-xl py-1.5 pl-1.5 pr-3 text-sm font-semibold outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/40",
           collapsed && "justify-center px-0",
           isActive
-            ? "bg-white/[0.13] text-white shadow-[inset_0_1px_0_0_rgb(255_255_255_/_0.08)]"
-            : "text-sidebar-foreground/65 hover:bg-white/[0.07] hover:text-white",
+            ? "bg-[color-mix(in_srgb,var(--tea)_16%,transparent)] text-white ring-1 ring-inset ring-[color-mix(in_srgb,var(--tea)_32%,transparent)]"
+            : "text-sidebar-foreground/70 hover:bg-[color-mix(in_srgb,var(--tea)_10%,transparent)] hover:text-white",
         )
       }
     >
@@ -96,15 +99,12 @@ function SidebarNavItem({
               boxShadow: isActive ? "0 0 12px var(--tea)" : undefined,
             }}
           />
-          {/* Ícone em chip com a cor TEA (diversidade da marca) */}
+          {/* Chip sólido na cor TEA do item (diversidade da marca) */}
           <span
             className={cn(
-              "grid h-9 w-9 shrink-0 place-items-center rounded-[0.65rem] transition-all duration-200",
-              isActive
-                ? "bg-[color-mix(in_srgb,var(--tea)_24%,transparent)]"
-                : "bg-white/[0.06] group-hover:bg-[color-mix(in_srgb,var(--tea)_14%,transparent)]",
+              "grid h-9 w-9 shrink-0 place-items-center rounded-[0.65rem] bg-[linear-gradient(135deg,var(--tea),color-mix(in_srgb,var(--tea)_70%,#001536))] text-[color:var(--tea-ink)] shadow-[0_4px_12px_-3px_color-mix(in_srgb,var(--tea)_55%,transparent)] transition-transform duration-200",
+              isActive ? "scale-105" : "group-hover:scale-105",
             )}
-            style={{ color: "var(--tea)" }}
           >
             <Icon
               className="h-[18px] w-[18px]"
