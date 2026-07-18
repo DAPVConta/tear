@@ -28,14 +28,27 @@ const CLICKSIGN_BASE_URL = (
 ).replace(/\/$/, "");
 
 // --- Helpers compartilhados (inline para deploy independente de layout) ---
+// Origens de produção conhecidas, sempre na allowlist além do que estiver em
+// ALLOWED_ORIGINS (mesmo padrão de openai-extract-laudo). Previews do Vercel
+// do próprio projeto (tear-*-dapvcontas-projects.vercel.app) também são
+// aceitos: a URL muda a cada deploy, então allowlist estática não os cobre.
+// CORS aqui é defesa em profundidade — a função já exige JWT válido.
+const DEFAULT_ORIGINS = [
+  "https://www.apptear.com",
+  "https://apptear.com",
+];
+const VERCEL_PREVIEW_RE =
+  /^https:\/\/[a-z0-9-]+-dapvcontas-projects\.vercel\.app$/;
+
 function corsHeaders(req: Request): Record<string, string> {
-  const list = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+  const configured = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean);
+  const list = [...new Set([...configured, ...DEFAULT_ORIGINS])];
   const origin = req.headers.get("Origin") ?? "";
   const allow =
-    list.length === 0 ? "*" : list.includes(origin) ? origin : list[0];
+    list.includes(origin) || VERCEL_PREVIEW_RE.test(origin) ? origin : list[0];
   return {
     "Access-Control-Allow-Origin": allow,
     "Access-Control-Allow-Headers":
