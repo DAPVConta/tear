@@ -86,6 +86,8 @@ export const keys = {
       ["dashboard-sessions-by-day", clinicId, days] as const,
     expiringGuides: (clinicId: number | undefined, withinDays: number) =>
       ["dashboard-expiring-guides", clinicId, withinDays] as const,
+    pendingSessions: (clinicId: number | undefined, days: number) =>
+      ["dashboard-pending-sessions", clinicId, days] as const,
     assessmentDistribution: (clinicId: number | undefined, days: number) =>
       ["dashboard-assessments", clinicId, days] as const,
   },

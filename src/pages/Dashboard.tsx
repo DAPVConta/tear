@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import {
   Users,
@@ -9,10 +10,12 @@ import {
   Plus,
   CalendarDays,
   ChevronRight,
+  ChevronDown,
   Activity,
   BarChart3,
   CheckCircle2,
-  Clock3,
+  ClipboardCheck,
+  FileClock,
   AlertTriangle,
 } from "lucide-react";
 import {
@@ -33,6 +36,7 @@ import { parseDateOnly, daysUntil } from "@/lib/date";
 import type { LucideIcon } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartTooltip } from "@/components/ui/chart-tooltip";
 import { TeaBars } from "@/components/brand/Logo";
@@ -44,6 +48,9 @@ import {
   useSessionsByDay,
   useExpiringAuthorizations,
   useAssessmentDistribution,
+  usePendingSessions,
+  type ExpiringAuthorization,
+  type PendingSession,
 } from "@/features/dashboard/api";
 
 function todayPt() {
@@ -75,12 +82,16 @@ export default function Dashboard() {
   const { clinic } = useClinic();
   const { resolvedTheme } = useTheme();
   const mode: ChartMode = resolvedTheme === "dark" ? "dark" : "light";
+  const [panel, setPanel] = useState<"pending" | "guides" | null>(null);
   const { data: metrics, isLoading: loadingMetrics } = useDashboardMetrics();
   const { data: sessions, isLoading: loadingSessions } = useSessionsByDay({
     days: 14,
   });
   const { data: expiring, isLoading: loadingExpiring } =
     useExpiringAuthorizations({ withinDays: 30 });
+  const { data: pending, isLoading: loadingPending } = usePendingSessions({
+    days: 30,
+  });
   const { data: assessments, isLoading: loadingAssessments } =
     useAssessmentDistribution({ days: 30 });
 
@@ -94,6 +105,10 @@ export default function Dashboard() {
   const prev7 = (sessions ?? []).slice(0, -7).reduce((s, d) => s + d.sessoes, 0);
   const weekDelta =
     prev7 > 0 ? Math.round(((last7 - prev7) / prev7) * 100) : null;
+
+  function toggle(next: "pending" | "guides") {
+    setPanel((prev) => (prev === next ? null : next));
+  }
 
   return (
     <div className="space-y-8">
@@ -372,88 +387,42 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Guias a vencer */}
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-soft">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-yellow-50 text-brand-yellow-800 dark:bg-brand-yellow-950/60 dark:text-brand-yellow-300">
-              <Clock3 className="h-5 w-5" />
-            </span>
-            <div>
-              <h2 className="text-h3">Guias a vencer</h2>
-              <p className="text-sm text-muted-foreground">
-                Autorizações que vencem nos próximos 30 dias
-              </p>
-            </div>
-          </div>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/guias">Ver todas</Link>
-          </Button>
-        </div>
-        {loadingExpiring ? (
-          <Skeleton className="h-32 w-full rounded-xl" />
-        ) : (expiring?.length ?? 0) === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-10 text-center">
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-success/10 text-success-text">
-              <CheckCircle2 className="h-6 w-6" />
-            </span>
-            <p className="text-sm text-muted-foreground">
-              Nenhuma guia vencendo no período. Tudo em dia.
-            </p>
-          </div>
-        ) : (
-          <ul className="space-y-1">
-            {expiring!.map((g) => {
-              const days = daysUntil(g.expiration_date);
-              const critical = days <= 7;
-              const name = g.patient?.name ?? "—";
-              return (
-                <li key={g.id}>
-                  <Link
-                    to={`/guias/${g.id}`}
-                    className="group flex items-center gap-4 rounded-xl px-3 py-3 transition-colors hover:bg-secondary/60"
-                  >
-                    <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-gradient text-xs font-bold text-white">
-                      {initials(name) || "—"}
-                      {critical && (
-                        <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-destructive text-white ring-2 ring-card">
-                          <AlertTriangle className="h-2.5 w-2.5" />
-                        </span>
-                      )}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold">{name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Guia {g.guide_number} · vence em{" "}
-                        {format(parseDateOnly(g.expiration_date), "dd/MM/yyyy")}
-                      </p>
-                    </div>
-                    <span
-                      className={cn(
-                        "rounded-full px-3 py-1 text-xs font-bold tabular-nums",
-                        critical
-                          ? "bg-brand-red-50 text-brand-red-700 dark:bg-brand-red-950/60 dark:text-brand-red-300"
-                          : "bg-brand-yellow-50 text-brand-yellow-800 dark:bg-brand-yellow-950/60 dark:text-brand-yellow-300",
-                      )}
-                    >
-                      {days === 0
-                        ? "vence hoje"
-                        : days === 1
-                          ? "1 dia"
-                          : `${days} dias`}
-                    </span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+      {/* Cartões de ação — clique monta a lista; clique no item vai para editar */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <ActionCard
+          label="Pendências"
+          hint="Sessões com item de faturamento em falta (30d)"
+          icon={ClipboardCheck}
+          accent="red"
+          count={pending?.length}
+          loading={loadingPending}
+          open={panel === "pending"}
+          onToggle={() => toggle("pending")}
+        />
+        <ActionCard
+          label="Guias a vencer"
+          hint="Autorizações vencendo em até 30 dias"
+          icon={FileClock}
+          accent="yellow"
+          count={expiring?.length}
+          loading={loadingExpiring}
+          open={panel === "guides"}
+          onToggle={() => toggle("guides")}
+        />
       </section>
+
+      {panel === "pending" && (
+        <PendingPanel items={pending} loading={loadingPending} />
+      )}
+      {panel === "guides" && (
+        <GuidesPanel items={expiring} loading={loadingExpiring} />
+      )}
     </div>
   );
 }
 
+// ————————————————————————————————————————————————————————————————
+// Acentos TEA compartilhados pelos cartões do dashboard.
 type MetricAccent = "blue" | "cyan" | "yellow" | "red";
 const ACCENT: Record<
   MetricAccent,
@@ -484,6 +453,277 @@ const ACCENT: Record<
     card: "border-brand-red-200/70 bg-gradient-to-br from-brand-red-50 to-brand-red-100/60 dark:border-brand-red-900/50 dark:from-brand-red-950/70 dark:to-brand-red-900/30",
   },
 };
+
+// Cartão de ação clicável (abre/fecha o painel de lista correspondente).
+function ActionCard({
+  label,
+  hint,
+  icon: Icon,
+  accent,
+  count,
+  loading,
+  open,
+  onToggle,
+}: {
+  label: string;
+  hint: string;
+  icon: LucideIcon;
+  accent: MetricAccent;
+  count: number | undefined;
+  loading?: boolean;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const a = ACCENT[accent];
+  const empty = !loading && (count ?? 0) === 0;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className={cn(
+        "group relative w-full overflow-hidden rounded-2xl border p-5 text-left shadow-soft outline-none transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-elevated focus-visible:ring-2 focus-visible:ring-ring",
+        a.card,
+        open && "ring-2 ring-ring",
+      )}
+    >
+      <span
+        className={cn(
+          "absolute inset-x-0 top-0 h-1 opacity-80 transition-opacity group-hover:opacity-100",
+          a.bar,
+        )}
+      />
+      <div className="flex items-center gap-4">
+        <span
+          className={cn(
+            "grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br transition-transform duration-200 ease-out group-hover:scale-105",
+            a.chip,
+            a.chipText,
+          )}
+        >
+          <Icon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-baseline gap-2">
+            <span className="font-display text-[1.75rem] font-extrabold tabular-nums leading-none tracking-tight">
+              {loading ? (
+                <Skeleton className="inline-block h-7 w-10" />
+              ) : (
+                (count ?? 0)
+              )}
+            </span>
+            <span className="text-sm font-semibold text-foreground">{label}</span>
+          </p>
+          <p className="mt-1 truncate text-caption text-muted-foreground">
+            {hint}
+          </p>
+        </div>
+        <ChevronDown
+          className={cn(
+            "h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200",
+            open && "rotate-180",
+          )}
+        />
+      </div>
+      {empty && (
+        <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-success-text">
+          <CheckCircle2 className="h-3.5 w-3.5" /> Tudo em dia
+        </p>
+      )}
+    </button>
+  );
+}
+
+function PanelShell({
+  title,
+  subtitle,
+  icon: Icon,
+  iconClass,
+  linkTo,
+  linkLabel,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  icon: LucideIcon;
+  iconClass: string;
+  linkTo: string;
+  linkLabel: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="animate-in fade-in slide-in-from-top-2 rounded-2xl border border-border bg-card p-6 shadow-soft duration-300">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span
+            className={cn(
+              "grid h-10 w-10 place-items-center rounded-xl",
+              iconClass,
+            )}
+          >
+            <Icon className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="text-h3">{title}</h2>
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
+          </div>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link to={linkTo}>{linkLabel}</Link>
+        </Button>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function PanelEmpty({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-10 text-center">
+      <span className="grid h-12 w-12 place-items-center rounded-full bg-success/10 text-success-text">
+        <CheckCircle2 className="h-6 w-6" />
+      </span>
+      <p className="text-sm text-muted-foreground">{message}</p>
+    </div>
+  );
+}
+
+function PendingPanel({
+  items,
+  loading,
+}: {
+  items: PendingSession[] | undefined;
+  loading: boolean;
+}) {
+  const navigate = useNavigate();
+  return (
+    <PanelShell
+      title="Sessões com pendências"
+      subtitle="Itens de faturamento em falta nos últimos 30 dias"
+      icon={ClipboardCheck}
+      iconClass="bg-brand-red-50 text-brand-red-700 dark:bg-brand-red-950/60 dark:text-brand-red-300"
+      linkTo="/auditoria"
+      linkLabel="Abrir auditoria"
+    >
+      {loading ? (
+        <Skeleton className="h-32 w-full rounded-xl" />
+      ) : (items?.length ?? 0) === 0 ? (
+        <PanelEmpty message="Nenhuma sessão com pendências. Tudo em dia." />
+      ) : (
+        <ul className="space-y-1">
+          {items!.map((s) => {
+            const name = s.patient?.name ?? "—";
+            return (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/evolucoes/${s.id}`)}
+                  className="group flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left transition-colors hover:bg-secondary/60"
+                >
+                  <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-gradient text-xs font-bold text-white">
+                    {initials(name)}
+                    <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-destructive text-white ring-2 ring-card">
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                    </span>
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {format(parseDateOnly(s.session_date), "dd/MM/yyyy")}
+                      {s.professional?.name ? ` · ${s.professional.name}` : ""}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {s.failed.map((r) => (
+                        <Badge key={r.id} variant="warning">
+                          {r.label}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </PanelShell>
+  );
+}
+
+function GuidesPanel({
+  items,
+  loading,
+}: {
+  items: ExpiringAuthorization[] | undefined;
+  loading: boolean;
+}) {
+  const navigate = useNavigate();
+  return (
+    <PanelShell
+      title="Guias a vencer"
+      subtitle="Autorizações que vencem nos próximos 30 dias"
+      icon={FileClock}
+      iconClass="bg-brand-yellow-50 text-brand-yellow-800 dark:bg-brand-yellow-950/60 dark:text-brand-yellow-300"
+      linkTo="/guias"
+      linkLabel="Ver todas"
+    >
+      {loading ? (
+        <Skeleton className="h-32 w-full rounded-xl" />
+      ) : (items?.length ?? 0) === 0 ? (
+        <PanelEmpty message="Nenhuma guia vencendo no período. Tudo em dia." />
+      ) : (
+        <ul className="space-y-1">
+          {items!.map((g) => {
+            const days = daysUntil(g.expiration_date);
+            const critical = days <= 7;
+            const name = g.patient?.name ?? "—";
+            return (
+              <li key={g.id}>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/guias/${g.id}`)}
+                  className="group flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left transition-colors hover:bg-secondary/60"
+                >
+                  <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-gradient text-xs font-bold text-white">
+                    {initials(name)}
+                    {critical && (
+                      <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-destructive text-white ring-2 ring-card">
+                        <AlertTriangle className="h-2.5 w-2.5" />
+                      </span>
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Guia {g.guide_number} · vence em{" "}
+                      {format(parseDateOnly(g.expiration_date), "dd/MM/yyyy")}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-3 py-1 text-xs font-bold tabular-nums",
+                      critical
+                        ? "bg-brand-red-50 text-brand-red-700 dark:bg-brand-red-950/60 dark:text-brand-red-300"
+                        : "bg-brand-yellow-50 text-brand-yellow-800 dark:bg-brand-yellow-950/60 dark:text-brand-yellow-300",
+                    )}
+                  >
+                    {days === 0
+                      ? "vence hoje"
+                      : days === 1
+                        ? "1 dia"
+                        : `${days} dias`}
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </PanelShell>
+  );
+}
 
 function Metric({
   label,

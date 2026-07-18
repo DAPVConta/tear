@@ -4,7 +4,8 @@ import { parseDateOnly } from "@/lib/date";
 import { supabase } from "@/lib/supabase";
 import { keys } from "@/lib/queryKeys";
 import { useClinic } from "@/providers/ClinicProvider";
-import type { Enums } from "@/types/database";
+import { auditEvolution } from "@/features/audit/checklist";
+import type { Enums, Tables } from "@/types/database";
 
 function today() {
   return format(new Date(), "yyyy-MM-dd");
@@ -128,7 +129,7 @@ export type ExpiringAuthorization = {
   patient: { name: string } | null;
 };
 
-export function useExpiringAuthorizations({ withinDays = 30 } = {}) {
+export function useExpiringAuthorizations({ withinDays = 30, max = 50 } = {}) {
   const { clinic } = useClinic();
   const clinicId = clinic?.id;
   return useQuery({
@@ -148,9 +149,61 @@ export function useExpiringAuthorizations({ withinDays = 30 } = {}) {
         .gte("expiration_date", t)
         .lte("expiration_date", limit)
         .order("expiration_date", { ascending: true })
-        .limit(8);
+        .limit(max);
       if (error) throw error;
       return (data ?? []) as unknown as ExpiringAuthorization[];
+    },
+  });
+}
+
+export type PendingSession = {
+  id: number;
+  session_date: string;
+  patient: { name: string } | null;
+  professional: { name: string } | null;
+  failed: { id: string; label: string }[];
+};
+
+type EvolutionWithRefs = Tables<"daily_evolutions"> & {
+  patient: { name: string } | null;
+  professional: { name: string } | null;
+};
+
+// Sessões (evolução diária) com pendências de faturamento no período — mesmas
+// regras de blindagem do módulo de Auditoria (checklist dinâmico).
+export function usePendingSessions({ days = 30 } = {}) {
+  const { clinic } = useClinic();
+  const clinicId = clinic?.id;
+  return useQuery({
+    queryKey: keys.dashboard.pendingSessions(clinicId, days),
+    enabled: !!clinicId,
+    queryFn: async () => {
+      const from = format(subDays(new Date(), days - 1), "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("daily_evolutions")
+        // Desambigua o FK professional_id (há também supervisor_id).
+        .select(
+          "*, patient:patients(name), professional:professionals!professional_id(name)",
+        )
+        .eq("clinic_id", clinicId!)
+        .gte("session_date", from)
+        .order("session_date", { ascending: false });
+      if (error) throw error;
+
+      const rows = (data ?? []) as unknown as EvolutionWithRefs[];
+      const pending: PendingSession[] = [];
+      for (const e of rows) {
+        const audit = auditEvolution(e);
+        if (audit.isComplete) continue;
+        pending.push({
+          id: e.id,
+          session_date: e.session_date,
+          patient: e.patient,
+          professional: e.professional,
+          failed: audit.failed.map((r) => ({ id: r.id, label: r.label })),
+        });
+      }
+      return pending;
     },
   });
 }
