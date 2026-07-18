@@ -754,7 +754,7 @@ function Metric({
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-2xl border p-6 shadow-soft transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-elevated",
+        "group relative h-full overflow-hidden rounded-2xl border p-6 shadow-soft transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-elevated",
         a.card,
       )}
     >
