@@ -243,6 +243,32 @@ export type Database = {
           },
         ]
       }
+      clinic_ai_settings: {
+        Row: {
+          clinic_id: number
+          openai_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          clinic_id: number
+          openai_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clinic_id?: number
+          openai_token?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinic_ai_settings_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinic_invites: {
         Row: {
           active: boolean
@@ -850,6 +876,7 @@ export type Database = {
           report_issue_date: string | null
           report_path: string | null
           report_validity_date: string | null
+          therapies: Json
           updated_at: string
         }
         Insert: {
@@ -881,6 +908,7 @@ export type Database = {
           report_issue_date?: string | null
           report_path?: string | null
           report_validity_date?: string | null
+          therapies?: Json
           updated_at?: string
         }
         Update: {
@@ -912,6 +940,7 @@ export type Database = {
           report_issue_date?: string | null
           report_path?: string | null
           report_validity_date?: string | null
+          therapies?: Json
           updated_at?: string
         }
         Relationships: [

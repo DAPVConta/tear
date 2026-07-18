@@ -1,5 +1,6 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { useClinic } from "@/providers/ClinicProvider";
 
 // Integração com a IA Claude via Edge Functions. A chave da API (CLAUDE_KEY)
 // vive apenas no servidor (Supabase Secrets); o navegador só fala com as
@@ -72,5 +73,75 @@ export function useExtractLaudo() {
   return useMutation({
     mutationFn: (input: { fileBase64: string; mediaType: string }) =>
       invokeEdge<LaudoExtraction>("claude-extract-laudo", input),
+  });
+}
+
+export type TherapyItem = { therapy: string; frequency: string };
+
+// Extração completa do laudo pela IA (OpenAI gpt-4o-mini) para o fluxo de novo
+// paciente: nome, terapias + periodicidade e os metadados do laudo. O token é
+// resolvido por clínica no servidor (Configurações → IA); aqui só enviamos o
+// clinic_id para a função validar a associação.
+export type LaudoAIExtraction = LaudoExtraction & {
+  patient_name: string | null;
+  therapies: TherapyItem[];
+};
+
+export function useExtractLaudoAI() {
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: (input: { fileBase64: string; mediaType: string }) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      return invokeEdge<LaudoAIExtraction>("openai-extract-laudo", {
+        ...input,
+        clinicId: clinic.id,
+      });
+    },
+  });
+}
+
+// --- Configuração de IA por clínica (token_gpt) ---------------------------
+// Presença do token, sem devolvê-lo em claro para a tela (mostramos só se está
+// configurado). RLS garante que só clinic_admin lê a linha.
+export function useClinicAiSettings() {
+  const { clinic } = useClinic();
+  const clinicId = clinic?.id;
+  return useQuery({
+    queryKey: ["clinic-ai-settings", clinicId],
+    enabled: !!clinicId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clinic_ai_settings")
+        .select("openai_token, updated_at")
+        .eq("clinic_id", clinicId!)
+        .maybeSingle();
+      if (error) throw error;
+      const token = data?.openai_token ?? null;
+      return {
+        configured: !!token && token.trim().length > 0,
+        updated_at: data?.updated_at ?? null,
+      };
+    },
+  });
+}
+
+export function useSaveOpenaiToken() {
+  const queryClient = useQueryClient();
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: async (token: string | null) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      const value = token && token.trim() ? token.trim() : null;
+      const { error } = await supabase
+        .from("clinic_ai_settings")
+        .upsert(
+          { clinic_id: clinic.id, openai_token: value },
+          { onConflict: "clinic_id" },
+        );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clinic-ai-settings"] });
+    },
   });
 }
