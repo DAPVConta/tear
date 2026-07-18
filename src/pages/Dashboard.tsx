@@ -31,7 +31,7 @@ import {
 import { format } from "date-fns";
 import { parseDateOnly, daysUntil } from "@/lib/date";
 import type { LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, initials } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartTooltip } from "@/components/ui/chart-tooltip";
@@ -70,12 +70,6 @@ const ASSESSMENT_ORDER = [
   "retrocesso_leve",
   "retrocesso_significativo",
 ];
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] ?? "") + (parts[parts.length - 1]?.[0] ?? ""))
-    .toUpperCase();
-}
 
 export default function Dashboard() {
   const { clinic } = useClinic();
@@ -463,31 +457,31 @@ export default function Dashboard() {
 type MetricAccent = "blue" | "cyan" | "yellow" | "red";
 const ACCENT: Record<
   MetricAccent,
-  { bar: string; chip: string; chipText: string; wash: string }
+  { bar: string; chip: string; chipText: string; card: string }
 > = {
   blue: {
     bar: "bg-brand-blue-light",
     chip: "from-brand-blue-light-400 to-brand-blue-light-600 shadow-glow",
     chipText: "text-white",
-    wash: "from-brand-blue-light-50/80 dark:from-brand-blue-light-950/40",
+    card: "border-brand-blue-light-200/70 bg-gradient-to-br from-brand-blue-light-50 to-brand-blue-light-100/60 dark:border-brand-blue-light-900/50 dark:from-brand-blue-light-950/70 dark:to-brand-blue-light-900/30",
   },
   cyan: {
     bar: "bg-brand-cyan",
     chip: "from-brand-cyan-400 to-brand-cyan-600 shadow-glow-cyan",
     chipText: "text-white",
-    wash: "from-brand-cyan-50/80 dark:from-brand-cyan-950/40",
+    card: "border-brand-cyan-200/70 bg-gradient-to-br from-brand-cyan-50 to-brand-cyan-100/60 dark:border-brand-cyan-900/50 dark:from-brand-cyan-950/70 dark:to-brand-cyan-900/30",
   },
   yellow: {
     bar: "bg-brand-yellow",
     chip: "from-brand-yellow-300 to-brand-yellow-500 shadow-glow-yellow",
     chipText: "text-brand-yellow-950",
-    wash: "from-brand-yellow-50/80 dark:from-brand-yellow-950/40",
+    card: "border-brand-yellow-200/70 bg-gradient-to-br from-brand-yellow-50 to-brand-yellow-100/60 dark:border-brand-yellow-900/50 dark:from-brand-yellow-950/70 dark:to-brand-yellow-900/30",
   },
   red: {
     bar: "bg-brand-red",
     chip: "from-brand-red-400 to-brand-red-600 shadow-glow-red",
     chipText: "text-white",
-    wash: "from-brand-red-50/80 dark:from-brand-red-950/40",
+    card: "border-brand-red-200/70 bg-gradient-to-br from-brand-red-50 to-brand-red-100/60 dark:border-brand-red-900/50 dark:from-brand-red-950/70 dark:to-brand-red-900/30",
   },
 };
 
@@ -514,14 +508,12 @@ function Metric({
     value === undefined || value === null ? fallback : `${value}${suffix}`;
   const a = ACCENT[accent];
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-soft transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-elevated">
-      {/* Lavagem de cor do acento TEA */}
-      <div
-        className={cn(
-          "pointer-events-none absolute inset-0 bg-gradient-to-br via-transparent to-transparent",
-          a.wash,
-        )}
-      />
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-2xl border p-6 shadow-soft transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-elevated",
+        a.card,
+      )}
+    >
       {/* Ícone-marca d'água decorativo */}
       <Icon className="pointer-events-none absolute -bottom-5 -right-5 h-24 w-24 text-foreground opacity-[0.04] transition-transform duration-300 group-hover:scale-110 group-hover:opacity-[0.06]" />
       {/* Barra de acento superior (cor TEA) */}

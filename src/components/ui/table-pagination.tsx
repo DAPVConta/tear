@@ -22,7 +22,10 @@ export function TablePagination({
   return (
     <div className="flex items-center justify-between border-t border-border p-4 text-sm text-muted-foreground">
       <span>
-        {total} {total === 1 ? itemLabel : plural}
+        <strong className="font-bold tabular-nums text-foreground">
+          {total}
+        </strong>{" "}
+        {total === 1 ? itemLabel : plural}
       </span>
       <div className="flex items-center gap-2">
         <Button
@@ -34,7 +37,7 @@ export function TablePagination({
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="tabular-nums">
+        <span className="rounded-lg bg-secondary px-3 py-1.5 text-xs font-bold tabular-nums text-secondary-foreground">
           {page} / {totalPages}
         </span>
         <Button

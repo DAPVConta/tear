@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
+import { cn, initials } from "@/lib/utils";
 import { maskPhone } from "@/lib/masks";
 import { specialtyLabels } from "@/lib/labels";
 import {
@@ -204,12 +205,24 @@ export default function ProfessionalsList() {
                   onClick={() => navigate(`/profissionais/${p.id}`)}
                 >
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{p.name}</span>
-                      {!p.active && <Badge variant="muted">Inativo</Badge>}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {p.email || "Sem e-mail"}
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={cn(
+                          "grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[11px] font-bold text-white",
+                          p.active ? "bg-brand-gradient" : "bg-muted-foreground/60",
+                        )}
+                      >
+                        {initials(p.name)}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate font-semibold">{p.name}</span>
+                          {!p.active && <Badge variant="muted">Inativo</Badge>}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {p.email || "Sem e-mail"}
+                        </div>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
