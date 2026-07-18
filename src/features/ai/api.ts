@@ -78,10 +78,12 @@ export function useExtractLaudo() {
 
 export type TherapyItem = { therapy: string; frequency: string };
 
-// Extração completa do laudo pela IA (OpenAI gpt-4o-mini) para o fluxo de novo
-// paciente: nome, terapias + periodicidade e os metadados do laudo. O token é
-// resolvido por clínica no servidor (Configurações → IA); aqui só enviamos o
-// clinic_id para a função validar a associação.
+// Extração completa do laudo pela IA (OpenAI) para o fluxo de novo paciente:
+// nome, terapias + periodicidade e os metadados do laudo. O documento é
+// enviado como imagens de página em alta resolução (renderizadas no navegador
+// — ver lib/pdfToImages) para OCR fiel. O token é resolvido por clínica no
+// servidor (Configurações → IA); aqui só enviamos o clinic_id para a função
+// validar a associação.
 export type LaudoAIExtraction = LaudoExtraction & {
   patient_name: string | null;
   therapies: TherapyItem[];
@@ -90,7 +92,9 @@ export type LaudoAIExtraction = LaudoExtraction & {
 export function useExtractLaudoAI() {
   const { clinic } = useClinic();
   return useMutation({
-    mutationFn: (input: { fileBase64: string; mediaType: string }) => {
+    mutationFn: (input: {
+      pages: { base64: string; mediaType: string }[];
+    }) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
       return invokeEdge<LaudoAIExtraction>("openai-extract-laudo", {
         ...input,
