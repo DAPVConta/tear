@@ -16,12 +16,23 @@ import { createClient } from "npm:@supabase/supabase-js@2.46.1";
 // ~10 MB de arquivo → ~13,5 MB em base64. Limite defensivo (custo/DoS).
 const MAX_BASE64_CHARS = 14_000_000;
 
-// CORS com allowlist (ALLOWED_ORIGINS) e verificação defensiva do JWT em código.
+// Origens de produção conhecidas (domínio oficial). Ficam sempre na allowlist,
+// além do que estiver em ALLOWED_ORIGINS, para não depender de o secret estar
+// atualizado após troca de domínio (ex.: *.vercel.app → apptear.com).
+const DEFAULT_ORIGINS = [
+  "https://www.apptear.com",
+  "https://apptear.com",
+];
+
+// CORS com allowlist (ALLOWED_ORIGINS ∪ defaults) e verificação defensiva do
+// JWT em código. Reflete a origem quando permitida; caso contrário devolve a
+// primeira conhecida (preflight de origem não permitida falha, como esperado).
 function corsHeaders(req: Request): Record<string, string> {
-  const list = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+  const configured = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean);
+  const list = [...new Set([...configured, ...DEFAULT_ORIGINS])];
   const origin = req.headers.get("Origin") ?? "";
   const allow =
     list.length === 0 ? "*" : list.includes(origin) ? origin : list[0];
