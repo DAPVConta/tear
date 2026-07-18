@@ -14,15 +14,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
+import { initials } from "@/lib/utils";
 import { useCommandPalette } from "./CommandPalette";
-
-function initials(value: string | null | undefined, fallback: string) {
-  if (!value) return fallback;
-  const parts = value.trim().split(/\s+/);
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-  return (first + last).toUpperCase() || fallback;
-}
 
 export function Topbar({ onOpenMobile }: { onOpenMobile: () => void }) {
   const navigate = useNavigate();

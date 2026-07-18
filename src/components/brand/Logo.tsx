@@ -42,6 +42,28 @@ export function LogoMark({
   );
 }
 
+// Barras coloridas da marca (diversidade e desenvolvimento). Elemento
+// decorativo reutilizável — hero, sidebar, cards.
+export function TeaBars({
+  className,
+  barClassName,
+}: {
+  className?: string;
+  barClassName?: string;
+}) {
+  return (
+    <span className={cn("flex items-center gap-1", className)} aria-hidden>
+      {["#1E88FF", "#45C7FF", "#FFC400", "#FF2D2D"].map((color) => (
+        <span
+          key={color}
+          className={cn("h-1 w-6 rounded-full", barClassName)}
+          style={{ backgroundColor: color }}
+        />
+      ))}
+    </span>
+  );
+}
+
 export function Wordmark({
   className,
   showTagline = false,

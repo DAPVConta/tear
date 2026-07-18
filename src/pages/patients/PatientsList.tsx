@@ -58,6 +58,7 @@ import {
 } from "@/components/ui/select";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
+import { initials } from "@/lib/utils";
 import { maskCPF, maskPhone } from "@/lib/masks";
 import { paymentTypeLabels } from "@/lib/labels";
 import {
@@ -270,10 +271,17 @@ export default function PatientsList() {
                   onClick={() => navigate(`/pacientes/${p.id}`)}
                 >
                   <TableCell>
-                    <div className="font-semibold">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {age(p.birth_date)}
-                      {p.cpf ? ` · ${maskCPF(p.cpf)}` : ""}
+                    <div className="flex items-center gap-3">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-gradient text-[11px] font-bold text-white">
+                        {initials(p.name)}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold">{p.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {age(p.birth_date)}
+                          {p.cpf ? ` · ${maskCPF(p.cpf)}` : ""}
+                        </div>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
