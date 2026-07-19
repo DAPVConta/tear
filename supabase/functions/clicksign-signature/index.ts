@@ -447,12 +447,63 @@ Deno.serve(async (req: Request) => {
         "GET",
         `/envelopes/${current.envelope_id}/documents/${current.document_id}`,
       );
+      const docAttrs = (doc.attributes ?? {}) as Record<string, unknown>;
       console.log(
         `clicksign download doc=${current.document_id}`,
-        JSON.stringify(doc.attributes ?? {}),
+        JSON.stringify(docAttrs),
       );
-      const url = findSignedUrl((doc.attributes ?? {}) as Record<string, unknown>);
+      let url = findSignedUrl(docAttrs);
+
+      // Fallback: alguns retornos trazem as URLs de download apenas no nível
+      // do envelope (ou na listagem de documentos), não no detalhe.
+      let envAttrs: Record<string, unknown> = {};
+      let listAttrs: Record<string, unknown> = {};
       if (!url) {
+        try {
+          const env = await clicksign(
+            token,
+            "GET",
+            `/envelopes/${current.envelope_id}`,
+          );
+          envAttrs = (env.attributes ?? {}) as Record<string, unknown>;
+          url = findSignedUrl(envAttrs);
+        } catch (e) {
+          console.error("clicksign download: falha ao ler envelope", e);
+        }
+      }
+      if (!url) {
+        try {
+          const list = await clicksign(
+            token,
+            "GET",
+            `/envelopes/${current.envelope_id}/documents`,
+          );
+          const arr = Array.isArray(list as unknown as unknown[])
+            ? (list as unknown as JsonApiResource[])
+            : [list as JsonApiResource];
+          listAttrs = { documents: arr.map((d) => d?.attributes ?? {}) };
+          for (const d of arr) {
+            url = findSignedUrl((d?.attributes ?? {}) as Record<string, unknown>);
+            if (url) break;
+          }
+        } catch (e) {
+          console.error("clicksign download: falha ao listar documentos", e);
+        }
+      }
+
+      if (!url) {
+        // DIAGNÓSTICO TEMPORÁRIO: guarda as respostas cruas no registro para
+        // inspeção (o painel de logs não expõe console.log de forma confiável).
+        await db
+          .from("daily_evolutions")
+          .update({
+            clicksign: {
+              ...current,
+              _debug: { doc: docAttrs, envelope: envAttrs, list: listAttrs },
+            },
+          })
+          .eq("id", evolutionId)
+          .eq("clinic_id", clinicId);
         return json(
           { error: "O documento assinado ainda não está disponível para download." },
           404,
