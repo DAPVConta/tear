@@ -488,7 +488,12 @@ operadora; restrição editar/excluir só pelo criador.
     solicita assinatura (nome/e-mail/CPF), acompanha status pendente e
     "Verificar status" — quando o envelope finaliza, a função marca
     professional_signature + signed_at (preservando signed_at existente).
-    Badges "Aguardando ClickSign" / "Assinada (ClickSign)".
+    Badges "Aguardando ClickSign" / "Assinada (ClickSign)". Ações diretas na
+    lista: "Verificar assinatura" (envelopes pendentes) e "Baixar documento
+    assinado" (envelopes finalizados — ação `download` busca a URL do PDF
+    assinado na ClickSign via findSignedUrl e abre em nova aba). A detecção de
+    conclusão aceita `closed`/`finished` e, quando o envelope ainda está
+    `running`, inspeciona os signatários (auto_close assíncrono).
     - PENDENTE: cadastrar `CLICKSIGN_TOKEN` nos Secrets das Edge Functions
       (painel Supabase) — sem ele a função responde erro amigável.
     - DEFER: webhook da ClickSign para atualizar o status sem clique

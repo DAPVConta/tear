@@ -127,3 +127,21 @@ export function useRefreshClickSignStatus() {
     },
   });
 }
+
+// Obtém a URL do documento assinado (PDF com página de assinaturas) na
+// ClickSign para download. Disponível após o envelope ser finalizado.
+export function useGetSignedDocumentUrl() {
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: async (evolutionId: number) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      const data = await invokeEdge<{ url?: string }>("clicksign-signature", {
+        action: "download",
+        evolutionId,
+        clinicId: clinic.id,
+      });
+      if (!data?.url) throw new Error("Documento assinado ainda não disponível.");
+      return data.url;
+    },
+  });
+}

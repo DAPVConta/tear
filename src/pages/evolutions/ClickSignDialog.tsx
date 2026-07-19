@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   FileSignature,
   Mail,
+  Download,
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -28,6 +29,7 @@ import {
   getClickSignEnvelope,
   useRequestClickSignSignature,
   useRefreshClickSignStatus,
+  useGetSignedDocumentUrl,
 } from "@/features/dailyEvolutions/clicksign";
 import type { EvolutionRow } from "@/features/dailyEvolutions/api";
 
@@ -46,7 +48,8 @@ export function ClickSignDialog({ open, onOpenChange, evolution }: Props) {
   const [cpf, setCpf] = useState("");
   const request = useRequestClickSignSignature();
   const refresh = useRefreshClickSignStatus();
-  const busy = request.isPending || refresh.isPending;
+  const download = useGetSignedDocumentUrl();
+  const busy = request.isPending || refresh.isPending || download.isPending;
 
   const envelope = getClickSignEnvelope(evolution);
 
@@ -86,6 +89,18 @@ export function ClickSignDialog({ open, onOpenChange, evolution }: Props) {
       });
     } catch (e) {
       toast.error("Falha ao enviar para a ClickSign", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    }
+  }
+
+  async function handleDownload() {
+    if (!evolution) return;
+    try {
+      const url = await download.mutateAsync(evolution.id);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (e) {
+      toast.error("Falha ao baixar o documento assinado", {
         description: e instanceof Error ? e.message : undefined,
       });
     }
@@ -218,7 +233,17 @@ export function ClickSignDialog({ open, onOpenChange, evolution }: Props) {
             Fechar
           </Button>
           {envelope ? (
-            envelope.status === "pending" && (
+            envelope.status === "signed" ? (
+              <Button variant="brand" onClick={handleDownload} disabled={busy}>
+                {download.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" /> Baixar documento assinado
+                  </>
+                )}
+              </Button>
+            ) : (
               <Button variant="brand" onClick={handleRefresh} disabled={busy}>
                 {refresh.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

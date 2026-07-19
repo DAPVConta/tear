@@ -112,13 +112,39 @@ async function clicksign(
 type Signer = { name?: string; email?: string; documentation?: string };
 
 type Payload = {
-  action?: "request" | "status";
+  action?: "request" | "status" | "download";
   evolutionId?: number;
   clinicId?: number;
   filename?: string;
   contentBase64?: string;
   signer?: Signer;
 };
+
+// Varre (recursivamente) os atributos de um recurso à procura da URL do
+// arquivo assinado. O nome exato do campo varia entre versões da API
+// (downloads.signed_file_url, signed_file_url, etc.); em vez de fixar um,
+// coletamos toda URL http(s) e priorizamos a que contém "signed", caindo
+// para qualquer "file"/"download" como fallback.
+function findSignedUrl(attrs: Record<string, unknown>): string | null {
+  const urls: { key: string; url: string }[] = [];
+  const walk = (obj: unknown, prefix: string) => {
+    if (!obj || typeof obj !== "object") return;
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      if (typeof v === "string" && /^https?:\/\//.test(v)) {
+        urls.push({ key: (prefix + k).toLowerCase(), url: v });
+      } else if (v && typeof v === "object") {
+        walk(v, `${prefix}${k}.`);
+      }
+    }
+  };
+  walk(attrs, "");
+  const signed = urls.find((u) => u.key.includes("signed"));
+  if (signed) return signed.url;
+  const file = urls.find(
+    (u) => u.key.includes("file") || u.key.includes("download"),
+  );
+  return file?.url ?? urls[0]?.url ?? null;
+}
 
 type ClickSignEnvelope = {
   envelope_id: string;
@@ -406,6 +432,33 @@ Deno.serve(async (req: Request) => {
         return json({ error: "Falha ao atualizar o status da assinatura." }, 500);
       }
       return json({ clicksign: record, envelope_status: envelopeStatus });
+    }
+
+    if (action === "download") {
+      if (!current) {
+        return json(
+          { error: "Nenhuma solicitação de assinatura ClickSign para esta evolução." },
+          404,
+        );
+      }
+      // Documento assinado só existe após a finalização (todos assinaram).
+      const doc = await clicksign(
+        token,
+        "GET",
+        `/envelopes/${current.envelope_id}/documents/${current.document_id}`,
+      );
+      console.log(
+        `clicksign download doc=${current.document_id}`,
+        JSON.stringify(doc.attributes ?? {}),
+      );
+      const url = findSignedUrl((doc.attributes ?? {}) as Record<string, unknown>);
+      if (!url) {
+        return json(
+          { error: "O documento assinado ainda não está disponível para download." },
+          404,
+        );
+      }
+      return json({ url });
     }
 
     return json({ error: "Ação inválida." }, 400);
