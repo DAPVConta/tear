@@ -164,8 +164,9 @@ export default function Dashboard() {
       </section>
 
       {/* Métricas + cartões de ação — um acento TEA por cartão (diversidade da
-          marca). Os dois últimos são clicáveis: montam a lista abaixo e cada
-          item leva para editar o registro. */}
+          marca). Cada card mostra ícone, número e nome. Os dois últimos são
+          clicáveis: montam a lista abaixo e cada item leva para editar o
+          registro. */}
       <Stagger className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StaggerItem>
           <Metric
