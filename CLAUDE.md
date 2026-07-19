@@ -475,6 +475,30 @@ operadora; restrição editar/excluir só pelo criador.
       e máscara para autorizados que ainda não destravaram a aba; o
       formulário/detalhe abre o gate antes de revelar o conteúdo.
 
+31. [FEITO] Assinatura via ClickSign na evolução diária: botão "Assinar" na
+    listagem gera o relatório da evolução em PDF (reuso do gerador jsPDF,
+    agora com saída base64) e abre o envelope na ClickSign (API v3 —
+    envelope → documento → signatário → requisitos [assinar + autenticação
+    por e-mail] → ativação → notificação). Edge Function `clicksign-signature`
+    (token `CLICKSIGN_TOKEN` só nos Secrets do servidor; opcional
+    `CLICKSIGN_BASE_URL` para sandbox); acesso ao banco sempre com o JWT do
+    usuário (RLS por clínica preservada). Coluna `daily_evolutions.clicksign`
+    (jsonb, migração 0031, fora da lista protegida pela trava de 24h) guarda
+    envelope/documento/signatário/status. `ClickSignDialog` na listagem:
+    solicita assinatura (nome/e-mail/CPF), acompanha status pendente e
+    "Verificar status" — quando o envelope finaliza, a função marca
+    professional_signature + signed_at (preservando signed_at existente).
+    Badges "Aguardando ClickSign" / "Assinada (ClickSign)". Ações diretas na
+    lista: "Verificar assinatura" (envelopes pendentes) e "Baixar documento
+    assinado" (envelopes finalizados — ação `download` busca a URL do PDF
+    assinado na ClickSign via findSignedUrl e abre em nova aba). A detecção de
+    conclusão aceita `closed`/`finished` e, quando o envelope ainda está
+    `running`, inspeciona os signatários (auto_close assíncrono).
+    - PENDENTE: cadastrar `CLICKSIGN_TOKEN` nos Secrets das Edge Functions
+      (painel Supabase) — sem ele a função responde erro amigável.
+    - DEFER: webhook da ClickSign para atualizar o status sem clique
+      (hoje é polling manual pelo botão "Verificar status").
+
 Todas as correções da tabela public.corrections foram resolvidas.
 
 ## Gestão de Membros

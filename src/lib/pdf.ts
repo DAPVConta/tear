@@ -273,7 +273,7 @@ function formatDateBR(iso: string): string {
 // Síntese da evolução diária em PDF A4 — cabeçalho institucional, identificação
 // do paciente, conteúdo clínico, adendos e bloco de assinatura (digital
 // ICP-Brasil quando houver). Otimizado para impressão.
-export function exportDailyEvolutionPDF(
+function buildDailyEvolutionPDF(
   evo: DailyEvolution,
   patient: Pick<Tables<"patients">, "name" | "cpf" | "birth_date"> | null,
   professional: Pick<
@@ -565,7 +565,33 @@ export function exportDailyEvolutionPDF(
   );
 
   const file = `evolucao-diaria-${patient?.name?.replace(/\s+/g, "_") ?? "paciente"}-${evo.session_date}.pdf`;
+  return { doc, file };
+}
+
+type DailyEvolutionPDFArgs = Parameters<typeof buildDailyEvolutionPDF>;
+
+export function exportDailyEvolutionPDF(...args: DailyEvolutionPDFArgs) {
+  const { doc, file } = buildDailyEvolutionPDF(...args);
   doc.save(file);
+}
+
+// Mesmo PDF, como data URI base64 — formato aceito pela API da ClickSign
+// (content_base64 do documento do envelope).
+export function renderDailyEvolutionPDFBase64(...args: DailyEvolutionPDFArgs): {
+  filename: string;
+  contentBase64: string;
+} {
+  const { doc, file } = buildDailyEvolutionPDF(...args);
+  const bytes = new Uint8Array(doc.output("arraybuffer"));
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return {
+    filename: file,
+    contentBase64: `data:application/pdf;base64,${btoa(binary)}`,
+  };
 }
 
 // Devolutiva para os Pais em PDF, em 2 vias (Clínica / Pais), com linguagem

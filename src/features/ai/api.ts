@@ -8,7 +8,7 @@ import { useClinic } from "@/providers/ClinicProvider";
 
 // Invoca uma Edge Function e normaliza o erro: extrai a mensagem detalhada do
 // corpo da resposta da função quando disponível.
-async function invokeEdge<T>(
+export async function invokeEdge<T>(
   name: string,
   body: Record<string, unknown>,
 ): Promise<T> {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   Plus,
   ClipboardList,
@@ -9,6 +10,10 @@ import {
   CircleDashed,
   BadgeCheck,
   ShieldAlert,
+  FileSignature,
+  RefreshCw,
+  Download,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { parseDateOnly } from "@/lib/date";
@@ -44,6 +49,12 @@ import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
 import { useClinic } from "@/providers/ClinicProvider";
 import { usePsychologyUnlock } from "@/features/dailyEvolutions/psychologyUnlock";
 import { PsychologyUnlockDialog } from "@/pages/evolutions/PsychologyUnlockDialog";
+import { ClickSignDialog } from "@/pages/evolutions/ClickSignDialog";
+import {
+  getClickSignEnvelope,
+  useRefreshClickSignStatus,
+  useGetSignedDocumentUrl,
+} from "@/features/dailyEvolutions/clicksign";
 import {
   useDailyEvolutions,
   useEvolutionsPendingValidation,
@@ -62,6 +73,7 @@ function ConfidentialBadge() {
 }
 
 function statusBadge(e: EvolutionRow) {
+  const clickSign = getClickSignEnvelope(e);
   if (e.validation_status === "homologada")
     return (
       <Badge variant="success">
@@ -74,10 +86,22 @@ function statusBadge(e: EvolutionRow) {
         <CircleDashed className="h-3 w-3" /> Pendente validação
       </Badge>
     );
+  if (clickSign?.status === "signed")
+    return (
+      <Badge variant="success">
+        <BadgeCheck className="h-3 w-3" /> Assinada (ClickSign)
+      </Badge>
+    );
   if (getDigitalSignature(e))
     return (
       <Badge variant="success">
         <BadgeCheck className="h-3 w-3" /> Assinada digitalmente
+      </Badge>
+    );
+  if (clickSign?.status === "pending")
+    return (
+      <Badge variant="warning">
+        <FileSignature className="h-3 w-3" /> Aguardando ClickSign
       </Badge>
     );
   if (isLocked(e))
@@ -118,6 +142,50 @@ export default function DailyEvolutionsList() {
   const { unlocked: psyUnlocked } = usePsychologyUnlock(clinic?.id);
   const [psyDialogOpen, setPsyDialogOpen] = useState(false);
   const [pendingConfidentialId, setPendingConfidentialId] = useState<number | null>(null);
+  const [clickSignFor, setClickSignFor] = useState<EvolutionRow | null>(null);
+  const [csBusyId, setCsBusyId] = useState<number | null>(null);
+  const refreshClickSign = useRefreshClickSignStatus();
+  const downloadSigned = useGetSignedDocumentUrl();
+
+  // Verifica o status da assinatura direto na lista (sem abrir o diálogo).
+  async function handleVerifyClickSign(e: EvolutionRow) {
+    setCsBusyId(e.id);
+    try {
+      const r = await refreshClickSign.mutateAsync(e.id);
+      if (r.status === "signed") {
+        toast.success("Evolução assinada via ClickSign", {
+          description: `Assinada por ${r.signer_name}.`,
+        });
+      } else {
+        toast.info("Ainda aguardando assinatura", {
+          description: `Situação do envelope na ClickSign: ${
+            r.envelope_status || "desconhecida"
+          }.`,
+        });
+      }
+    } catch (err) {
+      toast.error("Falha ao verificar assinatura", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setCsBusyId(null);
+    }
+  }
+
+  // Baixa o documento assinado (PDF com página de assinaturas) da ClickSign.
+  async function handleDownloadSigned(e: EvolutionRow) {
+    setCsBusyId(e.id);
+    try {
+      const url = await downloadSigned.mutateAsync(e.id);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error("Falha ao baixar o documento assinado", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setCsBusyId(null);
+    }
+  }
   const { data, isLoading, isError } = useDailyEvolutions({
     page,
     patientId: patientId === "all" ? undefined : Number(patientId),
@@ -256,7 +324,7 @@ export default function DailyEvolutionsList() {
               <TableHead>Profissional</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-12" />
+              <TableHead className="w-20" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -300,14 +368,71 @@ export default function DailyEvolutionsList() {
                       </div>
                     </TableCell>
                     <TableCell onClick={(ev) => ev.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Abrir"
-                        onClick={() => openEvolution(e)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        {!masked &&
+                          (() => {
+                            const cs = getClickSignEnvelope(e);
+                            const busy = csBusyId === e.id;
+                            if (cs?.status === "signed") {
+                              return (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Baixar documento assinado"
+                                  title="Baixar documento assinado"
+                                  disabled={busy}
+                                  onClick={() => handleDownloadSigned(e)}
+                                >
+                                  {busy ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Download className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              );
+                            }
+                            if (cs?.status === "pending") {
+                              return (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Verificar assinatura"
+                                  title="Verificar assinatura"
+                                  disabled={busy}
+                                  onClick={() => handleVerifyClickSign(e)}
+                                >
+                                  {busy ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              );
+                            }
+                            if (!getDigitalSignature(e)) {
+                              return (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Assinar via ClickSign"
+                                  title="Assinar via ClickSign"
+                                  onClick={() => setClickSignFor(e)}
+                                >
+                                  <FileSignature className="h-4 w-4" />
+                                </Button>
+                              );
+                            }
+                            return null;
+                          })()}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Abrir"
+                          onClick={() => openEvolution(e)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -354,6 +479,20 @@ export default function DailyEvolutionsList() {
         onUnlocked={() => {
           if (pendingConfidentialId) navigate(`/evolucoes/${pendingConfidentialId}`);
         }}
+      />
+
+      <ClickSignDialog
+        open={!!clickSignFor}
+        onOpenChange={(v) => {
+          if (!v) setClickSignFor(null);
+        }}
+        // Após a solicitação, o refetch da lista atualiza a linha — o diálogo
+        // acompanha o registro fresco (status pendente/assinada) pelo id.
+        evolution={
+          clickSignFor
+            ? (data?.rows.find((r) => r.id === clickSignFor.id) ?? clickSignFor)
+            : null
+        }
       />
     </div>
   );
