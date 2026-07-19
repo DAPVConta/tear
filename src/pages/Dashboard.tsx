@@ -170,7 +170,6 @@ export default function Dashboard() {
         <StaggerItem>
           <Metric
             label="Pacientes ativos"
-            hint="em acompanhamento"
             icon={Users}
             value={metrics?.patientsActive}
             loading={loadingMetrics}
@@ -180,7 +179,6 @@ export default function Dashboard() {
         <StaggerItem>
           <Metric
             label="Sessões na semana"
-            hint="desde segunda-feira"
             icon={ClipboardList}
             value={metrics?.sessionsThisWeek}
             loading={loadingMetrics}
@@ -190,7 +188,6 @@ export default function Dashboard() {
         <StaggerItem>
           <Metric
             label="Guias vigentes"
-            hint="ativas e dentro do prazo"
             icon={FileCheck2}
             value={metrics?.activeGuides}
             loading={loadingMetrics}
@@ -200,7 +197,6 @@ export default function Dashboard() {
         <StaggerItem>
           <Metric
             label="Taxa de presença"
-            hint="últimos 30 dias"
             icon={TrendingUp}
             value={metrics?.attendanceRate}
             suffix={metrics?.attendanceRate == null ? "" : "%"}
@@ -212,7 +208,6 @@ export default function Dashboard() {
         <StaggerItem>
           <ActionCard
             label="Pendências"
-            hint="Faturamento incompleto (30d)"
             icon={ClipboardCheck}
             accent="red"
             count={pending?.length}
@@ -224,7 +219,6 @@ export default function Dashboard() {
         <StaggerItem>
           <ActionCard
             label="Guias a vencer"
-            hint="Vencendo em até 30 dias"
             icon={FileClock}
             accent="yellow"
             count={expiring?.length}
@@ -460,7 +454,6 @@ const ACCENT: Record<
 // Cartão de ação clicável (abre/fecha o painel de lista correspondente).
 function ActionCard({
   label,
-  hint,
   icon: Icon,
   accent,
   count,
@@ -469,7 +462,6 @@ function ActionCard({
   onToggle,
 }: {
   label: string;
-  hint: string;
   icon: LucideIcon;
   accent: MetricAccent;
   count: number | undefined;
@@ -478,7 +470,6 @@ function ActionCard({
   onToggle: () => void;
 }) {
   const a = ACCENT[accent];
-  const empty = !loading && (count ?? 0) === 0;
   return (
     <button
       type="button"
@@ -521,18 +512,6 @@ function ActionCard({
           {loading ? <Skeleton className="inline-block h-8 w-16" /> : (count ?? 0)}
         </p>
         <p className="mt-2.5 text-sm font-semibold">{label}</p>
-        <p className="mt-0.5 flex items-center gap-1 text-xs">
-          {empty ? (
-            <>
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success-text" />
-              <span className="truncate font-medium text-success-text">
-                Tudo em dia
-              </span>
-            </>
-          ) : (
-            <span className="truncate text-muted-foreground">{hint}</span>
-          )}
-        </p>
       </div>
     </button>
   );
@@ -731,7 +710,6 @@ function GuidesPanel({
 
 function Metric({
   label,
-  hint,
   icon: Icon,
   value,
   suffix = "",
@@ -740,7 +718,6 @@ function Metric({
   accent = "blue",
 }: {
   label: string;
-  hint?: string;
   icon: LucideIcon;
   value: number | null | undefined;
   suffix?: string;
@@ -781,9 +758,6 @@ function Metric({
           {loading ? <Skeleton className="inline-block h-8 w-16" /> : display}
         </p>
         <p className="mt-2.5 text-sm font-semibold">{label}</p>
-        {hint && (
-          <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
-        )}
       </div>
     </div>
   );
