@@ -114,6 +114,87 @@ export function useMonthlyEvolution(id: number | undefined) {
   });
 }
 
+// --- Relatório "Histórico de Frequência de Atendimento" (modelo operadora) ---
+// Uma linha por evolução diária do mês (paciente + profissional), com data e
+// horários. As colunas de assinatura ficam em branco para assinatura física.
+export type FrequencyReportRow = {
+  session_date: string;
+  start_time: string;
+  end_time: string;
+};
+
+export type FrequencyReportData = {
+  patient:
+    | Pick<
+        Tables<"patients">,
+        "name" | "birth_date" | "health_plan_card" | "health_plan_name" | "guardian_name"
+      >
+    | null;
+  professional:
+    | Pick<
+        Tables<"professionals">,
+        "name" | "specialty" | "council_type" | "council_number" | "council_state"
+      >
+    | null;
+  referenceMonth: number;
+  referenceYear: number;
+  rows: FrequencyReportRow[];
+};
+
+// Busca sob demanda (acionada no clique da listagem) os dados para o PDF de
+// frequência: identificação do paciente/profissional + evoluções diárias do
+// período do paciente com aquele profissional.
+export async function fetchFrequencyReportData(
+  clinicId: number,
+  monthly: Pick<
+    MonthlyEvolution,
+    "patient_id" | "professional_id" | "reference_month" | "reference_year"
+  >,
+): Promise<FrequencyReportData> {
+  const { from, to } = monthRange(monthly.reference_year, monthly.reference_month);
+
+  const [
+    { data: patient, error: patientErr },
+    { data: professional, error: profErr },
+    { data: evolutions, error: evoErr },
+  ] = await Promise.all([
+    supabase
+      .from("patients")
+      .select("name, birth_date, health_plan_card, health_plan_name, guardian_name")
+      .eq("id", monthly.patient_id)
+      .eq("clinic_id", clinicId)
+      .maybeSingle(),
+    supabase
+      .from("professionals")
+      .select("name, specialty, council_type, council_number, council_state")
+      .eq("id", monthly.professional_id)
+      .eq("clinic_id", clinicId)
+      .maybeSingle(),
+    supabase
+      .from("daily_evolutions")
+      .select("session_date, start_time, end_time")
+      .eq("clinic_id", clinicId)
+      .eq("patient_id", monthly.patient_id)
+      .eq("professional_id", monthly.professional_id)
+      .gte("session_date", from)
+      .lte("session_date", to)
+      .order("session_date", { ascending: true })
+      .order("start_time", { ascending: true }),
+  ]);
+
+  if (patientErr) throw patientErr;
+  if (profErr) throw profErr;
+  if (evoErr) throw evoErr;
+
+  return {
+    patient: patient ?? null,
+    professional: professional ?? null,
+    referenceMonth: monthly.reference_month,
+    referenceYear: monthly.reference_year,
+    rows: (evolutions ?? []) as FrequencyReportRow[],
+  };
+}
+
 type GenerateInput = {
   patient_id: number;
   professional_id: number;
