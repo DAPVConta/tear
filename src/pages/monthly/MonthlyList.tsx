@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { useUrlState, useUrlNumber } from "@/hooks/useUrlState";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -6,10 +7,13 @@ import {
   CalendarRange,
   CheckCircle2,
   CircleDashed,
+  FileDown,
+  Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useClinic } from "@/providers/ClinicProvider";
 import { monthlyStatusLabels } from "@/lib/labels";
 import { TablePagination } from "@/components/ui/table-pagination";
 import {
@@ -35,6 +39,7 @@ import {
 import { usePatientOptions } from "@/features/patients/api";
 import {
   useMonthlyEvolutions,
+  fetchFrequencyReportData,
   MONTHLY_PAGE_SIZE,
   MONTH_NAMES_PT,
 } from "@/features/monthlyEvolutions/api";
@@ -44,9 +49,11 @@ const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
 export default function MonthlyList() {
   const navigate = useNavigate();
+  const { clinic } = useClinic();
   const [page, setPage] = useUrlNumber("page", 1);
   const [patientId, setPatientId] = useUrlState("patient", "all");
   const [year, setYear] = useUrlState("year", String(currentYear));
+  const [freqLoadingId, setFreqLoadingId] = useState<number | null>(null);
 
   const { data: patients } = usePatientOptions();
   const { data, isLoading, isError } = useMonthlyEvolutions({
@@ -63,6 +70,28 @@ export default function MonthlyList() {
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
+
+  async function onExportFrequency(m: {
+    id: number;
+    patient_id: number;
+    professional_id: number;
+    reference_month: number;
+    reference_year: number;
+  }) {
+    if (!clinic?.id) return;
+    setFreqLoadingId(m.id);
+    try {
+      const report = await fetchFrequencyReportData(clinic.id, m);
+      const { exportFrequencyHistoryPDF } = await import("@/lib/pdf");
+      exportFrequencyHistoryPDF(report, clinic.name ?? "Clínica");
+    } catch (e) {
+      toast.error("Não foi possível gerar o histórico de frequência", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setFreqLoadingId(null);
+    }
+  }
 
   return (
     <div>
@@ -127,10 +156,11 @@ export default function MonthlyList() {
               <TableHead>Profissional</TableHead>
               <TableHead>Sessões</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Frequência</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && <TableSkeletonRows columns={5} />}
+            {isLoading && <TableSkeletonRows columns={6} />}
             {!isLoading &&
               data?.rows.map((m) => (
                 <TableRow
@@ -165,6 +195,25 @@ export default function MonthlyList() {
                       )}
                       {monthlyStatusLabels[m.workflow_status]}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={freqLoadingId === m.id}
+                      title="Baixar histórico de frequência (PDF)"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onExportFrequency(m);
+                      }}
+                    >
+                      {freqLoadingId === m.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileDown className="h-4 w-4" />
+                      )}
+                      <span className="hidden sm:inline">Frequência</span>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

@@ -4,7 +4,11 @@ import {
   MONTH_NAMES_PT,
   getMonthlyDigitalSignature,
 } from "@/features/monthlyEvolutions/api";
-import type { MonthlyRow, GoalProgress } from "@/features/monthlyEvolutions/api";
+import type {
+  MonthlyRow,
+  GoalProgress,
+  FrequencyReportData,
+} from "@/features/monthlyEvolutions/api";
 import type { Tables } from "@/types/database";
 import {
   getAddenda,
@@ -268,6 +272,242 @@ function formatDateBR(iso: string): string {
   // datas "yyyy-mm-dd" sem timezone para evitar deslocamento de 1 dia.
   const [y, m, d] = iso.slice(0, 10).split("-");
   return d && m && y ? `${d}/${m}/${y}` : iso;
+}
+
+function ageFromBirthBR(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return "—";
+  const now = new Date();
+  let age = now.getFullYear() - y;
+  const mo = now.getMonth() + 1;
+  const da = now.getDate();
+  if (mo < m || (mo === m && da < d)) age -= 1;
+  return age >= 0 ? `${age} anos` : "—";
+}
+
+// Histórico de Frequência de Atendimento — modelo no padrão exigido pelas
+// operadoras (ex.: Unimed): identificação do beneficiário/profissional e tabela
+// de datas/horários com colunas de assinatura em branco para assinatura física
+// "conforme RG". Sem a logo da operadora — usa a identidade TEAR.
+export function exportFrequencyHistoryPDF(
+  data: FrequencyReportData,
+  clinicName: string,
+): void {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  const contentWidth = pageWidth - margin * 2;
+
+  // Cabeçalho institucional TEAR
+  doc.setFillColor(...BRAND_DARK);
+  doc.rect(0, 0, pageWidth, 60, "F");
+  doc.setTextColor(255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("TEAR", margin, 38);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text("Prontuário Inteligente para Clínicas de TEA", margin, 52);
+  doc.setFontSize(11);
+  doc.text(clinicName, pageWidth - margin, 38, { align: "right" });
+  doc.setFontSize(9);
+  doc.text(
+    `Emitido em ${new Date().toLocaleDateString("pt-BR")}`,
+    pageWidth - margin,
+    52,
+    { align: "right" },
+  );
+
+  // Título
+  doc.setTextColor(...BRAND_DARK);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text("Histórico de Frequência de Atendimento", margin, 96);
+
+  const { patient, professional } = data;
+  const council = professional
+    ? [professional.council_type, professional.council_number, professional.council_state]
+        .filter(Boolean)
+        .join(" ")
+    : "";
+  const specialty = professional?.specialty
+    ? specialtyLabels[professional.specialty]
+    : "";
+  const refPeriod = `${MONTH_NAMES_PT[data.referenceMonth - 1]} / ${data.referenceYear}`;
+
+  // Campo com rótulo (cinza, pequeno) e valor (preto, seminegrito) abaixo.
+  function field(label: string, value: string, x: number, y: number, w: number) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(120);
+    doc.text(label.toUpperCase(), x, y);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(20);
+    const lines = doc.splitTextToSize(value || "—", w);
+    doc.text(lines[0] ?? "—", x, y + 12);
+    doc.setDrawColor(225);
+    doc.line(x, y + 16, x + w - 8, y + 16);
+  }
+
+  let y = 118;
+  const colW = contentWidth / 4;
+  // Linha 1: beneficiário, carteirinha, período, idade
+  field("Beneficiário", patient?.name ?? "—", margin, y, colW * 1.6);
+  field(
+    "Código Carteira Beneficiário",
+    patient?.health_plan_card ?? "—",
+    margin + colW * 1.6,
+    y,
+    colW * 1.1,
+  );
+  field("Mês/Ano de Referência", refPeriod, margin + colW * 2.7, y, colW * 0.8);
+  field("Idade", ageFromBirthBR(patient?.birth_date), margin + colW * 3.5, y, colW * 0.5);
+
+  y += 34;
+  // Linha 2: profissional, especialidade, conselho
+  field("Nome do Profissional", professional?.name ?? "—", margin, y, colW * 1.7);
+  field("Especialidade", specialty || "—", margin + colW * 1.7, y, colW * 1.2);
+  field("Nº Registro Conselho", council || "—", margin + colW * 2.9, y, colW * 1.1);
+
+  y += 34;
+  // Linha 3: operadora, acompanhante
+  field(
+    "Convênio / Operadora",
+    patient?.health_plan_name ?? "—",
+    margin,
+    y,
+    colW * 1.7,
+  );
+  field(
+    "Nome do Acompanhante",
+    patient?.guardian_name ?? "—",
+    margin + colW * 1.7,
+    y,
+    colW * 1.5,
+  );
+  field("Grau de Parentesco", "", margin + colW * 3.2, y, colW * 0.8);
+
+  y += 30;
+
+  // Tabela de frequência
+  const body = data.rows.map((r) => [
+    formatDateBR(r.session_date),
+    r.start_time?.slice(0, 5) ?? "",
+    r.end_time?.slice(0, 5) ?? "",
+    "1",
+    "",
+    "",
+  ]);
+  // Quando não há evolução no período, imprime linhas em branco para
+  // preenchimento manual (o formulário continua utilizável impresso).
+  if (body.length === 0) {
+    for (let i = 0; i < 6; i += 1) body.push(["", "", "", "", "", ""]);
+  }
+
+  autoTable(doc, {
+    startY: y,
+    head: [
+      [
+        "Data",
+        "Horário de Início",
+        "Horário de Término",
+        "Qtd. Sessões",
+        "Assinatura do(a) Profissional",
+        "Assinatura do(a) Acompanhante",
+      ],
+    ],
+    body,
+    foot:
+      data.rows.length > 0
+        ? [["Total de sessões no período", "", "", String(data.rows.length), "", ""]]
+        : undefined,
+    theme: "grid",
+    headStyles: {
+      fillColor: BRAND_DARK,
+      textColor: 255,
+      fontStyle: "bold",
+      fontSize: 8,
+      halign: "center",
+      valign: "middle",
+    },
+    footStyles: {
+      fillColor: [240, 244, 252],
+      textColor: BRAND_DARK,
+      fontStyle: "bold",
+      halign: "center",
+    },
+    bodyStyles: { minCellHeight: 22, valign: "middle" },
+    styles: { fontSize: 9, halign: "center", cellPadding: 4 },
+    columnStyles: {
+      0: { cellWidth: 62 },
+      1: { cellWidth: 70 },
+      2: { cellWidth: 70 },
+      3: { cellWidth: 55 },
+      4: { cellWidth: "auto" },
+      5: { cellWidth: "auto" },
+    },
+    margin: { left: margin, right: margin },
+  });
+
+  let cursorY = (doc as unknown as { lastAutoTable: { finalY: number } })
+    .lastAutoTable.finalY;
+
+  // Declaração legal + blocos de assinatura física — precisam de ~150pt.
+  const needed = 150;
+  if (cursorY + needed > pageHeight - 40) {
+    doc.addPage();
+    cursorY = 80;
+  }
+
+  cursorY += 24;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(60);
+  const declaration = doc.splitTextToSize(
+    "Em conformidade com o artigo 299 do Código Penal, declaramos que as informações prestadas neste documento estão corretas, e que as terapias ocorreram para o beneficiário indicado, nas datas, locais e horários registrados.",
+    contentWidth,
+  );
+  doc.text(declaration, margin, cursorY);
+  cursorY += declaration.length * 12 + 40;
+
+  // Duas assinaturas lado a lado
+  const half = contentWidth / 2;
+  const gap = 24;
+  doc.setDrawColor(120);
+  doc.line(margin, cursorY, margin + half - gap, cursorY);
+  doc.line(margin + half, cursorY, pageWidth - margin, cursorY);
+  doc.setFontSize(8);
+  doc.setTextColor(90);
+  doc.text(
+    "Local, data, carimbo e assinatura do profissional responsável (conforme RG)",
+    margin,
+    cursorY + 12,
+  );
+  doc.text(
+    "Local, data e assinatura do acompanhante (igual ao RG)",
+    margin + half,
+    cursorY + 12,
+  );
+
+  // Rodapé
+  doc.setDrawColor(220);
+  doc.line(margin, pageHeight - 40, pageWidth - margin, pageHeight - 40);
+  doc.setFontSize(8);
+  doc.setTextColor(120);
+  doc.text(
+    "Documento gerado pelo TEAR — Prontuário Inteligente para Clínicas de TEA.",
+    margin,
+    pageHeight - 24,
+  );
+
+  const safeName = patient?.name?.replace(/\s+/g, "_") ?? "paciente";
+  const file = `frequencia-${safeName}-${data.referenceYear}-${String(
+    data.referenceMonth,
+  ).padStart(2, "0")}.pdf`;
+  doc.save(file);
 }
 
 // Síntese da evolução diária em PDF A4 — cabeçalho institucional, identificação
