@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 // Logo = lockup completo (ícone + wordmark); mark = ícone quadrado (favicon).
 // `white` = versão monocromática branca para fundos escuros (ex.: login).
 const BRAND_LOGO_URL =
-  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_logo.png";
+  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_logo_redim.png";
 const BRAND_LOGO_WHITE_URL =
   "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_logo_branco1.png";
 const BRAND_MARK_URL =

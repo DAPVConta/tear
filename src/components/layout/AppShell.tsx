@@ -90,7 +90,7 @@ function MobileDrawer({
       >
         {/* Primeira linha do menu com fundo branco — fixa/realça a logo. */}
         <div className="relative z-10 flex h-20 items-center justify-between bg-white px-4">
-          <Logo src={clinic?.logo_url ?? null} markClassName="h-14" />
+          <Logo src={clinic?.logo_url ?? null} markClassName="h-10" />
           <button
             onClick={onClose}
             aria-label="Fechar menu"
