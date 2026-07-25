@@ -31,7 +31,7 @@ export function Topbar({ onOpenMobile }: { onOpenMobile: () => void }) {
   }
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-lg lg:px-6">
+    <header className="sticky top-0 z-20 flex h-20 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-lg lg:px-6">
       <Button
         variant="ghost"
         size="icon"

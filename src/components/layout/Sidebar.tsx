@@ -29,14 +29,14 @@ export function Sidebar({
       {/* Primeira linha do menu com fundo branco — fixa/realça a logo. */}
       <div
         className={cn(
-          "relative z-10 flex h-16 items-center border-b border-black/5 bg-white px-4 shadow-sm",
+          "relative z-10 flex h-20 items-center bg-white px-4",
           collapsed ? "justify-center" : "justify-between",
         )}
       >
         {collapsed ? (
-          <LogoMark className="h-10 w-10 shadow-none" src={logoUrl} />
+          <LogoMark className="h-12 w-12 shadow-none" src={logoUrl} />
         ) : (
-          <Logo markClassName="h-10" src={logoUrl} />
+          <Logo markClassName={logoUrl ? "h-12 w-12" : "h-14"} src={logoUrl} />
         )}
         {!collapsed && (
           <button

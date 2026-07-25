@@ -29,8 +29,7 @@ const features = [
 export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <Logo />
+      <header className="mx-auto flex max-w-6xl items-center justify-end px-6 py-5">
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Button asChild variant="brand" size="lg">
@@ -53,7 +52,7 @@ export default function Landing() {
           </div>
           <div className="mx-auto max-w-4xl px-6 py-24 text-center lg:py-32">
             <div className="mb-8 flex justify-center">
-              <Logo markClassName="h-20 sm:h-24 lg:h-28" />
+              <Logo markClassName="h-56 max-w-full sm:h-72 lg:h-80" />
             </div>
             <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-4 py-1.5 text-sm font-semibold text-muted-foreground shadow-soft backdrop-blur">
               <span className="h-2 w-2 rounded-full bg-accent" />
