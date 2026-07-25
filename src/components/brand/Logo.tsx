@@ -15,21 +15,26 @@ const BRAND_MARK_URL =
 export function LogoMark({
   className,
   src,
+  // `framed` desenha a moldura branca arredondada (útil sobre fundos
+  // escuros). Em faixas já claras, use framed={false}.
+  framed = true,
 }: {
   className?: string;
   src?: string | null;
+  framed?: boolean;
 }) {
   return (
     <span
       className={cn(
-        "grid place-items-center overflow-hidden rounded-xl bg-white shadow-soft",
+        "grid place-items-center overflow-hidden",
+        framed && "rounded-xl bg-white shadow-soft",
         className,
       )}
     >
       <img
         src={src ?? BRAND_MARK_URL}
         alt={src ? "Logo da clínica" : "TEAR"}
-        className="h-full w-full object-contain p-1"
+        className={cn("h-full w-full object-contain", framed && "p-1")}
       />
     </span>
   );
@@ -83,18 +88,24 @@ export function Logo({
   markClassName,
   src,
   variant = "color",
+  framed = true,
 }: {
   className?: string;
   markClassName?: string;
   src?: string | null;
   // "white" usa a logo monocromática branca (fundos escuros, ex.: login).
   variant?: "color" | "white";
+  framed?: boolean;
 }) {
   // Com logo customizada, exibimos só a marca do tenant (sem wordmark TEAR).
   if (src) {
     return (
       <div className={cn("flex items-center gap-3", className)}>
-        <LogoMark className={cn("h-10 w-10", markClassName)} src={src} />
+        <LogoMark
+          className={cn("h-10 w-10", markClassName)}
+          src={src}
+          framed={framed}
+        />
       </div>
     );
   }

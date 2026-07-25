@@ -34,9 +34,13 @@ export function Sidebar({
         )}
       >
         {collapsed ? (
-          <LogoMark className="h-12 w-12 shadow-none" src={logoUrl} />
+          <LogoMark className="h-14 w-14" src={logoUrl} framed={false} />
         ) : (
-          <Logo markClassName={logoUrl ? "h-12 w-12" : "h-10"} src={logoUrl} />
+          <Logo
+            markClassName={logoUrl ? "h-14 w-14" : "h-14"}
+            src={logoUrl}
+            framed={false}
+          />
         )}
         {!collapsed && (
           <button
