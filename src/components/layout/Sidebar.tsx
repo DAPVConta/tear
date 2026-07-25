@@ -26,22 +26,23 @@ export function Sidebar({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-white/10 to-transparent" />
       <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-white/15 via-white/5 to-transparent" />
 
+      {/* Primeira linha do menu com fundo branco — fixa/realça a logo. */}
       <div
         className={cn(
-          "relative flex h-16 items-center px-4",
+          "relative z-10 flex h-16 items-center border-b border-black/5 bg-white px-4 shadow-sm",
           collapsed ? "justify-center" : "justify-between",
         )}
       >
         {collapsed ? (
-          <LogoMark className="h-10 w-10" src={logoUrl} />
+          <LogoMark className="h-10 w-10 shadow-none" src={logoUrl} />
         ) : (
-          <Logo markClassName="h-10 w-10" src={logoUrl} />
+          <Logo markClassName="h-10" src={logoUrl} />
         )}
         {!collapsed && (
           <button
             onClick={onToggle}
             aria-label="Recolher menu"
-            className="grid h-8 w-8 place-items-center rounded-lg text-sidebar-foreground/70 transition-colors hover:bg-white/10 hover:text-sidebar-foreground"
+            className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
           >
             <ChevronsLeft className="h-5 w-5" />
           </button>

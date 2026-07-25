@@ -2,8 +2,11 @@ import { cn } from "@/lib/utils";
 
 // Ativos oficiais da marca TEAR (Supabase Storage, bucket público `Logo`).
 // Logo = lockup completo (ícone + wordmark); mark = ícone quadrado (favicon).
+// `white` = versão monocromática branca para fundos escuros (ex.: login).
 const BRAND_LOGO_URL =
-  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/ter-logo.png";
+  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_logo.png";
+const BRAND_LOGO_WHITE_URL =
+  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_logo_branco1.png";
 const BRAND_MARK_URL =
   "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_favicon.png";
 
@@ -79,10 +82,13 @@ export function Logo({
   className,
   markClassName,
   src,
+  variant = "color",
 }: {
   className?: string;
   markClassName?: string;
   src?: string | null;
+  // "white" usa a logo monocromática branca (fundos escuros, ex.: login).
+  variant?: "color" | "white";
 }) {
   // Com logo customizada, exibimos só a marca do tenant (sem wordmark TEAR).
   if (src) {
@@ -96,7 +102,7 @@ export function Logo({
   return (
     <div className={cn("flex items-center", className)}>
       <img
-        src={BRAND_LOGO_URL}
+        src={variant === "white" ? BRAND_LOGO_WHITE_URL : BRAND_LOGO_URL}
         alt="TEAR — Prontuário Inteligente para Clínicas de TEA"
         className={cn("h-10 w-auto object-contain", markClassName)}
       />

@@ -88,12 +88,13 @@ function MobileDrawer({
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-16 items-center justify-between px-4">
+        {/* Primeira linha do menu com fundo branco — fixa/realça a logo. */}
+        <div className="relative z-10 flex h-16 items-center justify-between border-b border-black/5 bg-white px-4 shadow-sm">
           <Logo src={clinic?.logo_url ?? null} />
           <button
             onClick={onClose}
             aria-label="Fechar menu"
-            className="grid h-8 w-8 place-items-center rounded-md text-sidebar-foreground/70 hover:bg-white/10 hover:text-white"
+            className="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900"
           >
             <X className="h-5 w-5" />
           </button>
