@@ -1,8 +1,14 @@
 import { cn } from "@/lib/utils";
 
-// Logomark TEAR: barras coloridas (diversidade) sobre fundo da marca,
-// com o ponto central (pessoa no centro do cuidado).
-// Quando `src` é fornecido, renderiza a logo customizada do tenant.
+// Ativos oficiais da marca TEAR (Supabase Storage, bucket público `Logo`).
+// Logo = lockup completo (ícone + wordmark); mark = ícone quadrado (favicon).
+const BRAND_LOGO_URL =
+  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/ter-logo.png";
+const BRAND_MARK_URL =
+  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_favicon.png";
+
+// Ícone quadrado da marca. Quando `src` é fornecido, renderiza a logo
+// customizada do tenant; caso contrário, usa o ícone oficial TEAR.
 export function LogoMark({
   className,
   src,
@@ -10,35 +16,19 @@ export function LogoMark({
   className?: string;
   src?: string | null;
 }) {
-  if (src) {
-    return (
-      <span
-        className={cn(
-          "grid place-items-center overflow-hidden rounded-xl bg-white shadow-soft",
-          className,
-        )}
-      >
-        <img
-          src={src}
-          alt="Logo da clínica"
-          className="h-full w-full object-contain p-1"
-        />
-      </span>
-    );
-  }
   return (
-    <div
+    <span
       className={cn(
-        "relative grid place-items-center rounded-xl bg-brand-radial shadow-glow",
+        "grid place-items-center overflow-hidden rounded-xl bg-white shadow-soft",
         className,
       )}
     >
-      <svg viewBox="0 0 24 24" className="h-1/2 w-1/2" aria-hidden="true">
-        <rect x="5" y="5" width="14" height="3" rx="1.5" fill="#1E88FF" />
-        <rect x="5" y="10.5" width="14" height="3" rx="1.5" fill="#FFC400" />
-        <rect x="5" y="16" width="14" height="3" rx="1.5" fill="#FF2D2D" />
-      </svg>
-    </div>
+      <img
+        src={src ?? BRAND_MARK_URL}
+        alt={src ? "Logo da clínica" : "TEAR"}
+        className="h-full w-full object-contain p-1"
+      />
+    </span>
   );
 }
 
@@ -88,12 +78,10 @@ export function Wordmark({
 export function Logo({
   className,
   markClassName,
-  showTagline = false,
   src,
 }: {
   className?: string;
   markClassName?: string;
-  showTagline?: boolean;
   src?: string | null;
 }) {
   // Com logo customizada, exibimos só a marca do tenant (sem wordmark TEAR).
@@ -104,10 +92,14 @@ export function Logo({
       </div>
     );
   }
+  // Marca oficial TEAR (lockup completo) em todas as telas públicas.
   return (
-    <div className={cn("flex items-center gap-3", className)}>
-      <LogoMark className={cn("h-10 w-10", markClassName)} />
-      <Wordmark showTagline={showTagline} />
+    <div className={cn("flex items-center", className)}>
+      <img
+        src={BRAND_LOGO_URL}
+        alt="TEAR — Prontuário Inteligente para Clínicas de TEA"
+        className={cn("h-10 w-auto object-contain", markClassName)}
+      />
     </div>
   );
 }
