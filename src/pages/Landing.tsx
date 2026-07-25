@@ -50,9 +50,9 @@ export default function Landing() {
             <div className="absolute right-[10%] top-24 h-72 w-72 rounded-full bg-brand-yellow/12 blur-3xl" />
             <div className="absolute right-1/4 top-44 h-56 w-56 rounded-full bg-brand-red/10 blur-3xl" />
           </div>
-          <div className="mx-auto max-w-4xl px-6 py-24 text-center lg:py-32">
-            <div className="mb-8 flex justify-center">
-              <Logo markClassName="h-56 max-w-full sm:h-72 lg:h-80" />
+          <div className="mx-auto max-w-4xl px-6 pb-20 pt-6 text-center lg:pb-24 lg:pt-8">
+            <div className="mb-6 flex justify-center">
+              <Logo markClassName="h-auto w-full max-w-3xl" />
             </div>
             <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-4 py-1.5 text-sm font-semibold text-muted-foreground shadow-soft backdrop-blur">
               <span className="h-2 w-2 rounded-full bg-accent" />
