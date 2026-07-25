@@ -41,7 +41,8 @@ type FormValues = z.infer<typeof schema>;
 export default function Onboarding() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const canCreateClinic = profile?.platform_role === "platform_admin";
   const [searchParams] = useSearchParams();
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const { loading: cepLoading, lookup: lookupCepInfo } = useCepLookup();
@@ -212,25 +213,41 @@ export default function Onboarding() {
           </div>
         </div>
 
-        <div className="my-8 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
-          <span className="h-px flex-1 bg-border" /> ou crie uma nova clínica{" "}
-          <span className="h-px flex-1 bg-border" />
-        </div>
+        {!canCreateClinic ? (
+          <div className="mt-8 rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center">
+            <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-muted text-muted-foreground">
+              <Building2 className="h-6 w-6" />
+            </span>
+            <p className="mt-4 text-sm text-muted-foreground">
+              A criação de novas clínicas é feita pela administração da
+              plataforma. Se você deve fazer parte de uma clínica, peça o{" "}
+              <span className="font-medium text-foreground">
+                código de convite
+              </span>{" "}
+              ao administrador e use o campo acima.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="my-8 flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
+              <span className="h-px flex-1 bg-border" /> ou crie uma nova clínica{" "}
+              <span className="h-px flex-1 bg-border" />
+            </div>
 
-        <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-gradient text-white shadow-glow">
-          <Building2 className="h-7 w-7" />
-        </span>
-        <h1 className="mt-6 text-3xl font-extrabold tracking-tight">
-          Crie sua clínica
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          Comece informando o CNPJ — preenchemos o resto automaticamente.
-        </p>
+            <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-gradient text-white shadow-glow">
+              <Building2 className="h-7 w-7" />
+            </span>
+            <h1 className="mt-6 text-3xl font-extrabold tracking-tight">
+              Crie sua clínica
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Comece informando o CNPJ — preenchemos o resto automaticamente.
+            </p>
 
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          className="mt-8 space-y-4 rounded-2xl border border-border bg-card p-6 shadow-soft"
-        >
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              className="mt-8 space-y-4 rounded-2xl border border-border bg-card p-6 shadow-soft"
+            >
           <Field label="CNPJ" error={errors.cnpj?.message}>
             <div className="flex gap-2">
               <Input
@@ -348,7 +365,9 @@ export default function Onboarding() {
               </>
             )}
           </Button>
-        </form>
+            </form>
+          </>
+        )}
       </main>
     </div>
   );
