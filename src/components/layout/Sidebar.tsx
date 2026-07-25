@@ -29,7 +29,7 @@ export function Sidebar({
       {/* Primeira linha do menu com fundo branco — fixa/realça a logo. */}
       <div
         className={cn(
-          "relative z-10 flex h-20 items-center bg-white px-4",
+          "relative z-10 flex h-[4.5rem] items-center bg-white px-4",
           collapsed ? "justify-center" : "justify-between",
         )}
       >

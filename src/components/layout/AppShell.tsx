@@ -47,7 +47,7 @@ export function AppShell() {
 // A sidebar/topbar permanecem visíveis durante a troca de chunk.
 function RouteLoader() {
   return (
-    <div className="fixed inset-x-0 top-20 z-30 h-0.5 overflow-hidden lg:left-72">
+    <div className="fixed inset-x-0 top-[4.5rem] z-30 h-0.5 overflow-hidden lg:left-72">
       <div className="h-full w-1/3 animate-[route_1.1s_ease-in-out_infinite] bg-brand-gradient" />
       <style>{`
         @keyframes route {
@@ -89,7 +89,7 @@ function MobileDrawer({
         )}
       >
         {/* Primeira linha do menu com fundo branco — fixa/realça a logo. */}
-        <div className="relative z-10 flex h-20 items-center justify-between bg-white px-4">
+        <div className="relative z-10 flex h-[4.5rem] items-center justify-between bg-white px-4">
           <Logo
             src={clinic?.logo_url ?? null}
             markClassName={clinic?.logo_url ? "h-14 w-14" : "h-14"}
