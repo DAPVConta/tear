@@ -51,8 +51,13 @@ export default function Landing() {
             <div className="absolute right-1/4 top-44 h-56 w-56 rounded-full bg-brand-red/10 blur-3xl" />
           </div>
           <div className="mx-auto max-w-4xl px-6 pb-20 pt-6 text-center lg:pb-24 lg:pt-8">
-            <div className="mb-6 flex justify-center">
-              <Logo markClassName="h-auto w-full max-w-3xl" />
+            {/* O PNG da logo tem margem transparente própria: recortamos com
+                margens negativas proporcionais para colar nos textos. */}
+            <div className="mb-4 flex justify-center">
+              <Logo
+                className="w-full max-w-xl overflow-hidden"
+                markClassName="h-auto w-full -my-[14%]"
+              />
             </div>
             <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-4 py-1.5 text-sm font-semibold text-muted-foreground shadow-soft backdrop-blur">
               <span className="h-2 w-2 rounded-full bg-accent" />
