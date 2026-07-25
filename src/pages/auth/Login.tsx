@@ -63,7 +63,7 @@ export default function Login() {
         <div className="absolute inset-0 bg-grid opacity-[0.07] [mask-image:radial-gradient(120%_120%_at_30%_20%,black,transparent_75%)]" />
 
         <Link to="/" className="relative w-fit">
-          <Logo variant="white" markClassName="h-16 lg:h-20" />
+          <Logo variant="white" markClassName="h-12 lg:h-14" />
         </Link>
 
         <div className="relative">

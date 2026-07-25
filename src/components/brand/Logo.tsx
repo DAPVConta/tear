@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 const BRAND_LOGO_URL =
   "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_logo_redim.png";
 const BRAND_LOGO_WHITE_URL =
-  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_logo_branco1.png";
+  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_logo_branco2.png";
 const BRAND_MARK_URL =
   "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_favicon.png";
 
