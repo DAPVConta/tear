@@ -8,7 +8,7 @@ const BRAND_LOGO_URL =
 const BRAND_LOGO_WHITE_URL =
   "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_logo_branco2.png";
 const BRAND_MARK_URL =
-  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_favicon.png";
+  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_favicon1.png";
 
 // Ícone quadrado da marca. Quando `src` é fornecido, renderiza a logo
 // customizada do tenant; caso contrário, usa o ícone oficial TEAR.
