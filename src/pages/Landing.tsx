@@ -52,6 +52,9 @@ export default function Landing() {
             <div className="absolute right-1/4 top-44 h-56 w-56 rounded-full bg-brand-red/10 blur-3xl" />
           </div>
           <div className="mx-auto max-w-4xl px-6 py-24 text-center lg:py-32">
+            <div className="mb-8 flex justify-center">
+              <Logo markClassName="h-20 sm:h-24 lg:h-28" />
+            </div>
             <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-4 py-1.5 text-sm font-semibold text-muted-foreground shadow-soft backdrop-blur">
               <span className="h-2 w-2 rounded-full bg-accent" />
               Tecnologia · Empatia · Acompanhamento · Registro
