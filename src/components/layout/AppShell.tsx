@@ -47,7 +47,7 @@ export function AppShell() {
 // A sidebar/topbar permanecem visíveis durante a troca de chunk.
 function RouteLoader() {
   return (
-    <div className="fixed inset-x-0 top-16 z-30 h-0.5 overflow-hidden lg:left-72">
+    <div className="fixed inset-x-0 top-[4.5rem] z-30 h-0.5 overflow-hidden lg:left-72">
       <div className="h-full w-1/3 animate-[route_1.1s_ease-in-out_infinite] bg-brand-gradient" />
       <style>{`
         @keyframes route {
@@ -88,12 +88,17 @@ function MobileDrawer({
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-16 items-center justify-between px-4">
-          <Logo src={clinic?.logo_url ?? null} />
+        {/* Primeira linha do menu com fundo branco — fixa/realça a logo. */}
+        <div className="relative z-10 flex h-[4.5rem] items-center justify-between bg-white px-4">
+          <Logo
+            src={clinic?.logo_url ?? null}
+            markClassName={clinic?.logo_url ? "h-14 w-14" : "h-14"}
+            framed={false}
+          />
           <button
             onClick={onClose}
             aria-label="Fechar menu"
-            className="grid h-8 w-8 place-items-center rounded-md text-sidebar-foreground/70 hover:bg-white/10 hover:text-white"
+            className="grid h-8 w-8 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900"
           >
             <X className="h-5 w-5" />
           </button>

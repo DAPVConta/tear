@@ -52,7 +52,7 @@ export default function Login() {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* Painel da marca — aurora multicor da paleta + motivo das barras */}
-      <div className="relative hidden flex-col justify-between overflow-hidden bg-brand-radial p-12 text-white lg:flex">
+      <div className="relative hidden flex-col overflow-hidden bg-brand-radial p-12 text-white lg:flex">
         {/* Blobs aurora desfocados (diversidade da marca) */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -left-24 -top-24 h-96 w-96 rounded-full bg-brand-blue-light/30 blur-3xl" />
@@ -63,10 +63,10 @@ export default function Login() {
         <div className="absolute inset-0 bg-grid opacity-[0.07] [mask-image:radial-gradient(120%_120%_at_30%_20%,black,transparent_75%)]" />
 
         <Link to="/" className="relative w-fit">
-          <Logo />
+          <Logo variant="white" markClassName="h-12 lg:h-14" />
         </Link>
 
-        <div className="relative">
+        <div className="relative mt-16">
           {/* Barras coloridas — motivo da marca (diversidade/desenvolvimento) */}
           <div className="mb-7 flex gap-2" aria-hidden="true">
             <span className="h-1.5 w-14 rounded-full bg-brand-blue-light" />
@@ -94,7 +94,7 @@ export default function Login() {
           </ul>
         </div>
 
-        <p className="relative text-sm text-white/50">
+        <p className="relative mt-auto pt-12 text-sm text-white/50">
           © {new Date().getFullYear()} TEAR · Tecnologia, Empatia, Acompanhamento e Registro
         </p>
       </div>
