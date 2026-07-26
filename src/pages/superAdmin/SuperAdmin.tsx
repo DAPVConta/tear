@@ -1,14 +1,14 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import {
   Building2,
   Users,
   ClipboardList,
-  Activity,
   ShieldCheck,
-  Power,
+  ArrowUpRight,
+  Activity,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -22,113 +22,48 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  usePlatformOverview,
-  useToggleClinicActive,
-  useUpdateClinicPlan,
-  type PlatformClinicRow,
-} from "@/features/superAdmin/api";
-import type { Enums } from "@/types/database";
+import { ListEmptyState, ListErrorBanner } from "@/components/ui/list-states";
+import { clinicStatusLabels, clinicStatusVariant } from "@/lib/labels";
+import { usePlatformClinics } from "@/features/clinics/api";
 
-const planLabels: Record<Enums<"clinic_plan">, string> = {
-  trial: "Trial",
-  basic: "Basic",
-  professional: "Professional",
-  enterprise: "Enterprise",
-};
-
-const statusLabels: Record<Enums<"clinic_plan_status">, string> = {
-  active: "Ativo",
-  trialing: "Em trial",
-  past_due: "Pendente",
-  canceled: "Cancelado",
-};
-
-const statusVariant: Record<
-  Enums<"clinic_plan_status">,
-  "success" | "warning" | "destructive" | "muted"
-> = {
-  active: "success",
-  trialing: "warning",
-  past_due: "destructive",
-  canceled: "muted",
-};
-
+// Painel consolidado da plataforma. A gestão do cadastro (criar clínica,
+// mudar situação, criar administrador) vive no módulo Clínicas — aqui ficam
+// apenas os números globais e o atalho para as clínicas mais recentes.
 export default function SuperAdmin() {
-  const { data, isLoading, isError } = usePlatformOverview();
-  const toggleActive = useToggleClinicActive();
-  const updatePlan = useUpdateClinicPlan();
+  const { data, isLoading, isError } = usePlatformClinics();
 
   const totals = useMemo(() => {
     const rows = data ?? [];
     return {
       clinics: rows.length,
-      activeClinics: rows.filter((r) => r.active).length,
+      activeClinics: rows.filter((r) => r.status === "ativa").length,
       members: rows.reduce((s, r) => s + r.member_count, 0),
       patients: rows.reduce((s, r) => s + r.patient_count, 0),
       sessions30d: rows.reduce((s, r) => s + r.sessions_30d, 0),
     };
   }, [data]);
 
-  async function onToggle(c: PlatformClinicRow) {
-    try {
-      await toggleActive.mutateAsync({ id: c.id, active: !c.active });
-      toast.success(c.active ? "Clínica desativada" : "Clínica ativada");
-    } catch (e) {
-      toast.error("Falha ao alterar", {
-        description: e instanceof Error ? e.message : undefined,
-      });
-    }
-  }
-
-  async function onChangePlan(
-    c: PlatformClinicRow,
-    plan: Enums<"clinic_plan">,
-  ) {
-    try {
-      await updatePlan.mutateAsync({ id: c.id, plan, plan_status: c.plan_status });
-      toast.success("Plano atualizado");
-    } catch (e) {
-      toast.error("Falha", {
-        description: e instanceof Error ? e.message : undefined,
-      });
-    }
-  }
-
-  async function onChangeStatus(
-    c: PlatformClinicRow,
-    plan_status: Enums<"clinic_plan_status">,
-  ) {
-    try {
-      await updatePlan.mutateAsync({ id: c.id, plan: c.plan, plan_status });
-      toast.success("Status atualizado");
-    } catch (e) {
-      toast.error("Falha", {
-        description: e instanceof Error ? e.message : undefined,
-      });
-    }
-  }
+  const recent = (data ?? []).slice(0, 5);
 
   return (
     <div>
       <PageHeader
         title="Super Admin"
-        description="Gestão da plataforma TEAR e visão consolidada das clínicas."
+        description="Visão consolidada da plataforma TEAR."
         actions={
-          <Badge variant="default" className="px-3 py-1">
-            <ShieldCheck className="h-4 w-4" /> Plataforma
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Badge variant="default" className="px-3 py-1">
+              <ShieldCheck className="h-4 w-4" /> Plataforma
+            </Badge>
+            <Button variant="brand" asChild>
+              <Link to="/clinicas">
+                <Building2 className="h-4 w-4" /> Gerenciar clínicas
+              </Link>
+            </Button>
+          </div>
         }
       />
 
-      {/* Métricas globais */}
       <section className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
         <Stat label="Clínicas" value={totals.clinics} icon={Building2} loading={isLoading} />
         <Stat
@@ -138,12 +73,7 @@ export default function SuperAdmin() {
           loading={isLoading}
         />
         <Stat label="Membros" value={totals.members} icon={Users} loading={isLoading} />
-        <Stat
-          label="Pacientes"
-          value={totals.patients}
-          icon={Users}
-          loading={isLoading}
-        />
+        <Stat label="Pacientes" value={totals.patients} icon={Users} loading={isLoading} />
         <Stat
           label="Sessões (30d)"
           value={totals.sessions30d}
@@ -152,110 +82,69 @@ export default function SuperAdmin() {
         />
       </section>
 
-      <div className="rounded-2xl border border-border bg-card shadow-soft">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="font-display font-bold tracking-tight">
+            Clínicas recentes
+          </h2>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/clinicas">
+              Ver todas <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Clínica</TableHead>
-              <TableHead>CNPJ</TableHead>
-              <TableHead>Plano</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Membros</TableHead>
+              <TableHead>Situação</TableHead>
+              <TableHead>Administrador titular</TableHead>
               <TableHead className="text-right">Pacientes</TableHead>
-              <TableHead className="text-right">Sessões 30d</TableHead>
               <TableHead>Criada em</TableHead>
-              <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading &&
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 9 }).map((__, j) => (
+                  {Array.from({ length: 5 }).map((__, j) => (
                     <TableCell key={j}>
-                      <Skeleton className="h-5 w-full" />
+                      <Skeleton className="h-5 w-3/4" />
                     </TableCell>
                   ))}
                 </TableRow>
               ))}
             {!isLoading &&
-              data?.map((c) => (
-                <TableRow key={c.id} className={c.active ? "" : "opacity-60"}>
+              recent.map((c) => (
+                <TableRow key={c.id}>
                   <TableCell>
-                    <div className="font-semibold">{c.name}</div>
-                    {!c.active && (
-                      <Badge variant="destructive" className="mt-1">
-                        Inativa
-                      </Badge>
+                    <Link
+                      to={`/clinicas/${c.id}`}
+                      className="font-semibold hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {c.name}
+                    </Link>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {c.cnpj}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={clinicStatusVariant[c.status]}>
+                      {clinicStatusLabels[c.status]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {c.owner_name ?? (
+                      <span className="text-muted-foreground">
+                        Sem administrador
+                      </span>
                     )}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{c.cnpj}</TableCell>
-                  <TableCell>
-                    <Select
-                      value={c.plan}
-                      onValueChange={(v) =>
-                        onChangePlan(c, v as Enums<"clinic_plan">)
-                      }
-                    >
-                      <SelectTrigger className="h-9 w-36">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(planLabels).map(([v, label]) => (
-                          <SelectItem key={v} value={v}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={c.plan_status}
-                      onValueChange={(v) =>
-                        onChangeStatus(c, v as Enums<"clinic_plan_status">)
-                      }
-                    >
-                      <SelectTrigger className="h-9 w-36">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(statusLabels).map(([v, label]) => (
-                          <SelectItem key={v} value={v}>
-                            <Badge
-                              variant={
-                                statusVariant[v as Enums<"clinic_plan_status">]
-                              }
-                            >
-                              {label}
-                            </Badge>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {c.member_count}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {c.patient_count}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {c.sessions_30d}
-                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {format(parseISO(c.created_at), "dd/MM/yyyy")}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant={c.active ? "outline" : "brand"}
-                      size="sm"
-                      onClick={() => onToggle(c)}
-                      disabled={toggleActive.isPending}
-                    >
-                      <Power className="h-4 w-4" />
-                      {c.active ? "Desativar" : "Ativar"}
-                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -263,20 +152,21 @@ export default function SuperAdmin() {
         </Table>
 
         {!isLoading && isError && (
-          <div className="p-10 text-center text-sm text-destructive">
-            Não foi possível carregar o painel.
-          </div>
+          <ListErrorBanner message="Não foi possível carregar o painel." />
         )}
-        {!isLoading && !isError && (data?.length ?? 0) === 0 && (
-          <div className="flex flex-col items-center gap-3 p-16 text-center">
-            <span className="grid h-12 w-12 place-items-center rounded-xl bg-secondary text-muted-foreground">
-              <Activity className="h-6 w-6" />
-            </span>
-            <p className="font-semibold">Nenhuma clínica cadastrada</p>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Assim que clínicas forem criadas, elas aparecerão aqui.
-            </p>
-          </div>
+        {!isLoading && !isError && recent.length === 0 && (
+          <ListEmptyState
+            icon={Activity}
+            title="Nenhuma clínica cadastrada"
+            description="Cadastre a primeira clínica no módulo Clínicas."
+            action={
+              <Button variant="brand" asChild>
+                <Link to="/clinicas/nova">
+                  <Building2 className="h-4 w-4" /> Nova clínica
+                </Link>
+              </Button>
+            }
+          />
         )}
       </div>
     </div>

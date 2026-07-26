@@ -26,6 +26,8 @@ const factories = {
   "/auditoria": () => import("@/pages/audit/AuditDashboard"),
   "/configuracoes": () => import("@/pages/settings/SettingsPage"),
   "/super-admin": () => import("@/pages/superAdmin/SuperAdmin"),
+  "/clinicas": () => import("@/pages/clinics/ClinicsList"),
+  "/clinicas/form": () => import("@/pages/clinics/ClinicForm"),
   "/privacidade": () => import("@/pages/PrivacyPolicy"),
   "/404": () => import("@/pages/NotFound"),
 } as const;
@@ -54,6 +56,8 @@ export const AttendanceForm = lazy(factories["/frequencia/form"]);
 export const AuditDashboard = lazy(factories["/auditoria"]);
 export const SettingsPage = lazy(factories["/configuracoes"]);
 export const SuperAdmin = lazy(factories["/super-admin"]);
+export const ClinicsList = lazy(factories["/clinicas"]);
+export const ClinicForm = lazy(factories["/clinicas/form"]);
 export const PrivacyPolicy = lazy(factories["/privacidade"]);
 export const NotFound = lazy(factories["/404"]);
 

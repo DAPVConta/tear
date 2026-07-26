@@ -40,6 +40,30 @@ Slogan oficial: "Prontuário Inteligente para Clínicas de TEA".
    ter polimento de detalhe (estados hover/focus/loading/empty/error caprichados,
    skeletons, alinhamento pixel-perfect, consistência total). Em caso de dúvida,
    escolher sempre a opção visual mais refinada.
+10. **Skill `frontend-design` (obrigatória em toda tela nova ou redesenho)** —
+    usar sempre a skill oficial da Anthropic:
+    https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md
+    Pontos que valem como regra aqui:
+    - **Partir do assunto** — a tela nasce do domínio (clínica de TEA: prontuário,
+      guia, evolução, sessão), não de um template genérico.
+    - **Herói como tese** — abrir a tela com o elemento mais característico do
+      assunto, não com "número grande + gradiente" por hábito.
+    - **Tipografia é personalidade** — escala e pesos intencionais (fontes TEAR),
+      nunca neutros por omissão.
+    - **Estrutura carrega significado** — divisores, numeração e rótulos só quando
+      comunicam algo da informação.
+    - **Movimento deliberado** — animação a serviço do conteúdo, sem efeitos
+      espalhados.
+    - **Dois passos antes de codar** — 1) plano de design (4–6 cores nomeadas,
+      display/corpo/utilitária, layout em uma frase + wireframe ASCII, e UM
+      elemento-assinatura); 2) crítica do plano: se algo parecer default de IA,
+      refazer.
+    - **Ousadia em um lugar só** — o elemento-assinatura carrega o risco; o resto
+      fica quieto e disciplinado.
+    - **Piso de qualidade** — responsivo, foco de teclado visível,
+      `prefers-reduced-motion` respeitado.
+    - **Texto é material de design** — voz ativa, escala do usuário ("Salvar
+      alterações", não "Submeter"); erro e estado vazio são direção, não humor.
 
 ## Identidade visual (Manual da Marca TEAR)
 
@@ -498,6 +522,40 @@ operadora; restrição editar/excluir só pelo criador.
       (painel Supabase) — sem ele a função responde erro amigável.
     - DEFER: webhook da ClickSign para atualizar o status sem clique
       (hoje é polling manual pelo botão "Verificar status").
+
+32. [FEITO — Módulo Clínicas] Gestão de tenants pelo Super Admin (rota
+    `/clinicas`, visível apenas para `platform_admin`, item próprio na
+    sidebar). Migrações 0033 (enum + coluna) e 0034 (funções que usam os novos
+    valores — separadas porque Postgres não permite usar um valor de enum na
+    mesma transação em que ele é criado).
+    - **`clinics.status`** (`clinic_status`: em_implantacao / ativa / suspensa /
+      encerrada) — situação operacional do contrato, distinta de `plan_status`
+      (cobrança) e de `active` (chave de acesso). Salvar mantém `active`
+      coerente com o status (suspensa/encerrada bloqueiam a clínica inteira).
+      Backfill dos registros existentes conforme `active`.
+    - **Novo papel `clinic_owner`** ("Administrador titular") no enum
+      `member_role`; `is_clinic_admin()` passou a reconhecê-lo, então toda a RLS
+      por clínica já o trata como administrador — nenhuma policy mudou.
+    - **Criação do usuário admin com Auth**: Edge Function `clinic-admin-user`
+      (verify_jwt + checagem de `platform_role`), única com service role —
+      `admin.createUser` + upsert em `profiles` + vínculo em `clinic_members`
+      como `clinic_owner`. Se o e-mail já existir no Auth, apenas vincula.
+      Senha temporária gerada no servidor e exibida UMA vez na UI (nunca
+      persistida); ação "Nova senha" redefine; revogar/liberar acesso alterna
+      `clinic_members.active`.
+    - **RPCs**: `platform_clinics_overview` ampliado (status, titular,
+      admin_count, contato) e `platform_clinic_members` (equipe de uma clínica
+      para o Super Admin, com e-mail canônico de auth.users).
+    - **UI** (skill frontend-design): listagem com trilho colorido TEA por
+      situação, filtros de busca e status persistidos na URL, alerta "sem
+      administrador"; formulário em abas (Dados da clínica / Administradores)
+      com CNPJ→BrasilAPI, CEP→endereço, plano e limites.
+    - Super Admin deixou de duplicar o CRUD de clínicas: virou painel de
+      números globais + atalho para o módulo (`features/superAdmin` removido,
+      hooks unificados em `features/clinics/api.ts`).
+    - Aplicado no projeto: migrações 0033/0034 rodadas e Edge Function
+      `clinic-admin-user` publicada (verify_jwt). Não exige secret novo — usa a
+      `SUPABASE_SERVICE_ROLE_KEY` que o runtime das Functions já injeta.
 
 Todas as correções da tabela public.corrections foram resolvidas.
 
