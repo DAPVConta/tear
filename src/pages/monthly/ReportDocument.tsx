@@ -122,6 +122,7 @@ export function ReportDocument({
   summary,
   approved,
   dateLabel,
+  signatureImage,
 }: {
   clinicName: string;
   patientName: string;
@@ -132,6 +133,8 @@ export function ReportDocument({
   summary: string;
   approved: boolean;
   dateLabel: string;
+  /** Rubrica digitalizada do profissional; já chega filtrada (só em documento assinado). */
+  signatureImage?: string | null;
 }) {
   const sections = parseSections(summary ?? "");
   let counter = 0;
@@ -176,6 +179,13 @@ export function ReportDocument({
         <footer className="border-t border-border pt-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
+              {signatureImage && (
+                <img
+                  src={signatureImage}
+                  alt={`Assinatura de ${professionalName ?? "profissional"}`}
+                  className="mb-1 h-14 w-auto max-w-60 object-contain object-left dark:brightness-0 dark:invert"
+                />
+              )}
               <div className="h-px w-60 max-w-full bg-foreground/30" />
               <p className="mt-2 text-sm font-semibold text-foreground">
                 {professionalName ?? "—"}

@@ -4,6 +4,7 @@ import { keys } from "@/lib/queryKeys";
 import { useClinic } from "@/providers/ClinicProvider";
 import { invokeEdge } from "@/features/ai/api";
 import { renderDailyEvolutionPDFBase64 } from "@/lib/pdf";
+import { fetchSignatureDataUrl } from "@/features/professionals/api";
 import type { DailyEvolution } from "@/features/dailyEvolutions/api";
 
 // Assinatura digital via ClickSign (API v3 — Envelopes). O front gera o PDF
@@ -63,17 +64,30 @@ export function useRequestClickSignSignature() {
           .maybeSingle(),
         supabase
           .from("professionals")
-          .select("name, specialty, council_type, council_number, council_state")
+          .select(
+            "name, specialty, council_type, council_number, council_state, signature_path",
+          )
           .eq("id", evolution.professional_id)
           .eq("clinic_id", clinic.id)
           .maybeSingle(),
       ]);
+
+      // Rubrica digitalizada: só faz sentido (e só é aplicada) se a evolução
+      // já estiver assinada pelo profissional. Falha ao baixar não bloqueia o
+      // envio para assinatura.
+      let signatureImage: string | null = null;
+      if (evolution.professional_signature && professional?.signature_path) {
+        signatureImage = await fetchSignatureDataUrl(
+          professional.signature_path,
+        ).catch(() => null);
+      }
 
       const { filename, contentBase64 } = renderDailyEvolutionPDFBase64(
         evolution,
         patient ?? null,
         professional ?? null,
         clinic.trade_name || clinic.name || "Clínica",
+        signatureImage,
       );
 
       const data = await invokeEdge<{ clicksign?: ClickSignEnvelope }>(

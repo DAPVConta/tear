@@ -88,6 +88,89 @@ export function useSaveProfessionalSpecialties() {
   });
 }
 
+// --- Assinatura digitalizada (rubrica) do profissional ---------------------
+// Bucket PRIVADO; a pasta raiz é o clinic_id (RLS por clínica). A imagem é
+// aplicada nos relatórios que o profissional assina (evolução diária/mensal).
+// Não substitui a assinatura ICP-Brasil: é o elemento visual do documento.
+const SIGNATURES_BUCKET = "professional-signatures";
+
+export const SIGNATURE_ACCEPT = "image/png,image/jpeg";
+export const SIGNATURE_MAX_BYTES = 2 * 1024 * 1024;
+
+// Sobe a imagem e devolve o caminho para gravar em professionals.signature_path.
+export function useUploadProfessionalSignature() {
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      if (file.size > SIGNATURE_MAX_BYTES)
+        throw new Error("A imagem deve ter no máximo 2 MB.");
+      const ext = file.type === "image/png" ? "png" : "jpg";
+      const rand = Math.random().toString(36).slice(2, 8);
+      const path = `${clinic.id}/assinatura-${Date.now()}-${rand}.${ext}`;
+      const { error } = await supabase.storage
+        .from(SIGNATURES_BUCKET)
+        .upload(path, file, { cacheControl: "3600", upsert: false });
+      if (error) throw error;
+      return path;
+    },
+  });
+}
+
+// Baixa a rubrica e devolve um data URL — formato exigido pelo jsPDF
+// (addImage) e usado também na pré-visualização do cadastro.
+export async function fetchSignatureDataUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from(SIGNATURES_BUCKET)
+    .download(path);
+  if (error) throw error;
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("Falha ao ler a imagem"));
+    reader.readAsDataURL(data);
+  });
+}
+
+export function useProfessionalSignatureImage(path: string | null | undefined) {
+  return useQuery({
+    queryKey: ["professional-signature", path],
+    enabled: !!path,
+    staleTime: 30 * 60 * 1000,
+    queryFn: () => fetchSignatureDataUrl(path!),
+  });
+}
+
+// Apaga o arquivo da rubrica. Best-effort: usado ao substituir a imagem, para
+// não deixar arquivo órfão no bucket; a falha não interrompe o fluxo.
+export async function deleteSignatureFile(path: string): Promise<void> {
+  await supabase.storage.from(SIGNATURES_BUCKET).remove([path]);
+}
+
+// Remove a rubrica do Storage e limpa a coluna. Idempotente: se o arquivo já
+// não existir, a coluna é limpa mesmo assim.
+export function useRemoveProfessionalSignature() {
+  const queryClient = useQueryClient();
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: async ({ id, path }: { id: number; path: string }) => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      await deleteSignatureFile(path);
+      await updateRecord<Professional>({
+        table: "professionals",
+        id,
+        clinicId: clinic.id,
+        values: { signature_path: null },
+      });
+    },
+    onSuccess: (_d, { id, path }) => {
+      queryClient.invalidateQueries({ queryKey: ["professional-signature", path] });
+      queryClient.invalidateQueries({ queryKey: keys.professionals.all });
+      queryClient.invalidateQueries({ queryKey: keys.professionals.byId(id) });
+    },
+  });
+}
+
 export type ProfessionalStatusFilter = "active" | "inactive" | "all";
 
 type ListParams = {

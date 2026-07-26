@@ -55,6 +55,7 @@ import { usePatientOptions, usePatient, useUpdatePatient } from "@/features/pati
 import {
   useProfessionalOptions,
   useProfessional,
+  useProfessionalSignatureImage,
   useMyProfessional,
 } from "@/features/professionals/api";
 import {
@@ -389,6 +390,10 @@ export default function DailyEvolutionForm() {
   // Dados completos para a síntese em PDF (carregados em modo edição).
   const { data: pdfPatient } = usePatient(existing?.patient_id);
   const { data: pdfProfessional } = useProfessional(existing?.professional_id);
+  // Rubrica digitalizada do profissional (aplicada no PDF quando assinada).
+  const { data: signatureImage } = useProfessionalSignatureImage(
+    pdfProfessional?.signature_path,
+  );
 
   async function handleExportPdf() {
     if (!existing) return;
@@ -398,6 +403,7 @@ export default function DailyEvolutionForm() {
       pdfPatient ?? null,
       pdfProfessional ?? null,
       clinic?.trade_name || clinic?.name || "Clínica",
+      signatureImage ?? null,
     );
   }
 

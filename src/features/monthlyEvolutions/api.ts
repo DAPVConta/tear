@@ -37,7 +37,11 @@ export function buildMonthlySignaturePayload(m: MonthlyEvolution): string {
 
 export type MonthlyRow = MonthlyEvolution & {
   patient: { name: string } | null;
-  professional: { name: string; specialty: Enums<"specialty"> } | null;
+  professional: {
+    name: string;
+    specialty: Enums<"specialty">;
+    signature_path: string | null;
+  } | null;
 };
 
 export type GoalProgress = {
@@ -78,7 +82,7 @@ export function useMonthlyEvolutions({ page, patientId, year }: ListParams) {
       let q = supabase
         .from("monthly_evolutions")
         .select(
-          "*, patient:patients(name), professional:professionals!monthly_evolutions_professional_id_fkey(name, specialty)",
+          "*, patient:patients(name), professional:professionals!monthly_evolutions_professional_id_fkey(name, specialty, signature_path)",
           { count: "exact" },
         )
         .eq("clinic_id", clinicId!)
@@ -103,7 +107,7 @@ export function useMonthlyEvolution(id: number | undefined) {
       const { data, error } = await supabase
         .from("monthly_evolutions")
         .select(
-          "*, patient:patients(name), professional:professionals!monthly_evolutions_professional_id_fkey(name, specialty)",
+          "*, patient:patients(name), professional:professionals!monthly_evolutions_professional_id_fkey(name, specialty, signature_path)",
         )
         .eq("id", id!)
         .eq("clinic_id", clinic!.id)

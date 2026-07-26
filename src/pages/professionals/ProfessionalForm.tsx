@@ -48,9 +48,15 @@ import {
   useSetProfessionalActive,
   useProfessionalSpecialties,
   useSaveProfessionalSpecialties,
+  useProfessionalSignatureImage,
+  useUploadProfessionalSignature,
+  useRemoveProfessionalSignature,
+  deleteSignatureFile,
+  SIGNATURE_MAX_BYTES,
   type Specialty,
 } from "@/features/professionals/api";
 import { useClinicMembers } from "@/features/members/api";
+import { SignatureCard } from "./SignatureCard";
 
 const specialties = Object.keys(specialtyLabels) as [
   keyof typeof specialtyLabels,
@@ -121,6 +127,52 @@ export default function ProfessionalForm() {
   const setActiveMutation = useSetProfessionalActive();
   const saveSpecialties = useSaveProfessionalSpecialties();
   const [toggleOpen, setToggleOpen] = useState(false);
+
+  // Assinatura digitalizada: o arquivo escolhido só sobe ao salvar o cadastro,
+  // como no laudo do paciente. A pré-visualização é local (FileReader).
+  const uploadSignature = useUploadProfessionalSignature();
+  const removeSignature = useRemoveProfessionalSignature();
+  const { data: storedSignature, isLoading: signatureLoading } =
+    useProfessionalSignatureImage(existing?.signature_path);
+  const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
+
+  function onSelectSignature(file: File | null) {
+    if (!file) {
+      setSignatureFile(null);
+      setSignaturePreview(null);
+      return;
+    }
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      toast.error("Envie a assinatura em PNG ou JPG");
+      return;
+    }
+    if (file.size > SIGNATURE_MAX_BYTES) {
+      toast.error("A imagem deve ter no máximo 2 MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setSignaturePreview(String(reader.result));
+    reader.readAsDataURL(file);
+    setSignatureFile(file);
+  }
+
+  async function onRemoveSignature() {
+    if (!professionalId || !existing?.signature_path) return;
+    try {
+      await removeSignature.mutateAsync({
+        id: professionalId,
+        path: existing.signature_path,
+      });
+      setSignatureFile(null);
+      setSignaturePreview(null);
+      toast.success("Assinatura removida");
+    } catch (e) {
+      toast.error("Falha ao remover a assinatura", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    }
+  }
 
   const isActive = existing?.active ?? true;
 
@@ -210,6 +262,23 @@ export default function ProfessionalForm() {
 
   async function onSubmit(values: FormValues) {
     const principal = values.specialties[0];
+
+    let signaturePath = existing?.signature_path ?? null;
+    if (signatureFile) {
+      try {
+        signaturePath = await uploadSignature.mutateAsync(signatureFile);
+      } catch (e) {
+        toast.error("Falha ao enviar a assinatura", {
+          description: e instanceof Error ? e.message : undefined,
+        });
+        return;
+      }
+      // Substituiu a rubrica: apaga a anterior para não deixar órfão no bucket.
+      if (existing?.signature_path) {
+        await deleteSignatureFile(existing.signature_path).catch(() => {});
+      }
+    }
+
     const payload = {
       name: values.name,
       cpf: unmask(values.cpf),
@@ -224,6 +293,7 @@ export default function ProfessionalForm() {
       council_state: values.council_state,
       email: values.email || null,
       phone: values.phone ? unmask(values.phone) : null,
+      signature_path: signaturePath,
     };
 
     try {
@@ -504,6 +574,15 @@ export default function ProfessionalForm() {
             </Field>
           </CardContent>
         </Card>
+
+        <SignatureCard
+          storedImage={storedSignature ?? null}
+          pendingPreview={signaturePreview}
+          loading={signatureLoading && !!existing?.signature_path}
+          removing={removeSignature.isPending}
+          onSelect={onSelectSignature}
+          onRemove={isEdit ? onRemoveSignature : undefined}
+        />
 
         <Card>
           <CardHeader>
