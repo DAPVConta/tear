@@ -6,10 +6,12 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Loader2, ArrowRight, ShieldCheck, FileCheck2, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isRememberMeEnabled, setRememberMe } from "@/lib/authStorage";
 import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const schema = z.object({
   name: z.string().optional(),
@@ -20,6 +22,8 @@ type FormValues = z.infer<typeof schema>;
 
 export default function Login() {
   const [mode, setMode] = useState<"login" | "signup">("login");
+  // Preferência do dispositivo: onde o token será guardado (ver lib/authStorage).
+  const [remember, setRemember] = useState(isRememberMeEnabled);
   const navigate = useNavigate();
   const {
     register,
@@ -28,6 +32,10 @@ export default function Login() {
   } = useForm<FormValues>({ resolver: zodResolver(schema) });
 
   async function onSubmit(values: FormValues) {
+    // Decide o destino do token ANTES de autenticar, para que a sessão nova
+    // já nasça no storage certo.
+    setRememberMe(remember);
+
     if (mode === "login") {
       const { error } = await supabase.auth.signInWithPassword({
         email: values.email,
@@ -150,6 +158,24 @@ export default function Login() {
               )}
             </div>
 
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border bg-secondary/40 p-3 transition-colors hover:bg-secondary/70">
+              <Checkbox
+                checked={remember}
+                onCheckedChange={(v) => setRemember(v === true)}
+                className="mt-0.5"
+                aria-describedby="remember-hint"
+              />
+              <span className="text-sm">
+                <span className="font-medium">Manter conectado neste dispositivo</span>
+                <span
+                  id="remember-hint"
+                  className="mt-0.5 block text-xs text-muted-foreground"
+                >
+                  Deixe desmarcado em computador compartilhado da clínica.
+                </span>
+              </span>
+            </label>
+
             <Button
               type="submit"
               variant="brand"
@@ -179,11 +205,15 @@ export default function Login() {
             </button>
           </p>
 
-          {/* Expectativa explícita: a sessão não sobrevive ao fechamento do
-              navegador (ver lib/authStorage). */}
-          <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-            Por segurança, sua sessão termina ao fechar o navegador.
+          {/* Expectativa explícita sobre a duração da sessão (ver
+              lib/authStorage e config/session). */}
+          <p className="mt-4 flex items-start justify-center gap-1.5 text-center text-xs text-muted-foreground">
+            <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              {remember
+                ? "Você segue conectado neste dispositivo. Após 30 minutos sem uso, a sessão é encerrada."
+                : "Sua sessão termina ao fechar o navegador e após 30 minutos sem uso."}
+            </span>
           </p>
         </div>
       </div>

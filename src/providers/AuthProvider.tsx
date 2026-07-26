@@ -1,12 +1,16 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { clearStoredSession } from "@/lib/authStorage";
+import { SessionTimeoutGuard } from "@/components/session/SessionTimeoutGuard";
 import type { Tables } from "@/types/database";
 
 type Profile = Tables<"profiles">;
@@ -59,28 +63,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [session?.user.id]);
 
-  const value: AuthContextValue = {
-    session,
-    user: session?.user ?? null,
-    profile,
-    loading,
-    signOut: async () => {
-      // Limpa rascunhos com dado clínico (LGPD) antes de encerrar a sessão —
-      // evita que o próximo usuário do mesmo navegador leia conteúdo de
-      // paciente persistido em localStorage.
-      try {
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-          const key = localStorage.key(i);
-          if (key?.startsWith("tear:draft:")) localStorage.removeItem(key);
-        }
-      } catch {
-        // localStorage indisponível — segue com o signOut.
+  // Identidade estável: o guarda de inatividade usa `signOut` como dependência
+  // de efeito — recriá-lo a cada render reiniciaria o timer sem parar.
+  const signOut = useCallback(async () => {
+    // Limpa rascunhos com dado clínico (LGPD) antes de encerrar a sessão —
+    // evita que o próximo usuário do mesmo navegador leia conteúdo de
+    // paciente persistido em localStorage.
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key?.startsWith("tear:draft:")) localStorage.removeItem(key);
       }
-      await supabase.auth.signOut();
-    },
-  };
+    } catch {
+      // localStorage indisponível — segue com o signOut.
+    }
+    await supabase.auth.signOut();
+    // Garante que nenhum token sobre nos dois storages, independentemente da
+    // opção "lembrar-me" vigente.
+    clearStoredSession();
+  }, []);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      session,
+      user: session?.user ?? null,
+      profile,
+      loading,
+      signOut,
+    }),
+    [session, profile, loading, signOut],
+  );
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      <SessionTimeoutGuard />
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

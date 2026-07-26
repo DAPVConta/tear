@@ -589,16 +589,31 @@ Fase 2 restante: Asaas billing.
   Supabase Auth é gravado em `sessionStorage` (`lib/authStorage.ts`), não em
   `localStorage`. Fechar o navegador/aba exige novo login; recarregar a página
   (F5) mantém o login.
-- Consequência aceita: cada aba tem sua própria sessão — abrir o app em uma nova
-  aba pede login. É o preço de não deixar credencial persistida em máquina
-  compartilhada da clínica.
+- Consequência aceita nesse modo: cada aba tem sua própria sessão — abrir o app
+  em uma nova aba pede login. É o preço de não deixar credencial persistida em
+  máquina compartilhada da clínica.
+- **"Manter conectado neste dispositivo"** (checkbox no login): liga o modo
+  `localStorage` — a sessão sobrevive ao reinício do navegador e é compartilhada
+  entre abas. A preferência mora em `tear:remember-me` (localStorage) e é lida
+  pelo storage adapter a cada chamada; `setRememberMe()` migra o token já
+  gravado entre os dois storages, então alternar não derruba a sessão ativa.
+  Padrão: desligado.
+- **Logout automático por inatividade** (`config/session.ts` +
+  `components/session/SessionTimeoutGuard.tsx`): 30min sem interação encerram a
+  sessão, com aviso 1min antes (contador regressivo, "Continuar conectado" /
+  "Sair agora"). Vale nos dois modos. Um único timer de 1s compara o relógio —
+  assim a regra também vale quando a máquina dorme. Durante o aviso o
+  rastreamento de atividade pausa: renovar exige clique explícito (mouse
+  tremendo em tela desatendida não conta como presença). A contagem reinicia a
+  cada carregamento da página — o alvo é a tela aberta e sem ninguém na frente,
+  não punir quem volta no dia seguinte com "lembrar-me" ligado.
 - No boot, `purgeLegacyPersistentSession()` apaga tokens `sb-*-auth-token`
-  remanescentes do modelo antigo em `localStorage`.
+  remanescentes em `localStorage` — só quando "lembrar-me" está desligado.
+- `signOut()` limpa rascunhos clínicos (LGPD) e chama `clearStoredSession()`,
+  que apaga o token nos dois storages.
 - Sem Web Storage (modo privado/webview restrito), cai para storage em memória —
   mesma regra, sessão morre com a página.
-- Tela de login informa a regra ("sua sessão termina ao fechar o navegador").
-- NÃO implementado (avaliar se o dono quiser): logout automático por
-  inatividade e "lembrar-me" opcional.
+- Tela de login informa a regra vigente conforme a opção marcada.
 
 ## Segurança e LGPD
 

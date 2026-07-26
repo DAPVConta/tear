@@ -1,64 +1,142 @@
-// Controle de sessão do TEAR.
+// Controle de sessão do TEAR — onde o token do Supabase Auth é guardado.
 //
-// Regra do produto: a sessão vive enquanto a sessão do NAVEGADOR viver. Fechou
-// o navegador (ou a aba), tem de logar de novo — comportamento esperado de um
-// sistema com dado clínico em máquina compartilhada dentro da clínica.
+// Duas políticas, escolhidas pelo usuário na tela de login:
 //
-// Implementação: o token do Supabase Auth passa a morar em `sessionStorage`
-// (escopo aba/janela, apagado pelo próprio navegador ao encerrar) em vez de
-// `localStorage` (que sobrevive a reinícios indefinidamente). Recarregar a
-// página (F5) NÃO desloga — o refresh token continua na aba.
+//   "lembrar-me" DESLIGADO (padrão)  → `sessionStorage`: a sessão vive enquanto
+//     a sessão do NAVEGADOR viver. Recarregar (F5) mantém o login; fechar o
+//     navegador/aba exige login novo. É o modo indicado para máquina
+//     compartilhada dentro da clínica.
+//
+//   "lembrar-me" LIGADO → `localStorage`: a sessão sobrevive ao reinício do
+//     navegador e é compartilhada entre abas. Indicado para o dispositivo
+//     pessoal do profissional.
+//
+// Em ambos os modos vale o logout automático por inatividade (config/session).
 
-// Fallback em memória para contextos sem Web Storage (modo restrito, SSR,
-// alguns webviews). Nesses casos a sessão vive só enquanto a página estiver
-// aberta, o que respeita a mesma regra.
-function createMemoryStorage(): Storage {
+const REMEMBER_KEY = "tear:remember-me";
+
+// supabase-js só precisa destes três métodos.
+export type AuthStorage = {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+  removeItem: (key: string) => void;
+};
+
+// Fallback em memória para contextos sem Web Storage (modo privado, webview
+// restrito, SSR). Nesses casos a sessão vive só enquanto a página estiver
+// aberta — o que respeita a regra mais restritiva das duas.
+function createMemoryStorage(): AuthStorage {
   const map = new Map<string, string>();
   return {
-    get length() {
-      return map.size;
-    },
-    key: (i: number) => Array.from(map.keys())[i] ?? null,
-    getItem: (k: string) => map.get(k) ?? null,
-    setItem: (k: string, v: string) => void map.set(k, v),
-    removeItem: (k: string) => void map.delete(k),
-    clear: () => map.clear(),
-  } as Storage;
+    getItem: (k) => map.get(k) ?? null,
+    setItem: (k, v) => void map.set(k, v),
+    removeItem: (k) => void map.delete(k),
+  };
 }
 
-function resolveSessionStorage(): Storage {
+function probe(store: Storage | undefined): AuthStorage | null {
   try {
-    if (typeof window === "undefined" || !window.sessionStorage) {
-      return createMemoryStorage();
-    }
+    if (!store) return null;
     // Safari em modo privado aceita a referência e falha na escrita.
-    const probe = "tear:storage-probe";
-    window.sessionStorage.setItem(probe, "1");
-    window.sessionStorage.removeItem(probe);
-    return window.sessionStorage;
+    const key = "tear:storage-probe";
+    store.setItem(key, "1");
+    store.removeItem(key);
+    return store;
   } catch {
-    return createMemoryStorage();
+    return null;
   }
 }
 
-// Storage usado pelo client do Supabase Auth.
-export const browserSessionStorage: Storage = resolveSessionStorage();
+const hasWindow = typeof window !== "undefined";
+const memory = createMemoryStorage();
+const local = (hasWindow && probe(window.localStorage)) || memory;
+const session = (hasWindow && probe(window.sessionStorage)) || memory;
 
-// Antes deste controle o token ficava em `localStorage` e sobrevivia a
-// reinícios do navegador. Removemos os resquícios no boot para que nenhuma
-// credencial antiga continue guardada na máquina — e para que quem estava
-// logado seja levado ao login, como a nova regra exige.
-export function purgeLegacyPersistentSession(): void {
-  try {
-    if (typeof window === "undefined" || !window.localStorage) return;
-    for (let i = window.localStorage.length - 1; i >= 0; i--) {
-      const key = window.localStorage.key(i);
-      // Chaves do supabase-js: `sb-<project-ref>-auth-token[.<n>]`.
-      if (key && /^sb-.*-auth-token(\.\d+)?$/.test(key)) {
-        window.localStorage.removeItem(key);
-      }
-    }
-  } catch {
-    // localStorage indisponível — nada a limpar.
+export function isRememberMeEnabled(): boolean {
+  return local.getItem(REMEMBER_KEY) === "1";
+}
+
+function activeStore(): AuthStorage {
+  return isRememberMeEnabled() ? local : session;
+}
+
+function inactiveStore(): AuthStorage {
+  return isRememberMeEnabled() ? session : local;
+}
+
+// Chaves do supabase-js: `sb-<project-ref>-auth-token[.<n>]`.
+const AUTH_KEY_RE = /^sb-.*-auth-token(\.\d+)?$/;
+
+function forEachStorageKey(
+  store: Storage | AuthStorage,
+  visit: (key: string) => void,
+): void {
+  // Só as Storage nativas expõem length/key; o fallback em memória não guarda
+  // resquício entre sessões, então não precisa varredura.
+  const native = store as Storage;
+  if (typeof native.length !== "number" || typeof native.key !== "function") {
+    return;
   }
+  for (let i = native.length - 1; i >= 0; i--) {
+    const key = native.key(i);
+    if (key) visit(key);
+  }
+}
+
+// Storage entregue ao client do Supabase. A escolha do destino é resolvida a
+// cada chamada, então alternar "lembrar-me" antes do login já direciona a
+// sessão nova para o lugar certo.
+export const authStorage: AuthStorage = {
+  getItem: (key) => activeStore().getItem(key),
+  setItem: (key, value) => {
+    activeStore().setItem(key, value);
+    // Nunca deixa uma cópia velha do token no outro storage.
+    inactiveStore().removeItem(key);
+  },
+  removeItem: (key) => {
+    local.removeItem(key);
+    session.removeItem(key);
+  },
+};
+
+// Alterna a política. Migra o token já gravado para o novo destino, de modo que
+// marcar/desmarcar a opção com sessão ativa não derrube o usuário.
+export function setRememberMe(enabled: boolean): void {
+  if (enabled === isRememberMeEnabled()) return;
+
+  const from = activeStore();
+  const to = enabled ? local : session;
+  const migrating: [string, string][] = [];
+  forEachStorageKey(from, (key) => {
+    if (!AUTH_KEY_RE.test(key)) return;
+    const value = from.getItem(key);
+    if (value !== null) migrating.push([key, value]);
+  });
+
+  local.setItem(REMEMBER_KEY, enabled ? "1" : "0");
+
+  for (const [key, value] of migrating) {
+    to.setItem(key, value);
+    from.removeItem(key);
+  }
+}
+
+// Remove qualquer token persistido, nos dois storages. Usado no logout
+// explícito para não deixar credencial na máquina.
+export function clearStoredSession(): void {
+  for (const store of [local, session]) {
+    forEachStorageKey(store, (key) => {
+      if (AUTH_KEY_RE.test(key)) store.removeItem(key);
+    });
+  }
+}
+
+// Antes do controle de sessão o token ficava sempre em `localStorage` e
+// sobrevivia a reinícios. Com "lembrar-me" desligado esse resquício é
+// credencial órfã: apagamos no boot.
+export function purgeLegacyPersistentSession(): void {
+  if (isRememberMeEnabled()) return;
+  forEachStorageKey(local, (key) => {
+    if (AUTH_KEY_RE.test(key)) local.removeItem(key);
+  });
 }
