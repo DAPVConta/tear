@@ -583,6 +583,23 @@ Todas as correções da tabela public.corrections foram resolvidas.
 
 Fase 2 restante: Asaas billing.
 
+## Controle de sessão
+
+- A sessão do usuário vive enquanto a sessão do **navegador** viver: o token do
+  Supabase Auth é gravado em `sessionStorage` (`lib/authStorage.ts`), não em
+  `localStorage`. Fechar o navegador/aba exige novo login; recarregar a página
+  (F5) mantém o login.
+- Consequência aceita: cada aba tem sua própria sessão — abrir o app em uma nova
+  aba pede login. É o preço de não deixar credencial persistida em máquina
+  compartilhada da clínica.
+- No boot, `purgeLegacyPersistentSession()` apaga tokens `sb-*-auth-token`
+  remanescentes do modelo antigo em `localStorage`.
+- Sem Web Storage (modo privado/webview restrito), cai para storage em memória —
+  mesma regra, sessão morre com a página.
+- Tela de login informa a regra ("sua sessão termina ao fechar o navegador").
+- NÃO implementado (avaliar se o dono quiser): logout automático por
+  inatividade e "lembrar-me" opcional.
+
 ## Segurança e LGPD
 
 - **Headers HTTP** (vercel.json): HSTS preload, X-Content-Type-Options, X-Frame-Options DENY, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy bloqueando câmera/microfone/geolocalização, Cross-Origin policies, CSP restritivo (script-src self, conexão só a Supabase + BrasilAPI, frame-ancestors none).

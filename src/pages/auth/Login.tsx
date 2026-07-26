@@ -178,6 +178,13 @@ export default function Login() {
               {mode === "login" ? "Criar agora" : "Entrar"}
             </button>
           </p>
+
+          {/* Expectativa explícita: a sessão não sobrevive ao fechamento do
+              navegador (ver lib/authStorage). */}
+          <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+            Por segurança, sua sessão termina ao fechar o navegador.
+          </p>
         </div>
       </div>
     </div>
