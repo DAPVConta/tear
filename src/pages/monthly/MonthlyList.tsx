@@ -16,7 +16,10 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useClinic } from "@/providers/ClinicProvider";
-import { monthlyStatusLabels } from "@/lib/labels";
+import {
+  monthlyStatusLabels,
+  monthlySignatureMethodLabels,
+} from "@/lib/labels";
 import { TablePagination } from "@/components/ui/table-pagination";
 import {
   TableSkeletonRows,
@@ -240,6 +243,11 @@ export default function MonthlyList() {
                       )}
                       {monthlyStatusLabels[m.workflow_status]}
                     </Badge>
+                    {m.workflow_status === "assinada" && m.signature_method && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {monthlySignatureMethodLabels[m.signature_method]}
+                      </p>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">

@@ -62,6 +62,14 @@ export const monthlyStatusLabels: Record<Enums<"monthly_status">, string> = {
   assinada: "Assinada",
 };
 
+export const monthlySignatureMethodLabels: Record<
+  Enums<"monthly_signature_method">,
+  string
+> = {
+  certificado: "Certificado ICP-Brasil",
+  digital: "Assinatura digital",
+};
+
 export const genderLabels: Record<Enums<"gender">, string> = {
   masculino: "Masculino",
   feminino: "Feminino",

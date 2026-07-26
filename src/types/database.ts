@@ -760,6 +760,9 @@ export type Database = {
           reviewed_at: string | null
           reviewer_id: number | null
           reviewer_name: string | null
+          signature_method:
+            | Database["public"]["Enums"]["monthly_signature_method"]
+            | null
           signed_at: string | null
           submitted_at: string | null
           total_absent: number
@@ -791,6 +794,9 @@ export type Database = {
           reviewed_at?: string | null
           reviewer_id?: number | null
           reviewer_name?: string | null
+          signature_method?:
+            | Database["public"]["Enums"]["monthly_signature_method"]
+            | null
           signed_at?: string | null
           submitted_at?: string | null
           total_absent: number
@@ -822,6 +828,9 @@ export type Database = {
           reviewed_at?: string | null
           reviewer_id?: number | null
           reviewer_name?: string | null
+          signature_method?:
+            | Database["public"]["Enums"]["monthly_signature_method"]
+            | null
           signed_at?: string | null
           submitted_at?: string | null
           total_absent?: number
@@ -1473,6 +1482,7 @@ export type Database = {
         | "therapist"
         | "receptionist"
       monthly_period_type: "mensal" | "periodo"
+      monthly_signature_method: "certificado" | "digital"
       monthly_status:
         | "rascunho"
         | "pendente_aprovacao"
@@ -1675,6 +1685,7 @@ export const Constants = {
         "receptionist",
       ],
       monthly_period_type: ["mensal", "periodo"],
+      monthly_signature_method: ["certificado", "digital"],
       monthly_status: [
         "rascunho",
         "pendente_aprovacao",

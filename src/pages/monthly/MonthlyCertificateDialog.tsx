@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/form/Field";
 import {
   buildMonthlySignaturePayload,
-  useSignMonthlyDigital,
+  useSignMonthlyCertificate,
   type MonthlyEvolution,
 } from "@/features/monthlyEvolutions/api";
 
@@ -25,7 +25,7 @@ type Props = {
   onSigned?: () => void;
 };
 
-export function MonthlySignatureDialog({
+export function MonthlyCertificateDialog({
   open,
   onOpenChange,
   monthly,
@@ -34,7 +34,7 @@ export function MonthlySignatureDialog({
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const sign = useSignMonthlyDigital(monthly.id);
+  const sign = useSignMonthlyCertificate(monthly.id);
 
   function reset() {
     setFile(null);
@@ -53,7 +53,7 @@ export function MonthlySignatureDialog({
       const { signWithA1Certificate } = await import("@/lib/digitalSignature");
       const signature = await signWithA1Certificate(file, password, payload);
       await sign.mutateAsync(signature);
-      toast.success("Evolução mensal assinada digitalmente", {
+      toast.success("Relatório assinado com certificado", {
         description: `Titular: ${signature.signer_name}`,
       });
       reset();
@@ -82,11 +82,11 @@ export function MonthlySignatureDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-brand-blue-light" />
-            Assinatura digital ICP-Brasil
+            Assinar com certificado
           </DialogTitle>
           <DialogDescription>
-            Use seu certificado A1 (e-CPF) para assinar a evolução mensal já
-            aprovada. O arquivo e a senha são processados apenas neste
+            Certificado A1 (e-CPF) ICP-Brasil para assinar o relatório já
+            aprovado. O arquivo e a senha são processados apenas neste
             dispositivo — nada é enviado a servidores externos.
           </DialogDescription>
         </DialogHeader>
@@ -130,7 +130,7 @@ export function MonthlySignatureDialog({
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <>
-                <ShieldCheck className="h-4 w-4" /> Assinar evolução mensal
+                <ShieldCheck className="h-4 w-4" /> Assinar com certificado
               </>
             )}
           </Button>

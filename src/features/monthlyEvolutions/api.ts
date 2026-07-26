@@ -10,6 +10,7 @@ import { buildMonthlySummary } from "./summary";
 
 export type MonthlyEvolution = Tables<"monthly_evolutions">;
 export type MonthlyPeriodType = Enums<"monthly_period_type">;
+export type MonthlySignatureMethod = Enums<"monthly_signature_method">;
 export const MONTHLY_PAGE_SIZE = 12;
 
 export function getMonthlyDigitalSignature(
@@ -513,39 +514,67 @@ export function useReviewMonthly(id: number) {
   });
 }
 
-// Grava a assinatura e encerra o ciclo do relatório. Compartilhada pelo fluxo
-// individual (detalhe) e pela assinatura em lote (listagem).
+// Grava a assinatura e encerra o ciclo do relatório. Compartilhada pelos dois
+// métodos (certificado A1 e assinatura digitalizada) e pelo lote da listagem.
 async function persistMonthlySignature(
   clinicId: number,
   id: number,
-  signature: DigitalSignature,
+  method: MonthlySignatureMethod,
+  signature: DigitalSignature | null,
 ) {
   const { error } = await supabase
     .from("monthly_evolutions")
     .update({
       workflow_status: "assinada",
-      digital_signature: signature as unknown as Json,
-      signed_at: signature.signed_at,
+      signature_method: method,
+      digital_signature: signature ? (signature as unknown as Json) : null,
+      signed_at: signature?.signed_at ?? new Date().toISOString(),
     })
     .eq("id", id)
     .eq("clinic_id", clinicId);
   if (error) throw error;
 }
 
-// Assinatura digital (A1 local) que encerra o ciclo.
-export function useSignMonthlyDigital(id: number) {
+// Método 1 — assinar com certificado ICP-Brasil (A1 local).
+export function useSignMonthlyCertificate(id: number) {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
     mutationFn: async (signature: DigitalSignature) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      await persistMonthlySignature(clinic.id, id, signature);
+      await persistMonthlySignature(clinic.id, id, "certificado", signature);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.monthly.all });
       queryClient.invalidateQueries({ queryKey: keys.monthly.byId(id) });
     },
   });
+}
+
+// Método 2 — assinatura digital: aplica no relatório a assinatura digitalizada
+// que o profissional tem no cadastro. Sem certificado; vale como aceite
+// eletrônico registrado (autor, data/hora e rubrica).
+export function useSignMonthlyRubric(id: number) {
+  const queryClient = useQueryClient();
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: async () => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      await persistMonthlySignature(clinic.id, id, "digital", null);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.monthly.all });
+      queryClient.invalidateQueries({ queryKey: keys.monthly.byId(id) });
+    },
+  });
+}
+
+// A assinatura digital só existe se houver rubrica no cadastro do profissional
+// — sem ela o documento sairia sem nenhuma marca de autoria.
+export function hasProfessionalRubric(
+  m: Pick<MonthlyRow, "professional">,
+): boolean {
+  return !!m.professional?.signature_path;
 }
 
 // Só o relatório já aprovado pelo coordenador pode ser assinado — a assinatura
@@ -561,37 +590,55 @@ export type BatchSignResult = {
 };
 
 /**
- * Assina várias evoluções com o MESMO certificado A1: o arquivo é aberto uma
- * única vez e cada relatório recebe um envelope PKCS#7 próprio, vinculado ao
- * seu conteúdo. Uma falha isolada não derruba o lote — o resultado diz linha a
- * linha o que foi assinado.
+ * Assina várias evoluções de uma vez.
+ * - certificado: o A1 é aberto UMA vez e cada relatório recebe um envelope
+ *   PKCS#7 próprio, vinculado ao seu conteúdo.
+ * - digital: aplica a rubrica cadastrada do profissional de cada relatório.
+ * Uma falha isolada não derruba o lote — o resultado diz linha a linha o que
+ * foi assinado.
  */
 export function useSignMonthlyBatch() {
   const queryClient = useQueryClient();
   const { clinic } = useClinic();
   return useMutation({
     mutationFn: async (input: {
-      file: File;
-      password: string;
+      method: MonthlySignatureMethod;
+      file?: File | null;
+      password?: string;
       items: MonthlyEvolution[];
       onProgress?: (done: number, total: number) => void;
     }): Promise<{ results: BatchSignResult[]; signerName: string }> => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const { loadA1Certificate, signPayloadWithCertificate } = await import(
-        "@/lib/digitalSignature"
-      );
-      const certificate = await loadA1Certificate(input.file, input.password);
+
+      let signPayload: ((payload: string) => DigitalSignature) | null = null;
+      if (input.method === "certificado") {
+        if (!input.file) throw new Error("Selecione o arquivo do certificado.");
+        const { loadA1Certificate, signPayloadWithCertificate } = await import(
+          "@/lib/digitalSignature"
+        );
+        const certificate = await loadA1Certificate(
+          input.file,
+          input.password ?? "",
+        );
+        signPayload = (payload) =>
+          signPayloadWithCertificate(certificate, payload);
+      }
+
       const results: BatchSignResult[] = [];
       let signerName = "";
       let done = 0;
       for (const item of input.items) {
         try {
-          const signature = signPayloadWithCertificate(
-            certificate,
-            buildMonthlySignaturePayload(item),
+          const signature = signPayload
+            ? signPayload(buildMonthlySignaturePayload(item))
+            : null;
+          await persistMonthlySignature(
+            clinic.id,
+            item.id,
+            input.method,
+            signature,
           );
-          await persistMonthlySignature(clinic.id, item.id, signature);
-          signerName = signature.signer_name;
+          if (signature) signerName = signature.signer_name;
           results.push({ id: item.id, ok: true });
         } catch (e) {
           results.push({
