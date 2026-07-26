@@ -1,9 +1,11 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
-  MONTH_NAMES_PT,
+  formatMonthlyPeriod,
+  monthlyFileSuffix,
   getMonthlyDigitalSignature,
 } from "@/features/monthlyEvolutions/api";
+import { formatDateBR } from "@/lib/date";
 import type {
   MonthlyRow,
   GoalProgress,
@@ -94,17 +96,18 @@ export function exportMonthlyEvolutionPDF(
   doc.setTextColor(...BRAND_DARK);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("Evolução Mensal", margin, 100);
+  doc.text(
+    monthly.period_type === "periodo"
+      ? "Evolução por Período"
+      : "Evolução Mensal",
+    margin,
+    100,
+  );
 
-  const refMonth = MONTH_NAMES_PT[monthly.reference_month - 1];
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.setTextColor(60);
-  doc.text(
-    `${refMonth} / ${monthly.reference_year}`,
-    margin,
-    120,
-  );
+  doc.text(formatMonthlyPeriod(monthly), margin, 120);
 
   // Identificação
   doc.setDrawColor(220);
@@ -221,7 +224,7 @@ export function exportMonthlyEvolutionPDF(
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.setTextColor(...BRAND_DARK);
-    doc.text("Plano para o próximo mês", margin, y);
+    doc.text("Plano para o próximo período", margin, y);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(40);
@@ -299,14 +302,9 @@ export function exportMonthlyEvolutionPDF(
     pageHeight - 24,
   );
 
-  const file = `evolucao-mensal-${monthly.patient?.name?.replace(/\s+/g, "_") ?? "paciente"}-${monthly.reference_year}-${String(monthly.reference_month).padStart(2, "0")}.pdf`;
-  doc.save(file);
-}
-
-function formatDateBR(iso: string): string {
-  // datas "yyyy-mm-dd" sem timezone para evitar deslocamento de 1 dia.
-  const [y, m, d] = iso.slice(0, 10).split("-");
-  return d && m && y ? `${d}/${m}/${y}` : iso;
+  const safePatient = monthly.patient?.name?.replace(/\s+/g, "_") ?? "paciente";
+  const prefix = monthlySig ? "evolucao-assinada" : "evolucao";
+  doc.save(`${prefix}-${safePatient}-${monthlyFileSuffix(monthly)}.pdf`);
 }
 
 function ageFromBirthBR(iso: string | null | undefined): string {
@@ -370,7 +368,7 @@ export function exportFrequencyHistoryPDF(
   const specialty = professional?.specialty
     ? specialtyLabels[professional.specialty]
     : "";
-  const refPeriod = `${MONTH_NAMES_PT[data.referenceMonth - 1]} / ${data.referenceYear}`;
+  const refPeriod = data.periodLabel;
 
   // Campo com rótulo (cinza, pequeno) e valor (preto, seminegrito) abaixo.
   function field(label: string, value: string, x: number, y: number, w: number) {
@@ -390,15 +388,16 @@ export function exportFrequencyHistoryPDF(
   let y = 118;
   const colW = contentWidth / 4;
   // Linha 1: beneficiário, carteirinha, período, idade
-  field("Beneficiário", patient?.name ?? "—", margin, y, colW * 1.6);
+  // (o período tem folga extra por comportar um intervalo "de → até").
+  field("Beneficiário", patient?.name ?? "—", margin, y, colW * 1.4);
   field(
     "Código Carteira Beneficiário",
     patient?.health_plan_card ?? "—",
-    margin + colW * 1.6,
+    margin + colW * 1.4,
     y,
-    colW * 1.1,
+    colW * 1.0,
   );
-  field("Mês/Ano de Referência", refPeriod, margin + colW * 2.7, y, colW * 0.8);
+  field("Período de Referência", refPeriod, margin + colW * 2.4, y, colW * 1.1);
   field("Idade", ageFromBirthBR(patient?.birth_date), margin + colW * 3.5, y, colW * 0.5);
 
   y += 34;
@@ -539,10 +538,7 @@ export function exportFrequencyHistoryPDF(
   );
 
   const safeName = patient?.name?.replace(/\s+/g, "_") ?? "paciente";
-  const file = `frequencia-${safeName}-${data.referenceYear}-${String(
-    data.referenceMonth,
-  ).padStart(2, "0")}.pdf`;
-  doc.save(file);
+  doc.save(`frequencia-${safeName}-${data.periodFileSuffix}.pdf`);
 }
 
 // Síntese da evolução diária em PDF A4 — cabeçalho institucional, identificação

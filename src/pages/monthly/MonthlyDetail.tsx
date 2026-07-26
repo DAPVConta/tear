@@ -46,7 +46,7 @@ import {
   useSubmitMonthly,
   useReviewMonthly,
   getMonthlyDigitalSignature,
-  MONTH_NAMES_PT,
+  formatMonthlyPeriod,
   type GoalProgress,
 } from "@/features/monthlyEvolutions/api";
 import { useGenerateMonthlyAnalysis } from "@/features/ai/api";
@@ -184,7 +184,7 @@ export default function MonthlyDetail() {
       : [];
     try {
       const text = await generateAI.mutateAsync({
-        period: `${MONTH_NAMES_PT[data.reference_month - 1]} / ${data.reference_year}`,
+        period: formatMonthlyPeriod(data),
         specialty: data.professional?.specialty
           ? specialtyLabels[data.professional.specialty]
           : undefined,
@@ -224,7 +224,7 @@ export default function MonthlyDetail() {
   const goals = Array.isArray(data.goals_progress)
     ? (data.goals_progress as unknown as GoalProgress[])
     : [];
-  const period = `${MONTH_NAMES_PT[data.reference_month - 1]} / ${data.reference_year}`;
+  const period = formatMonthlyPeriod(data);
   const signatureSource =
     data.approved && data.approved_at ? data.approved_at : data.created_at;
   const signatureDate = format(new Date(signatureSource), "dd 'de' MMMM 'de' yyyy", {
@@ -257,7 +257,7 @@ export default function MonthlyDetail() {
   return (
     <div>
       <PageHeader
-        title={`Evolução mensal — ${period}`}
+        title={`${data.period_type === "periodo" ? "Evolução por período" : "Evolução mensal"} — ${period}`}
         description={data.patient?.name ?? undefined}
         actions={
           <div className="flex items-center gap-2">
@@ -315,6 +315,7 @@ export default function MonthlyDetail() {
                 : undefined
             }
             period={period}
+            periodType={data.period_type}
             totals={{
               sessions: data.total_sessions,
               present: data.total_present,
@@ -425,12 +426,12 @@ export default function MonthlyDetail() {
                     placeholder="Síntese conclusiva do período"
                   />
                 </Field>
-                <Field label="Plano para o próximo mês">
+                <Field label="Plano para o próximo período">
                   <textarea
                     {...register("next_month_plan")}
                     rows={3}
                     className="flex w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    placeholder="Direcionamentos para o próximo mês"
+                    placeholder="Direcionamentos para o próximo período"
                   />
                 </Field>
               </div>

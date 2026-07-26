@@ -749,6 +749,9 @@ export type Database = {
           id: number
           next_month_plan: string | null
           patient_id: number
+          period_end: string
+          period_start: string
+          period_type: Database["public"]["Enums"]["monthly_period_type"]
           professional_id: number
           professional_review: string | null
           reference_month: number
@@ -777,6 +780,9 @@ export type Database = {
           id?: never
           next_month_plan?: string | null
           patient_id: number
+          period_end?: string
+          period_start?: string
+          period_type?: Database["public"]["Enums"]["monthly_period_type"]
           professional_id: number
           professional_review?: string | null
           reference_month: number
@@ -805,6 +811,9 @@ export type Database = {
           id?: never
           next_month_plan?: string | null
           patient_id?: number
+          period_end?: string
+          period_start?: string
+          period_type?: Database["public"]["Enums"]["monthly_period_type"]
           professional_id?: number
           professional_review?: string | null
           reference_month?: number
@@ -1463,6 +1472,7 @@ export type Database = {
         | "clinic_owner"
         | "therapist"
         | "receptionist"
+      monthly_period_type: "mensal" | "periodo"
       monthly_status:
         | "rascunho"
         | "pendente_aprovacao"
@@ -1664,6 +1674,7 @@ export const Constants = {
         "therapist",
         "receptionist",
       ],
+      monthly_period_type: ["mensal", "periodo"],
       monthly_status: [
         "rascunho",
         "pendente_aprovacao",
