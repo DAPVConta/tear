@@ -2,9 +2,56 @@ import type { Enums } from "@/types/database";
 import type { CouncilType } from "@/lib/constants";
 
 export const memberRoleLabels: Record<Enums<"member_role">, string> = {
+  clinic_owner: "Administrador titular",
   clinic_admin: "Administrador",
   therapist: "Terapeuta",
   receptionist: "Recepção",
+};
+
+// Situação operacional da clínica (contrato/implantação) — distinta do plano
+// de cobrança (`plan_status`) e da chave de acesso (`active`).
+export const clinicStatusLabels: Record<Enums<"clinic_status">, string> = {
+  em_implantacao: "Em implantação",
+  ativa: "Ativa",
+  suspensa: "Suspensa",
+  encerrada: "Encerrada",
+};
+
+export const clinicStatusVariant: Record<
+  Enums<"clinic_status">,
+  "success" | "warning" | "destructive" | "muted"
+> = {
+  em_implantacao: "warning",
+  ativa: "success",
+  suspensa: "destructive",
+  encerrada: "muted",
+};
+
+export const clinicPlanLabels: Record<Enums<"clinic_plan">, string> = {
+  trial: "Trial",
+  basic: "Basic",
+  professional: "Professional",
+  enterprise: "Enterprise",
+};
+
+export const clinicPlanStatusLabels: Record<
+  Enums<"clinic_plan_status">,
+  string
+> = {
+  active: "Ativo",
+  trialing: "Em trial",
+  past_due: "Pendente",
+  canceled: "Cancelado",
+};
+
+export const clinicPlanStatusVariant: Record<
+  Enums<"clinic_plan_status">,
+  "success" | "warning" | "destructive" | "muted"
+> = {
+  active: "success",
+  trialing: "warning",
+  past_due: "destructive",
+  canceled: "muted",
 };
 
 export const monthlyStatusLabels: Record<Enums<"monthly_status">, string> = {

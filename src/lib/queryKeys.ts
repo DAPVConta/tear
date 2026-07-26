@@ -91,8 +91,13 @@ export const keys = {
     assessmentDistribution: (clinicId: number | undefined, days: number) =>
       ["dashboard-assessments", clinicId, days] as const,
   },
-  platform: {
-    overview: ["platform-overview"] as const,
+  // Módulo Clínicas (Super Admin) — cadastro de tenants e seus administradores.
+  clinics: {
+    all: ["platform-clinics"] as const,
+    list: () => ["platform-clinics", "list"] as const,
+    byId: (id: number | undefined) => ["platform-clinics", "detail", id] as const,
+    members: (id: number | undefined) =>
+      ["platform-clinics", "members", id] as const,
   },
   corrections: {
     all: ["corrections"] as const,

@@ -31,6 +31,8 @@ import {
   AuditDashboard,
   SettingsPage,
   SuperAdmin,
+  ClinicsList,
+  ClinicForm,
   PrivacyPolicy,
   NotFound,
 } from "@/routes/pages";
@@ -89,6 +91,9 @@ export default function App() {
 
               <Route element={<RequirePlatformAdmin />}>
                 <Route path="/super-admin" element={<SuperAdmin />} />
+                <Route path="/clinicas" element={<ClinicsList />} />
+                <Route path="/clinicas/nova" element={<ClinicForm />} />
+                <Route path="/clinicas/:id" element={<ClinicForm />} />
               </Route>
             </Route>
           </Route>

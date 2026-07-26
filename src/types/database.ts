@@ -385,6 +385,7 @@ export type Database = {
           plan: Database["public"]["Enums"]["clinic_plan"]
           plan_status: Database["public"]["Enums"]["clinic_plan_status"]
           state: string | null
+          status: Database["public"]["Enums"]["clinic_status"]
           theme: Json
           trade_name: string | null
           trial_ends_at: string | null
@@ -407,6 +408,7 @@ export type Database = {
           plan?: Database["public"]["Enums"]["clinic_plan"]
           plan_status?: Database["public"]["Enums"]["clinic_plan_status"]
           state?: string | null
+          status?: Database["public"]["Enums"]["clinic_status"]
           theme?: Json
           trade_name?: string | null
           trial_ends_at?: string | null
@@ -429,6 +431,7 @@ export type Database = {
           plan?: Database["public"]["Enums"]["clinic_plan"]
           plan_status?: Database["public"]["Enums"]["clinic_plan_status"]
           state?: string | null
+          status?: Database["public"]["Enums"]["clinic_status"]
           theme?: Json
           trade_name?: string | null
           trial_ends_at?: string | null
@@ -1343,15 +1346,24 @@ export type Database = {
         Args: never
         Returns: {
           active: boolean
+          admin_count: number
+          city: string | null
           cnpj: string
           created_at: string
+          email: string
           id: number
           member_count: number
           name: string
+          owner_email: string | null
+          owner_name: string | null
           patient_count: number
+          phone: string | null
           plan: Database["public"]["Enums"]["clinic_plan"]
           plan_status: Database["public"]["Enums"]["clinic_plan_status"]
           sessions_30d: number
+          state: string | null
+          status: Database["public"]["Enums"]["clinic_status"]
+          trade_name: string | null
         }[]
       }
       redeem_clinic_invite: { Args: { p_code: string }; Returns: number }
@@ -1427,6 +1439,7 @@ export type Database = {
       authorization_status: "ativa" | "vencida" | "cancelada" | "esgotada"
       clinic_plan: "trial" | "basic" | "professional" | "enterprise"
       clinic_plan_status: "active" | "past_due" | "canceled" | "trialing"
+      clinic_status: "em_implantacao" | "ativa" | "suspensa" | "encerrada"
       correction_status: "aberto" | "em_andamento" | "resolvido" | "cancelado"
       deletion_request_status: "pending" | "processed" | "denied"
       evolution_assessment:
@@ -1442,7 +1455,11 @@ export type Database = {
         | "em_manutencao"
         | "descontinuada"
       guardian_validation_method: "assinatura_digital" | "token" | "presencial"
-      member_role: "clinic_admin" | "therapist" | "receptionist"
+      member_role:
+        | "clinic_admin"
+        | "clinic_owner"
+        | "therapist"
+        | "receptionist"
       monthly_status:
         | "rascunho"
         | "pendente_aprovacao"
@@ -1620,6 +1637,7 @@ export const Constants = {
       authorization_status: ["ativa", "vencida", "cancelada", "esgotada"],
       clinic_plan: ["trial", "basic", "professional", "enterprise"],
       clinic_plan_status: ["active", "past_due", "canceled", "trialing"],
+      clinic_status: ["em_implantacao", "ativa", "suspensa", "encerrada"],
       correction_status: ["aberto", "em_andamento", "resolvido", "cancelado"],
       deletion_request_status: ["pending", "processed", "denied"],
       evolution_assessment: [
@@ -1637,7 +1655,12 @@ export const Constants = {
         "descontinuada",
       ],
       guardian_validation_method: ["assinatura_digital", "token", "presencial"],
-      member_role: ["clinic_admin", "therapist", "receptionist"],
+      member_role: [
+        "clinic_admin",
+        "clinic_owner",
+        "therapist",
+        "receptionist",
+      ],
       monthly_status: [
         "rascunho",
         "pendente_aprovacao",
