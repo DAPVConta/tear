@@ -557,6 +557,33 @@ operadora; restrição editar/excluir só pelo criador.
       `clinic-admin-user` publicada (verify_jwt). Não exige secret novo — usa a
       `SUPABASE_SERVICE_ROLE_KEY` que o runtime das Functions já injeta.
 
+33. [FEITO — Assinatura digitalizada do profissional] Cada profissional pode ter
+    a imagem da própria assinatura manuscrita, aplicada automaticamente nos
+    relatórios que ele assina (migração 0035).
+    - **Storage**: bucket PRIVADO `professional-signatures` (pasta raiz =
+      clinic_id). Leitura para membros da clínica (necessária para gerar o PDF);
+      escrita/remoção só para admin da clínica ou profissional com conta de
+      acesso vinculada, via helper `can_manage_professional_signature`.
+      Coluna `professionals.signature_path`.
+    - **Cadastro de profissionais**: card "Assinatura digitalizada" com upload
+      (PNG/JPG, até 2 MB), pré-visualização no formato da linha de assinatura do
+      documento impresso, trocar e remover. O arquivo sobe ao salvar o cadastro
+      (mesmo padrão do laudo do paciente).
+    - **Aplicação nos relatórios**: helper `drawSignatureImage` no `lib/pdf`
+      desenha a rubrica acima da linha de assinatura preservando a proporção
+      (máx. 170×46pt); imagem inválida nunca quebra a emissão.
+      * Evolução diária (PDF + envio à ClickSign): só quando
+        `professional_signature = true`.
+      * Evolução mensal (PDF + documento na tela `ReportDocument`): só quando
+        `signed_at` ou `approved`.
+      Documento em aberto/rascunho NUNCA sai com a rubrica aplicada — a imagem
+      é o elemento visual, o valor jurídico continua vindo da assinatura
+      ICP-Brasil (A1) ou do aceite eletrônico registrado.
+    - Aplicado no projeto: migração 0035 rodada.
+    - DEFER: rubrica nos demais documentos (receita/atestado/laudo médico,
+      histórico de frequência, devolutiva aos pais) e rubrica do supervisor no
+      bloco de homologação técnica.
+
 Todas as correções da tabela public.corrections foram resolvidas.
 
 ## Gestão de Membros

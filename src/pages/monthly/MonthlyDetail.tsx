@@ -50,7 +50,10 @@ import {
   type GoalProgress,
 } from "@/features/monthlyEvolutions/api";
 import { useGenerateMonthlyAnalysis } from "@/features/ai/api";
-import { useMyProfessional } from "@/features/professionals/api";
+import {
+  useMyProfessional,
+  useProfessionalSignatureImage,
+} from "@/features/professionals/api";
 import { useClinic } from "@/providers/ClinicProvider";
 import { specialtyLabels, monthlyStatusLabels } from "@/lib/labels";
 import { MonthlySignatureDialog } from "./MonthlySignatureDialog";
@@ -76,6 +79,11 @@ export default function MonthlyDetail() {
   const review = useReviewMonthly(monthlyId);
   const generateAI = useGenerateMonthlyAnalysis();
   const { data: myProfessional } = useMyProfessional();
+  // Rubrica digitalizada do profissional responsável (aplicada no PDF quando a
+  // evolução já está assinada/aprovada).
+  const { data: signatureImage } = useProfessionalSignatureImage(
+    data?.professional?.signature_path,
+  );
   const [sigOpen, setSigOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -166,7 +174,7 @@ export default function MonthlyDetail() {
   async function onExport() {
     if (!data) return;
     const { exportMonthlyEvolutionPDF } = await import("@/lib/pdf");
-    exportMonthlyEvolutionPDF(data, clinic?.name ?? "Clínica");
+    exportMonthlyEvolutionPDF(data, clinic?.name ?? "Clínica", signatureImage ?? null);
   }
 
   async function onGenerateAI() {
@@ -315,6 +323,9 @@ export default function MonthlyDetail() {
             summary={data.generated_summary}
             approved={data.approved}
             dateLabel={signatureDate}
+            signatureImage={
+              data.signed_at || data.approved ? (signatureImage ?? null) : null
+            }
           />
         </div>
 

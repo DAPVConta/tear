@@ -1021,6 +1021,7 @@ export type Database = {
           is_at_supervisor: boolean
           name: string
           phone: string | null
+          signature_path: string | null
           specialty: Database["public"]["Enums"]["specialty"]
           updated_at: string
           user_id: string | null
@@ -1042,6 +1043,7 @@ export type Database = {
           is_at_supervisor?: boolean
           name: string
           phone?: string | null
+          signature_path?: string | null
           specialty: Database["public"]["Enums"]["specialty"]
           updated_at?: string
           user_id?: string | null
@@ -1063,6 +1065,7 @@ export type Database = {
           is_at_supervisor?: boolean
           name?: string
           phone?: string | null
+          signature_path?: string | null
           specialty?: Database["public"]["Enums"]["specialty"]
           updated_at?: string
           user_id?: string | null
