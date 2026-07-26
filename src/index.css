@@ -124,6 +124,17 @@
   h1, h2, h3, h4, h5 {
     @apply font-display tracking-tight;
   }
+
+  /* Telas internas (AppShell): a página não rola — quem rola é a área de
+     conteúdo. Impede faixa branca morta abaixo do shell. A classe é aplicada
+     pelo AppShell e removida ao sair dele (landing/login/política rolam
+     normalmente). */
+  html.app-locked,
+  html.app-locked body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
 }
 
 @layer utilities {
