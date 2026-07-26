@@ -1,4 +1,4 @@
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { X } from "lucide-react";
 import { MotionProvider, PageTransition } from "@/components/motion/motion";
@@ -15,6 +15,17 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
 
+  // Dentro do app a rolagem pertence à área de conteúdo (<main>), nunca à
+  // página. Sem esta trava, qualquer nó solto no fim do <body> (portais,
+  // toaster, extensões do navegador) cria uma faixa branca morta abaixo do
+  // shell. As telas públicas (landing, login, política) seguem rolando
+  // normalmente — a classe só existe enquanto o shell está montado.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("app-locked");
+    return () => root.classList.remove("app-locked");
+  }, []);
+
   return (
     <CommandPaletteProvider>
       <MotionProvider>
@@ -24,9 +35,11 @@ export function AppShell() {
         {/* Drawer mobile */}
         <MobileDrawer open={mobileOpen} onClose={() => setMobileOpen(false)} />
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        {/* min-h-0 nos dois níveis: sem ele, a coluna cresce com o conteúdo
+            (min-height:auto do flex) e a rolagem escapa do <main>. */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <Topbar onOpenMobile={() => setMobileOpen(true)} />
-          <main className="flex-1 overflow-y-auto">
+          <main className="min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-7xl px-4 py-8 lg:px-8 lg:py-10">
               <Suspense fallback={<RouteLoader />}>
                 {/* Transição de página por rota (fade + leve subida). */}
