@@ -5,9 +5,11 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useClinic } from "@/providers/ClinicProvider";
 import type { Enums, Json, Tables, TablesUpdate } from "@/types/database";
 import type { DigitalSignature } from "@/lib/digitalSignature";
+import { formatDateBR } from "@/lib/date";
 import { buildMonthlySummary } from "./summary";
 
 export type MonthlyEvolution = Tables<"monthly_evolutions">;
+export type MonthlyPeriodType = Enums<"monthly_period_type">;
 export const MONTHLY_PAGE_SIZE = 12;
 
 export function getMonthlyDigitalSignature(
@@ -25,7 +27,7 @@ export function buildMonthlySignaturePayload(m: MonthlyEvolution): string {
     `Evolução mensal #${m.id}`,
     `Paciente: ${m.patient_id}`,
     `Profissional: ${m.professional_id}`,
-    `Período: ${m.reference_month}/${m.reference_year}`,
+    `Período: ${formatMonthlyPeriod(m)}`,
     `Sessões: ${m.total_sessions} (presenças ${m.total_present}, ausências ${m.total_absent})`,
     `Síntese: ${m.generated_summary}`,
     `Análise: ${m.professional_review ?? ""}`,
@@ -52,17 +54,49 @@ export type GoalProgress = {
   status: string;
 };
 
-function monthRange(year: number, month: number) {
+const MONTH_NAMES_PT = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+// Intervalo "yyyy-MM-dd" do 1º ao último dia do mês.
+export function monthRange(year: number, month: number) {
   const from = `${year}-${String(month).padStart(2, "0")}-01`;
   const lastDay = new Date(year, month, 0).getDate();
   const to = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
   return { from, to };
 }
 
-const MONTH_NAMES_PT = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
-];
+// Recorte de um relatório já gravado. period_start/period_end são a fonte de
+// verdade (preenchidos também para o mensal); o mês de referência é o fallback
+// para registros lidos antes da migração 0036.
+export type MonthlyPeriodFields = Pick<
+  MonthlyEvolution,
+  "period_type" | "period_start" | "period_end" | "reference_month" | "reference_year"
+>;
+
+export function monthlyRange(m: MonthlyPeriodFields) {
+  if (m.period_start && m.period_end) {
+    return { from: m.period_start, to: m.period_end };
+  }
+  return monthRange(m.reference_year, m.reference_month);
+}
+
+// Rótulo do recorte: "Julho / 2026" (mensal) ou "01/06/2026 a 15/07/2026".
+export function formatMonthlyPeriod(m: MonthlyPeriodFields): string {
+  if (m.period_type === "periodo" && m.period_start && m.period_end) {
+    return `${formatDateBR(m.period_start)} a ${formatDateBR(m.period_end)}`;
+  }
+  return `${MONTH_NAMES_PT[m.reference_month - 1]} / ${m.reference_year}`;
+}
+
+// Sufixo do nome de arquivo — mantém os PDFs distinguíveis entre recortes.
+export function monthlyFileSuffix(m: MonthlyPeriodFields): string {
+  if (m.period_type === "periodo" && m.period_start && m.period_end) {
+    return `${m.period_start}_a_${m.period_end}`;
+  }
+  return `${m.reference_year}-${String(m.reference_month).padStart(2, "0")}`;
+}
 
 type ListParams = {
   page: number;
@@ -140,8 +174,10 @@ export type FrequencyReportData = {
         "name" | "specialty" | "council_type" | "council_number" | "council_state"
       >
     | null;
-  referenceMonth: number;
-  referenceYear: number;
+  // Rótulo do recorte ("Julho / 2026" ou "01/06/2026 a 15/07/2026").
+  periodLabel: string;
+  // Base do nome do arquivo gerado.
+  periodFileSuffix: string;
   rows: FrequencyReportRow[];
 };
 
@@ -150,12 +186,10 @@ export type FrequencyReportData = {
 // período do paciente com aquele profissional.
 export async function fetchFrequencyReportData(
   clinicId: number,
-  monthly: Pick<
-    MonthlyEvolution,
-    "patient_id" | "professional_id" | "reference_month" | "reference_year"
-  >,
+  monthly: Pick<MonthlyEvolution, "patient_id" | "professional_id"> &
+    MonthlyPeriodFields,
 ): Promise<FrequencyReportData> {
-  const { from, to } = monthRange(monthly.reference_year, monthly.reference_month);
+  const { from, to } = monthlyRange(monthly);
 
   const [
     { data: patient, error: patientErr },
@@ -193,25 +227,32 @@ export async function fetchFrequencyReportData(
   return {
     patient: patient ?? null,
     professional: professional ?? null,
-    referenceMonth: monthly.reference_month,
-    referenceYear: monthly.reference_year,
+    periodLabel: formatMonthlyPeriod(monthly),
+    periodFileSuffix: monthlyFileSuffix(monthly),
     rows: (evolutions ?? []) as FrequencyReportRow[],
   };
 }
 
-type GenerateInput = {
+// Parâmetros do motor: mês fechado ou intervalo livre escolhido na tela.
+export type GenerateInput = {
   patient_id: number;
   professional_id: number;
-  reference_year: number;
-  reference_month: number;
-};
+} & (
+  | { period_type: "mensal"; reference_year: number; reference_month: number }
+  | { period_type: "periodo"; period_start: string; period_end: string }
+);
 
-// Lançado quando já existe uma evolução mensal para o período (unique
-// paciente+ano+mês). Carrega o id da existente para a UI oferecer abri-la.
+// Lançado quando já existe uma evolução para o mesmo recorte (unique
+// paciente+mês para o mensal, paciente+intervalo para o período). Carrega o id
+// da existente para a UI oferecer abri-la.
 export class MonthlyExistsError extends Error {
   existingId?: number;
-  constructor(existingId?: number) {
-    super("Já existe uma evolução mensal para este paciente neste mês.");
+  constructor(existingId?: number, periodType: MonthlyPeriodType = "mensal") {
+    super(
+      periodType === "periodo"
+        ? "Já existe uma evolução deste paciente para exatamente este período."
+        : "Já existe uma evolução mensal para este paciente neste mês.",
+    );
     this.name = "MonthlyExistsError";
     this.existingId = existingId;
   }
@@ -226,7 +267,27 @@ export function useGenerateMonthlyEvolution() {
   return useMutation({
     mutationFn: async (input: GenerateInput) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const { from, to } = monthRange(input.reference_year, input.reference_month);
+      // Recorte normalizado: o intervalo é sempre explícito e o mês de
+      // referência (obrigatório na tabela) vem do início do período.
+      const { from, to } =
+        input.period_type === "mensal"
+          ? monthRange(input.reference_year, input.reference_month)
+          : { from: input.period_start, to: input.period_end };
+      const referenceYear =
+        input.period_type === "mensal"
+          ? input.reference_year
+          : Number(from.slice(0, 4));
+      const referenceMonth =
+        input.period_type === "mensal"
+          ? input.reference_month
+          : Number(from.slice(5, 7));
+      const periodLabel = formatMonthlyPeriod({
+        period_type: input.period_type,
+        period_start: from,
+        period_end: to,
+        reference_month: referenceMonth,
+        reference_year: referenceYear,
+      });
 
       // 1. Frequência no período
       const { data: attendances, error: attErr } = await supabase
@@ -293,8 +354,7 @@ export function useGenerateMonthlyEvolution() {
       const summary = buildMonthlySummary({
         patientName: patient?.name ?? "Paciente",
         professionalName: professional?.name ?? "Profissional",
-        month: input.reference_month,
-        year: input.reference_year,
+        periodLabel,
         attendances: attendances ?? [],
         evolutions: evolutions ?? [],
         goals: goals.map((g) => ({
@@ -316,8 +376,11 @@ export function useGenerateMonthlyEvolution() {
           clinic_id: clinic.id,
           patient_id: input.patient_id,
           professional_id: input.professional_id,
-          reference_month: input.reference_month,
-          reference_year: input.reference_year,
+          period_type: input.period_type,
+          period_start: from,
+          period_end: to,
+          reference_month: referenceMonth,
+          reference_year: referenceYear,
           total_sessions,
           total_present,
           total_absent,
@@ -327,18 +390,24 @@ export function useGenerateMonthlyEvolution() {
         .select()
         .single();
       if (error) {
-        // Unique (paciente, ano, mês): já existe evolução para o período.
-        // Busca a existente para oferecer abri-la em vez de erro técnico.
+        // Unique do recorte: já existe evolução para este paciente no mesmo
+        // mês (mensal) ou no mesmo intervalo (período). Busca a existente para
+        // oferecer abri-la em vez de devolver um erro técnico.
         if (error.code === "23505") {
-          const { data: existing } = await supabase
+          let q = supabase
             .from("monthly_evolutions")
             .select("id")
             .eq("clinic_id", clinic.id)
             .eq("patient_id", input.patient_id)
-            .eq("reference_year", input.reference_year)
-            .eq("reference_month", input.reference_month)
-            .maybeSingle();
-          throw new MonthlyExistsError(existing?.id);
+            .eq("period_type", input.period_type);
+          q =
+            input.period_type === "mensal"
+              ? q
+                  .eq("reference_year", referenceYear)
+                  .eq("reference_month", referenceMonth)
+              : q.eq("period_start", from).eq("period_end", to);
+          const { data: existing } = await q.maybeSingle();
+          throw new MonthlyExistsError(existing?.id, input.period_type);
         }
         throw error;
       }
@@ -444,6 +513,25 @@ export function useReviewMonthly(id: number) {
   });
 }
 
+// Grava a assinatura e encerra o ciclo do relatório. Compartilhada pelo fluxo
+// individual (detalhe) e pela assinatura em lote (listagem).
+async function persistMonthlySignature(
+  clinicId: number,
+  id: number,
+  signature: DigitalSignature,
+) {
+  const { error } = await supabase
+    .from("monthly_evolutions")
+    .update({
+      workflow_status: "assinada",
+      digital_signature: signature as unknown as Json,
+      signed_at: signature.signed_at,
+    })
+    .eq("id", id)
+    .eq("clinic_id", clinicId);
+  if (error) throw error;
+}
+
 // Assinatura digital (A1 local) que encerra o ciclo.
 export function useSignMonthlyDigital(id: number) {
   const queryClient = useQueryClient();
@@ -451,20 +539,74 @@ export function useSignMonthlyDigital(id: number) {
   return useMutation({
     mutationFn: async (signature: DigitalSignature) => {
       if (!clinic?.id) throw new Error("Clínica não definida");
-      const { error } = await supabase
-        .from("monthly_evolutions")
-        .update({
-          workflow_status: "assinada",
-          digital_signature: signature as unknown as Json,
-          signed_at: signature.signed_at,
-        })
-        .eq("id", id)
-        .eq("clinic_id", clinic.id);
-      if (error) throw error;
+      await persistMonthlySignature(clinic.id, id, signature);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.monthly.all });
       queryClient.invalidateQueries({ queryKey: keys.monthly.byId(id) });
+    },
+  });
+}
+
+// Só o relatório já aprovado pelo coordenador pode ser assinado — a assinatura
+// em lote acelera o trabalho, não pula etapa do fluxo.
+export function canSignMonthly(m: Pick<MonthlyEvolution, "workflow_status">) {
+  return m.workflow_status === "aguardando_assinatura";
+}
+
+export type BatchSignResult = {
+  id: number;
+  ok: boolean;
+  error?: string;
+};
+
+/**
+ * Assina várias evoluções com o MESMO certificado A1: o arquivo é aberto uma
+ * única vez e cada relatório recebe um envelope PKCS#7 próprio, vinculado ao
+ * seu conteúdo. Uma falha isolada não derruba o lote — o resultado diz linha a
+ * linha o que foi assinado.
+ */
+export function useSignMonthlyBatch() {
+  const queryClient = useQueryClient();
+  const { clinic } = useClinic();
+  return useMutation({
+    mutationFn: async (input: {
+      file: File;
+      password: string;
+      items: MonthlyEvolution[];
+      onProgress?: (done: number, total: number) => void;
+    }): Promise<{ results: BatchSignResult[]; signerName: string }> => {
+      if (!clinic?.id) throw new Error("Clínica não definida");
+      const { loadA1Certificate, signPayloadWithCertificate } = await import(
+        "@/lib/digitalSignature"
+      );
+      const certificate = await loadA1Certificate(input.file, input.password);
+      const results: BatchSignResult[] = [];
+      let signerName = "";
+      let done = 0;
+      for (const item of input.items) {
+        try {
+          const signature = signPayloadWithCertificate(
+            certificate,
+            buildMonthlySignaturePayload(item),
+          );
+          await persistMonthlySignature(clinic.id, item.id, signature);
+          signerName = signature.signer_name;
+          results.push({ id: item.id, ok: true });
+        } catch (e) {
+          results.push({
+            id: item.id,
+            ok: false,
+            error: e instanceof Error ? e.message : "Falha ao assinar",
+          });
+        }
+        done += 1;
+        input.onProgress?.(done, input.items.length);
+      }
+      return { results, signerName };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: keys.monthly.all });
     },
   });
 }

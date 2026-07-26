@@ -118,6 +118,7 @@ export function ReportDocument({
   professionalName,
   professionalRole,
   period,
+  periodType = "mensal",
   totals,
   summary,
   approved,
@@ -129,6 +130,8 @@ export function ReportDocument({
   professionalName?: string;
   professionalRole?: string;
   period: string;
+  /** Recorte do relatório — muda apenas o título do documento. */
+  periodType?: "mensal" | "periodo";
   totals: Totals;
   summary: string;
   approved: boolean;
@@ -149,7 +152,9 @@ export function ReportDocument({
             {clinicName}
           </p>
           <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Relatório de Evolução Terapêutica Mensal
+            {periodType === "periodo"
+              ? "Relatório de Evolução Terapêutica por Período"
+              : "Relatório de Evolução Terapêutica Mensal"}
           </h2>
           <p className="text-sm text-muted-foreground">
             {patientName} · {period}

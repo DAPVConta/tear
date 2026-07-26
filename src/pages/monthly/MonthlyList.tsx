@@ -9,6 +9,8 @@ import {
   CircleDashed,
   FileDown,
   Loader2,
+  ShieldCheck,
+  Download,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -37,12 +39,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePatientOptions } from "@/features/patients/api";
+import { fetchSignatureDataUrl } from "@/features/professionals/api";
 import {
   useMonthlyEvolutions,
   fetchFrequencyReportData,
+  canSignMonthly,
+  formatMonthlyPeriod,
   MONTHLY_PAGE_SIZE,
-  MONTH_NAMES_PT,
+  type MonthlyRow,
 } from "@/features/monthlyEvolutions/api";
+import { MonthlyBatchSignatureDialog } from "./MonthlyBatchSignatureDialog";
 
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -54,6 +60,8 @@ export default function MonthlyList() {
   const [patientId, setPatientId] = useUrlState("patient", "all");
   const [year, setYear] = useUrlState("year", String(currentYear));
   const [freqLoadingId, setFreqLoadingId] = useState<number | null>(null);
+  const [signedLoadingId, setSignedLoadingId] = useState<number | null>(null);
+  const [signOpen, setSignOpen] = useState(false);
 
   const { data: patients } = usePatientOptions();
   const { data, isLoading, isError } = useMonthlyEvolutions({
@@ -71,13 +79,10 @@ export default function MonthlyList() {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  async function onExportFrequency(m: {
-    id: number;
-    patient_id: number;
-    professional_id: number;
-    reference_month: number;
-    reference_year: number;
-  }) {
+  const rows = data?.rows ?? [];
+  const eligibleToSign = rows.filter(canSignMonthly).length;
+
+  async function onExportFrequency(m: MonthlyRow) {
     if (!clinic?.id) return;
     setFreqLoadingId(m.id);
     try {
@@ -93,17 +98,52 @@ export default function MonthlyList() {
     }
   }
 
+  // Documento assinado: o mesmo relatório em PDF, agora com a rubrica do
+  // profissional e o bloco da assinatura digital (titular, emissor, hash).
+  async function onDownloadSigned(m: MonthlyRow) {
+    setSignedLoadingId(m.id);
+    try {
+      const signatureImage = m.professional?.signature_path
+        ? await fetchSignatureDataUrl(m.professional.signature_path).catch(
+            () => null,
+          )
+        : null;
+      const { exportMonthlyEvolutionPDF } = await import("@/lib/pdf");
+      exportMonthlyEvolutionPDF(m, clinic?.name ?? "Clínica", signatureImage);
+    } catch (e) {
+      toast.error("Não foi possível baixar o documento assinado", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setSignedLoadingId(null);
+    }
+  }
+
   return (
     <div>
       <PageHeader
         title="Evolução mensal"
-        description="Sínteses mensais geradas automaticamente e aprovação clínica."
+        description="Sínteses geradas automaticamente, aprovação clínica e assinatura."
         actions={
-          <Button asChild variant="brand">
-            <Link to="/evolucao-mensal/gerar">
-              <Plus className="h-4 w-4" /> Gerar nova
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Assinatura em lote: um certificado, todas as linhas aprovadas.
+                Fica habilitado sempre que há linhas — o diálogo mostra o
+                estado de cada uma, inclusive por que alguma não pode assinar. */}
+            <Button
+              variant="outline"
+              onClick={() => setSignOpen(true)}
+              disabled={isLoading || rows.length === 0}
+              title="Assinar as evoluções desta página com certificado A1"
+            >
+              <ShieldCheck className="h-4 w-4" /> Assinar
+              {eligibleToSign > 0 ? ` (${eligibleToSign})` : ""}
+            </Button>
+            <Button asChild variant="brand">
+              <Link to="/evolucao-mensal/gerar">
+                <Plus className="h-4 w-4" /> Gerar nova
+              </Link>
+            </Button>
+          </div>
         }
       />
 
@@ -156,20 +196,25 @@ export default function MonthlyList() {
               <TableHead>Profissional</TableHead>
               <TableHead>Sessões</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Frequência</TableHead>
+              <TableHead className="text-right">Documentos</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && <TableSkeletonRows columns={6} />}
             {!isLoading &&
-              data?.rows.map((m) => (
+              rows.map((m) => (
                 <TableRow
                   key={m.id}
                   className="cursor-pointer"
                   onClick={() => navigate(`/evolucao-mensal/${m.id}`)}
                 >
                   <TableCell className="font-semibold">
-                    {MONTH_NAMES_PT[m.reference_month - 1]} / {m.reference_year}
+                    {formatMonthlyPeriod(m)}
+                    {m.period_type === "periodo" && (
+                      <span className="ml-2 align-middle text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        período
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>{m.patient?.name ?? "—"}</TableCell>
                   <TableCell>{m.professional?.name ?? "—"}</TableCell>
@@ -197,23 +242,45 @@ export default function MonthlyList() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={freqLoadingId === m.id}
-                      title="Baixar histórico de frequência (PDF)"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onExportFrequency(m);
-                      }}
-                    >
-                      {freqLoadingId === m.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <FileDown className="h-4 w-4" />
+                    <div className="flex items-center justify-end gap-2">
+                      {m.workflow_status === "assinada" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={signedLoadingId === m.id}
+                          title="Baixar arquivo assinado (PDF)"
+                          aria-label="Baixar arquivo assinado"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDownloadSigned(m);
+                          }}
+                        >
+                          {signedLoadingId === m.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4 text-[hsl(142_70%_35%)]" />
+                          )}
+                          <span className="hidden sm:inline">Assinado</span>
+                        </Button>
                       )}
-                      <span className="hidden sm:inline">Frequência</span>
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={freqLoadingId === m.id}
+                        title="Baixar histórico de frequência (PDF)"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onExportFrequency(m);
+                        }}
+                      >
+                        {freqLoadingId === m.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileDown className="h-4 w-4" />
+                        )}
+                        <span className="hidden sm:inline">Frequência</span>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -223,7 +290,7 @@ export default function MonthlyList() {
         {!isLoading && isError && (
           <ListErrorBanner message="Não foi possível carregar as evoluções mensais." />
         )}
-        {!isLoading && !isError && (data?.rows.length ?? 0) === 0 && (
+        {!isLoading && !isError && rows.length === 0 && (
           <ListEmptyState
             icon={CalendarRange}
             title="Nenhuma evolução mensal"
@@ -248,6 +315,12 @@ export default function MonthlyList() {
           />
         )}
       </div>
+
+      <MonthlyBatchSignatureDialog
+        open={signOpen}
+        onOpenChange={setSignOpen}
+        rows={rows}
+      />
     </div>
   );
 }

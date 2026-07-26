@@ -50,15 +50,21 @@ function field(
   return attrs.getField(name)?.value ?? "";
 }
 
+// Certificado já aberto (chave + certificado). Abrir uma única vez permite
+// assinar vários documentos em lote sem reprocessar o arquivo/senha a cada um.
+export type A1Certificate = {
+  privateKey: forge.pki.rsa.PrivateKey;
+  cert: forge.pki.Certificate;
+};
+
 /**
- * Assina o payload com o certificado A1 (PKCS#12) fornecido pelo usuário.
+ * Abre o arquivo A1 (PKCS#12) do usuário e extrai chave privada + certificado.
  * Lança erro amigável se o arquivo/senha forem inválidos.
  */
-export async function signWithA1Certificate(
+export async function loadA1Certificate(
   file: File,
   password: string,
-  payload: string,
-): Promise<DigitalSignature> {
+): Promise<A1Certificate> {
   let p12: forge.pkcs12.Pkcs12Pfx;
   try {
     const der = await fileToBinaryString(file);
@@ -87,9 +93,20 @@ export async function signWithA1Certificate(
     );
   }
 
-  const privateKey = keyBag.key;
-  const cert = certBag.cert;
+  return {
+    privateKey: keyBag.key as forge.pki.rsa.PrivateKey,
+    cert: certBag.cert,
+  };
+}
 
+/**
+ * Assina o payload com um certificado já aberto. Cada chamada produz um
+ * envelope PKCS#7 próprio, vinculado ao hash daquele conteúdo.
+ */
+export function signPayloadWithCertificate(
+  { privateKey, cert }: A1Certificate,
+  payload: string,
+): DigitalSignature {
   // Hash do conteúdo (para exibição/auditoria).
   const md = forge.md.sha256.create();
   md.update(payload, "utf8");
@@ -100,7 +117,7 @@ export async function signWithA1Certificate(
   p7.content = forge.util.createBuffer(payload, "utf8");
   p7.addCertificate(cert);
   p7.addSigner({
-    key: privateKey as forge.pki.rsa.PrivateKey,
+    key: privateKey,
     certificate: cert,
     digestAlgorithm: forge.pki.oids.sha256,
     authenticatedAttributes: [
@@ -127,4 +144,16 @@ export async function signWithA1Certificate(
     certificate_valid_to: cert.validity.notAfter.toISOString(),
     signed_at: new Date().toISOString(),
   };
+}
+
+/**
+ * Atalho para o caso de um documento só: abre o certificado e assina.
+ */
+export async function signWithA1Certificate(
+  file: File,
+  password: string,
+  payload: string,
+): Promise<DigitalSignature> {
+  const certificate = await loadA1Certificate(file, password);
+  return signPayloadWithCertificate(certificate, payload);
 }

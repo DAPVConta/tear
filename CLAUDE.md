@@ -584,6 +584,36 @@ operadora; restrição editar/excluir só pelo criador.
       histórico de frequência, devolutiva aos pais) e rubrica do supervisor no
       bloco de homologação técnica.
 
+34. [FEITO — Evolução mensal OU por período + assinatura em lote] (migração
+    0036).
+    - **Recorte do relatório**: enum `monthly_period_type` (`mensal` |
+      `periodo`) + colunas `period_start`/`period_end` em monthly_evolutions
+      (backfill do intervalo do mês nos registros existentes). As datas passam
+      a ser a fonte única de verdade para agregação, PDF de frequência e
+      rótulos; `reference_month/year` continuam preenchidos (no período, vêm da
+      data inicial) para ordenação e filtro por ano.
+    - Anti-duplicidade por recorte: a unique paciente+mês+ano virou índice
+      parcial só do `mensal`; o `periodo` tem unique parcial por
+      paciente+intervalo (mesmo intervalo exato é barrado, recortes diferentes
+      no mesmo mês são permitidos).
+    - **MonthlyGenerate**: seletor "Mensal / Por período"; no período abre
+      DatePicker de → até com validação Zod (final ≥ inicial e não futura). A
+      trava de 22 dias (mês fechado) continua valendo só no recorte mensal.
+    - Motor `buildMonthlySummary` deixou de receber mês/ano e passou a receber
+      `periodLabel` — mesmo texto serve aos dois recortes.
+    - **Assinatura em lote na listagem**: botão "Assinar" abre diálogo que lista
+      as evoluções da página, marca as aprovadas (`aguardando_assinatura`) e
+      assina todas com UM certificado A1 (`loadA1Certificate` +
+      `signPayloadWithCertificate` — o .pfx é aberto uma vez e cada relatório
+      recebe envelope PKCS#7 próprio, vinculado ao seu hash). Falha isolada não
+      derruba o lote. O fluxo de aprovação é preservado: rascunho/pendente
+      aparecem no diálogo com o motivo, desabilitados.
+    - **Download do assinado**: linha assinada ganha o botão "Assinado"
+      (ícone de download) que emite o PDF com a rubrica do profissional e o
+      bloco da assinatura digital (titular/CPF/emissor/hash/data). O arquivo é
+      gerado do registro assinado; não há cópia em Storage.
+    - PENDENTE: aplicar a migração 0036 no projeto Supabase.
+
 Todas as correções da tabela public.corrections foram resolvidas.
 
 ## Gestão de Membros

@@ -4,14 +4,9 @@ import {
   promptingLevelLabels,
 } from "@/lib/labels";
 
-// Motor determinístico de síntese mensal — produz um relatório em 6 seções
-// a partir dos sinais agregados do período (frequência, evoluções diárias,
-// progresso das metas). Sem IA: regras condicionais + templates de frases.
-
-const MONTH_NAMES_PT = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
-];
+// Motor determinístico de síntese do período — produz um relatório em 6 seções
+// a partir dos sinais agregados (frequência, evoluções diárias, progresso das
+// metas). Sem IA: regras condicionais + templates de frases.
 
 // Nível de ajuda — quanto MAIOR o índice, mais autônomo.
 const PROMPTING_RANK: Record<Enums<"prompting_level">, number> = {
@@ -53,8 +48,9 @@ export type GoalLite = {
 export type SummaryInput = {
   patientName: string;
   professionalName: string;
-  month: number;
-  year: number;
+  // Rótulo do recorte já formatado ("Julho/2026" ou "01/06/2026 a 15/07/2026"),
+  // para o motor servir tanto o relatório mensal quanto o por período.
+  periodLabel: string;
   attendances: AttendanceLite[];
   evolutions: EvolutionLite[];
   goals: GoalLite[];
@@ -118,14 +114,11 @@ function topSkills(evolutions: EvolutionLite[], limit = 5): string[] {
 export function buildMonthlySummary({
   patientName,
   professionalName,
-  month,
-  year,
+  periodLabel,
   attendances,
   evolutions,
   goals,
 }: SummaryInput): SummaryOutput {
-  const monthName = MONTH_NAMES_PT[month - 1] ?? "";
-
   // Frequência (controle de presença) — base das presenças/ausências.
   const attendanceTotal = attendances.length;
   const present = attendances.filter((a) => a.status === "presente").length;
@@ -192,7 +185,7 @@ export function buildMonthlySummary({
   lines.push("SÍNTESE DO PERÍODO");
   if (sessions === 0 && attendanceTotal === 0) {
     lines.push(
-      `Em ${monthName}/${year}, não houve sessões nem registros de frequência para ${patientName}.`,
+      `Em ${periodLabel}, não houve sessões nem registros de frequência para ${patientName}.`,
     );
   } else {
     const justifiedNote =
@@ -204,7 +197,7 @@ export function buildMonthlySummary({
         ? ` Houve ${canceled} cancelamento${canceled === 1 ? "" : "s"} no período.`
         : "";
     lines.push(
-      `Em ${monthName}/${year}, ${patientName} teve ${sessions} ${sessions === 1 ? "sessão registrada" : "sessões registradas"} com ${professionalName}. ` +
+      `Em ${periodLabel}, ${patientName} teve ${sessions} ${sessions === 1 ? "sessão registrada" : "sessões registradas"} com ${professionalName}. ` +
         `No controle de frequência: ${present} presença${present === 1 ? "" : "s"} (${presenceRate}%) e ${absent} ausência${absent === 1 ? "" : "s"} em ${attendanceTotal} agendamento${attendanceTotal === 1 ? "" : "s"}${justifiedNote}.${canceledNote}`,
     );
   }
@@ -231,10 +224,10 @@ export function buildMonthlySummary({
   const progressNotes: string[] = [];
   if (assessmentTrend === "positive") {
     progressNotes.push(
-      "Observou-se evolução consistente — a qualidade das respostas terapêuticas aumentou da primeira para a segunda metade do mês.",
+      "Observou-se evolução consistente — a qualidade das respostas terapêuticas aumentou da primeira para a segunda metade do período.",
     );
   } else if (assessmentTrend === "stable" && evolutions.length >= 4) {
-    progressNotes.push("O perfil de evolução manteve-se estável ao longo do mês.");
+    progressNotes.push("O perfil de evolução manteve-se estável ao longo do período.");
   }
   if (promptingTrend === "positive" && promptingDominant) {
     progressNotes.push(
@@ -277,12 +270,12 @@ export function buildMonthlySummary({
   }
   if (assessmentTrend === "negative") {
     challenges.push(
-      "Houve queda na qualidade das avaliações ao longo do mês; requer atenção.",
+      "Houve queda na qualidade das avaliações ao longo do período; requer atenção.",
     );
   }
   if (promptingTrend === "negative") {
     challenges.push(
-      "O nível de ajuda necessário aumentou ao longo do mês — revisar estratégias.",
+      "O nível de ajuda necessário aumentou ao longo do período — revisar estratégias.",
     );
   }
   if (challenges.length === 0) {

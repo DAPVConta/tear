@@ -17,6 +17,12 @@ export function todayLocalISO(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// "yyyy-MM-dd" → "dd/MM/yyyy" sem passar por Date (imune a fuso).
+export function formatDateBR(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+}
+
 // Dias entre hoje e uma data (yyyy-MM-dd). Negativo = no passado.
 export function daysUntil(dateOnly: string): number {
   return differenceInCalendarDays(parseDateOnly(dateOnly), new Date());
