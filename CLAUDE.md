@@ -612,7 +612,31 @@ operadora; restrição editar/excluir só pelo criador.
       (ícone de download) que emite o PDF com a rubrica do profissional e o
       bloco da assinatura digital (titular/CPF/emissor/hash/data). O arquivo é
       gerado do registro assinado; não há cópia em Storage.
-    - PENDENTE: aplicar a migração 0036 no projeto Supabase.
+    - Aplicado no projeto: migração 0036 rodada e release em produção.
+
+35. [FEITO — Duas formas de assinar a evolução mensal] (migração 0037).
+    - Enum `monthly_signature_method` (`certificado` | `digital`) + coluna
+      `signature_method` em monthly_evolutions (backfill: quem já tinha
+      `digital_signature` recebeu `certificado`).
+    - **Assinar com certificado** — o fluxo antigo "Assinar digitalmente",
+      renomeado: certificado A1 ICP-Brasil local, envelope PKCS#7 em
+      `digital_signature`. Dialog `MonthlyCertificateDialog`.
+    - **Assinatura digital** — aplica no relatório a assinatura digitalizada
+      do cadastro do profissional (`professionals.signature_path`, #33), com
+      registro de data/hora; sem certificado. Dialog `MonthlyRubricDialog`
+      mostra a rubrica antes de confirmar.
+    - Blindagem server-side: trigger `enforce_monthly_signature_method` recusa
+      `signature_method='digital'` quando o profissional não tem rubrica
+      cadastrada (o documento sairia sem marca de autoria).
+    - Ambos partem de `aguardando_assinatura` e levam a `assinada` — o fluxo de
+      aprovação do coordenador continua igual.
+    - Assinatura em lote da listagem ganhou o seletor de método; na forma
+      digital não pede certificado e marca como inelegível a linha cujo
+      profissional não tem rubrica.
+    - PDF: além da rubrica, a forma digital imprime "Assinado eletronicamente
+      por [nome] em [data/hora]"; a forma certificado mantém o bloco
+      ICP-Brasil (titular/CPF/emissor/hash).
+    - PENDENTE: aplicar a migração 0037 no projeto Supabase.
 
 Todas as correções da tabela public.corrections foram resolvidas.
 

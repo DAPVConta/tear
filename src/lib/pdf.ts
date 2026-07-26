@@ -275,6 +275,21 @@ export function exportMonthlyEvolutionPDF(
     doc.text(`Aprovado pelo coordenador ${monthly.reviewer_name}`, margin, sy);
   }
 
+  // Assinatura digital (rubrica do cadastro): a imagem acima é a assinatura, e
+  // esta linha registra autor e momento do aceite.
+  if (monthly.signature_method === "digital" && monthly.signed_at) {
+    sy += 12;
+    doc.text(
+      doc.splitTextToSize(
+        `Assinado eletronicamente por ${monthly.professional?.name ?? "profissional responsável"} em ${new Date(monthly.signed_at).toLocaleString("pt-BR")} — assinatura digitalizada registrada no TEAR.`,
+        pageWidth - margin * 2,
+      ),
+      margin,
+      sy,
+    );
+    sy += 12;
+  }
+
   const monthlySig = getMonthlyDigitalSignature(monthly);
   if (monthlySig) {
     const rows = [
@@ -303,7 +318,8 @@ export function exportMonthlyEvolutionPDF(
   );
 
   const safePatient = monthly.patient?.name?.replace(/\s+/g, "_") ?? "paciente";
-  const prefix = monthlySig ? "evolucao-assinada" : "evolucao";
+  const prefix =
+    monthly.workflow_status === "assinada" ? "evolucao-assinada" : "evolucao";
   doc.save(`${prefix}-${safePatient}-${monthlyFileSuffix(monthly)}.pdf`);
 }
 

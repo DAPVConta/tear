@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   ThumbsUp,
   ThumbsDown,
+  PenLine,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ import {
   useReviewMonthly,
   getMonthlyDigitalSignature,
   formatMonthlyPeriod,
+  hasProfessionalRubric,
   type GoalProgress,
 } from "@/features/monthlyEvolutions/api";
 import { useGenerateMonthlyAnalysis } from "@/features/ai/api";
@@ -56,7 +58,8 @@ import {
 } from "@/features/professionals/api";
 import { useClinic } from "@/providers/ClinicProvider";
 import { specialtyLabels, monthlyStatusLabels } from "@/lib/labels";
-import { MonthlySignatureDialog } from "./MonthlySignatureDialog";
+import { MonthlyCertificateDialog } from "./MonthlyCertificateDialog";
+import { MonthlyRubricDialog } from "./MonthlyRubricDialog";
 import { ReportDocument } from "./ReportDocument";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -84,7 +87,8 @@ export default function MonthlyDetail() {
   const { data: signatureImage } = useProfessionalSignatureImage(
     data?.professional?.signature_path,
   );
-  const [sigOpen, setSigOpen] = useState(false);
+  const [certOpen, setCertOpen] = useState(false);
+  const [rubricOpen, setRubricOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
@@ -242,6 +246,7 @@ export default function MonthlyDetail() {
     wf === "pendente_aprovacao" &&
     (role === "clinic_admin" || isCoordinatorForThis);
   const canSign = wf === "aguardando_assinatura";
+  const hasRubric = hasProfessionalRubric(data);
   const digitalSig = getMonthlyDigitalSignature(data);
   const statusVariant: "muted" | "warning" | "accent" | "success" =
     wf === "assinada"
@@ -298,8 +303,11 @@ export default function MonthlyDetail() {
           <div className="mb-6 flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-soft">
             <CheckCircle2 className="h-4 w-4 text-[hsl(142_70%_40%)]" />
             Aprovada pelo coordenador <strong>{data.reviewer_name}</strong>
-            {digitalSig &&
-              ` · Assinada digitalmente por ${digitalSig.signer_name}`}
+            {digitalSig
+              ? ` · Assinada com certificado por ${digitalSig.signer_name}`
+              : data.signature_method === "digital" && data.signed_at
+                ? ` · Assinatura digital de ${data.professional?.name ?? "profissional"} aplicada`
+                : ""}
           </div>
         )}
 
@@ -504,13 +512,28 @@ export default function MonthlyDetail() {
                 )}
 
                 {canSign && (
-                  <Button
-                    type="button"
-                    variant="brand"
-                    onClick={() => setSigOpen(true)}
-                  >
-                    <ShieldCheck className="h-4 w-4" /> Assinar digitalmente
-                  </Button>
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setRubricOpen(true)}
+                      title={
+                        hasRubric
+                          ? "Aplicar a assinatura cadastrada do profissional"
+                          : "O profissional não tem assinatura digitalizada no cadastro"
+                      }
+                      disabled={!hasRubric}
+                    >
+                      <PenLine className="h-4 w-4" /> Assinatura digital
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="brand"
+                      onClick={() => setCertOpen(true)}
+                    >
+                      <ShieldCheck className="h-4 w-4" /> Assinar com certificado
+                    </Button>
+                  </>
                 )}
               </div>
             </form>
@@ -518,9 +541,15 @@ export default function MonthlyDetail() {
         </Card>
       </div>
 
-      <MonthlySignatureDialog
-        open={sigOpen}
-        onOpenChange={setSigOpen}
+      <MonthlyCertificateDialog
+        open={certOpen}
+        onOpenChange={setCertOpen}
+        monthly={data}
+      />
+
+      <MonthlyRubricDialog
+        open={rubricOpen}
+        onOpenChange={setRubricOpen}
         monthly={data}
       />
 
