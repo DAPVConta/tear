@@ -30,6 +30,161 @@ import {
 const BRAND_DARK: [number, number, number] = [0, 31, 107];
 const BRAND_ACCENT: [number, number, number] = [30, 136, 255];
 
+const FOOTER_TEXT =
+  "Documento gerado pelo TEAR — Prontuário Inteligente para Clínicas de TEA.";
+// Faixa inferior reservada ao rodapé: nenhum conteúdo é escrito abaixo disso.
+const FOOTER_RESERVE = 56;
+// Topo do conteúdo nas páginas de continuação (abaixo do cabeçalho reduzido).
+const CONTINUATION_TOP = 64;
+
+type TextOpts = {
+  size?: number;
+  style?: "normal" | "bold";
+  color?: number | [number, number, number];
+  lineHeight?: number;
+  gapAfter?: number;
+};
+
+function applyText(doc: jsPDF, opts: TextOpts) {
+  doc.setFont("helvetica", opts.style ?? "normal");
+  doc.setFontSize(opts.size ?? 10);
+  const color = opts.color ?? 40;
+  if (Array.isArray(color)) doc.setTextColor(...color);
+  else doc.setTextColor(color);
+}
+
+// Cabeçalho reduzido das páginas de continuação: identifica o documento sem
+// repetir a faixa institucional inteira. Preserva fonte/cores do chamador —
+// é desenhado no meio de um fluxo de texto e não pode alterar o estilo dele.
+function drawContinuationHeader(doc: jsPDF, margin: number, label: string) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const font = doc.getFont();
+  const size = doc.getFontSize();
+  const textColor = doc.getTextColor();
+  const drawColor = doc.getDrawColor();
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(120);
+  const [line] = doc.splitTextToSize(
+    label,
+    pageWidth - margin * 2,
+  ) as unknown as string[];
+  doc.text(line ?? label, margin, 36);
+  doc.setDrawColor(225);
+  doc.line(margin, 44, pageWidth - margin, 44);
+
+  doc.setFont(font.fontName, font.fontStyle);
+  doc.setFontSize(size);
+  doc.setTextColor(textColor);
+  doc.setDrawColor(drawColor);
+}
+
+// Rodapé em TODAS as páginas (inclusive as criadas pelo autoTable), com
+// numeração quando o documento passa de uma página. Chamar por último.
+function addFooters(doc: jsPDF, margin: number) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const total = doc.getNumberOfPages();
+  for (let page = 1; page <= total; page += 1) {
+    doc.setPage(page);
+    doc.setDrawColor(220);
+    doc.line(margin, pageHeight - 40, pageWidth - margin, pageHeight - 40);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    doc.text(FOOTER_TEXT, margin, pageHeight - 24);
+    if (total > 1) {
+      doc.text(`Página ${page} de ${total}`, pageWidth - margin, pageHeight - 24, {
+        align: "right",
+      });
+    }
+  }
+  doc.setPage(total);
+}
+
+// Fluxo de texto com quebra de página automática. Escreve LINHA A LINHA: um
+// bloco maior que a página continua na próxima em vez de ser cortado — nenhum
+// conteúdo clínico se perde na emissão.
+function createFlow(
+  doc: jsPDF,
+  opts: {
+    margin: number;
+    startY: number;
+    topY?: number;
+    onNewPage?: () => void;
+  },
+) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const { margin } = opts;
+  const contentWidth = pageWidth - margin * 2;
+  const topY = opts.topY ?? CONTINUATION_TOP;
+  const bottom = pageHeight - FOOTER_RESERVE;
+  let y = opts.startY;
+
+  function breakPage() {
+    doc.addPage();
+    y = topY;
+    opts.onNewPage?.();
+  }
+
+  // Garante `needed` pontos livres; abre página nova quando não couber.
+  function ensure(needed: number) {
+    if (y + needed > bottom) breakPage();
+  }
+
+  function paragraph(text: string, textOpts: TextOpts = {}) {
+    const lineHeight = textOpts.lineHeight ?? (textOpts.size ?? 10) * 1.2;
+    applyText(doc, textOpts);
+    const lines = doc.splitTextToSize(
+      text,
+      contentWidth,
+    ) as unknown as string[];
+    lines.forEach((line) => {
+      ensure(lineHeight);
+      doc.text(line, margin, y);
+      y += lineHeight;
+    });
+    y += textOpts.gapAfter ?? 0;
+  }
+
+  // Título de seção: só abre página se o título couber junto de pelo menos
+  // duas linhas do corpo (evita título órfão no pé da página).
+  function heading(title: string, textOpts: TextOpts = {}) {
+    ensure((textOpts.size ?? 12) + 6 + 24);
+    applyText(doc, {
+      size: 12,
+      style: "bold",
+      color: BRAND_DARK,
+      ...textOpts,
+    });
+    doc.text(title, margin, y);
+    y += textOpts.lineHeight ?? 14;
+  }
+
+  return {
+    contentWidth,
+    ensure,
+    paragraph,
+    heading,
+    gap(n: number) {
+      y += n;
+    },
+    get y() {
+      return y;
+    },
+    set y(value: number) {
+      y = value;
+    },
+  };
+}
+
+function lastTableY(doc: jsPDF): number {
+  return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
+    .finalY;
+}
+
 // Rubrica digitalizada do profissional (data URL vindo do Storage privado).
 const SIGNATURE_MAX_W = 170;
 const SIGNATURE_MAX_H = 46;
@@ -93,21 +248,28 @@ export function exportMonthlyEvolutionPDF(
   );
 
   // Título
+  const docTitle =
+    monthly.period_type === "periodo"
+      ? "Evolução por Período"
+      : "Evolução Mensal";
+  const periodLabel = formatMonthlyPeriod(monthly);
+  const continuationLabel = [
+    docTitle,
+    monthly.patient?.name ?? "—",
+    periodLabel,
+  ].join("  ·  ");
+  const continuation = () =>
+    drawContinuationHeader(doc, margin, continuationLabel);
+
   doc.setTextColor(...BRAND_DARK);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text(
-    monthly.period_type === "periodo"
-      ? "Evolução por Período"
-      : "Evolução Mensal",
-    margin,
-    100,
-  );
+  doc.text(docTitle, margin, 100);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.setTextColor(60);
-  doc.text(formatMonthlyPeriod(monthly), margin, 120);
+  doc.text(periodLabel, margin, 120);
 
   // Identificação
   doc.setDrawColor(220);
@@ -140,42 +302,25 @@ export function exportMonthlyEvolutionPDF(
     theme: "grid",
     headStyles: { fillColor: BRAND_ACCENT, textColor: 255, fontStyle: "bold" },
     styles: { fontSize: 10, halign: "center" },
-    margin: { left: margin, right: margin },
+    margin: { left: margin, right: margin, top: CONTINUATION_TOP },
+    didDrawPage: (data) => {
+      if (data.pageNumber > 1) continuation();
+    },
+  });
+
+  const flow = createFlow(doc, {
+    margin,
+    startY: lastTableY(doc) + 24,
+    onNewPage: continuation,
   });
 
   // Síntese
-  let y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
-    .finalY + 24;
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...BRAND_DARK);
-  doc.text("Síntese gerada", margin, y);
-  y += 10;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(40);
-  const summaryLines = doc.splitTextToSize(
-    monthly.generated_summary,
-    pageWidth - margin * 2,
-  );
-  doc.text(summaryLines, margin, y + 12);
-  y += 12 + summaryLines.length * 12;
+  flow.heading("Síntese gerada");
+  flow.paragraph(monthly.generated_summary, { gapAfter: 16 });
 
   if (monthly.professional_review) {
-    y += 16;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(...BRAND_DARK);
-    doc.text("Análise profissional", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(40);
-    const reviewLines = doc.splitTextToSize(
-      monthly.professional_review,
-      pageWidth - margin * 2,
-    );
-    doc.text(reviewLines, margin, y + 14);
-    y += 14 + reviewLines.length * 12;
+    flow.heading("Análise profissional");
+    flow.paragraph(monthly.professional_review, { gapAfter: 16 });
   }
 
   // Metas
@@ -183,9 +328,10 @@ export function exportMonthlyEvolutionPDF(
     ? (monthly.goals_progress as unknown as GoalProgress[])
     : [];
   if (goals.length > 0) {
-    y += 16;
+    // Só inicia a tabela se couber o cabeçalho e ao menos uma linha.
+    flow.ensure(60);
     autoTable(doc, {
-      startY: y,
+      startY: flow.y,
       head: [["Meta", "Categoria", "Progresso", "Status"]],
       body: goals.map((g) => [
         g.description,
@@ -196,55 +342,28 @@ export function exportMonthlyEvolutionPDF(
       theme: "striped",
       headStyles: { fillColor: BRAND_DARK, textColor: 255, fontStyle: "bold" },
       styles: { fontSize: 9 },
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, top: CONTINUATION_TOP },
+      didDrawPage: (data) => {
+        if (data.pageNumber > 1) continuation();
+      },
     });
-    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
-      .finalY;
+    flow.y = lastTableY(doc) + 8;
   }
 
   if (monthly.conclusion) {
-    y += 24;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(...BRAND_DARK);
-    doc.text("Conclusão", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(40);
-    const lines = doc.splitTextToSize(
-      monthly.conclusion,
-      pageWidth - margin * 2,
-    );
-    doc.text(lines, margin, y + 14);
-    y += 14 + lines.length * 12;
+    flow.gap(16);
+    flow.heading("Conclusão");
+    flow.paragraph(monthly.conclusion, { gapAfter: 16 });
   }
 
   if (monthly.next_month_plan) {
-    y += 16;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(...BRAND_DARK);
-    doc.text("Plano para o próximo período", margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(40);
-    const lines = doc.splitTextToSize(
-      monthly.next_month_plan,
-      pageWidth - margin * 2,
-    );
-    doc.text(lines, margin, y + 14);
+    flow.heading("Plano para o próximo período");
+    flow.paragraph(monthly.next_month_plan);
   }
 
   // Assinatura do profissional responsável
-  const ph = doc.internal.pageSize.getHeight();
   const rubric =
     monthly.signed_at || monthly.approved ? (signatureImage ?? null) : null;
-  y += 48;
-  if (y > ph - (rubric ? 150 : 90)) {
-    doc.addPage();
-    y = 90;
-  }
-  if (rubric) y = drawSignatureImage(doc, rubric, margin, y);
   const role = monthly.professional?.specialty
     ? specialtyLabels[monthly.professional.specialty]
     : "";
@@ -253,69 +372,58 @@ export function exportMonthlyEvolutionPDF(
       ? monthly.approved_at
       : monthly.created_at;
   const sigDate = new Date(sigSource).toLocaleDateString("pt-BR");
+  const monthlySig = getMonthlyDigitalSignature(monthly);
+
+  // Metadados quebrados antes da reserva: o bloco de assinatura é indivisível
+  // — rubrica, nome e dados do certificado saem sempre na mesma página.
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  const sigMeta = (
+    [
+      role || null,
+      `Emitido em ${sigDate}`,
+      monthly.reviewer_name
+        ? `Aprovado pelo coordenador ${monthly.reviewer_name}`
+        : null,
+      monthly.signature_method === "digital" && monthly.signed_at
+        ? `Assinado eletronicamente por ${monthly.professional?.name ?? "profissional responsável"} em ${new Date(monthly.signed_at).toLocaleString("pt-BR")} — assinatura digitalizada registrada no TEAR.`
+        : null,
+      ...(monthlySig
+        ? [
+            "Assinado digitalmente — ICP-Brasil (A1)",
+            `Titular: ${monthlySig.signer_name}${monthlySig.signer_cpf ? ` · CPF ${monthlySig.signer_cpf}` : ""}`,
+            `Emissor: ${monthlySig.certificate_issuer}`,
+            `Hash SHA-256: ${monthlySig.content_hash}`,
+            `Data/hora: ${new Date(monthlySig.signed_at).toLocaleString("pt-BR")}`,
+          ]
+        : []),
+    ].filter(Boolean) as string[]
+  ).flatMap(
+    (r) => doc.splitTextToSize(r, flow.contentWidth) as unknown as string[],
+  );
+
+  flow.gap(48);
+  flow.ensure(
+    (rubric ? SIGNATURE_MAX_H + 4 : 0) + 14 + sigMeta.length * 13 + 8,
+  );
+  if (rubric) flow.y = drawSignatureImage(doc, rubric, margin, flow.y);
   doc.setDrawColor(120);
-  doc.line(margin, y, margin + 240, y);
+  doc.line(margin, flow.y, margin + 240, flow.y);
+  flow.gap(14);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(0);
-  doc.text(monthly.professional?.name ?? "—", margin, y + 14);
+  doc.text(monthly.professional?.name ?? "—", margin, flow.y);
+  flow.gap(13);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(90);
-  let sy = y + 14;
-  if (role) {
-    sy += 13;
-    doc.text(role, margin, sy);
-  }
-  sy += 13;
-  doc.text(`Emitido em ${sigDate}`, margin, sy);
+  sigMeta.forEach((line) => {
+    doc.text(line, margin, flow.y);
+    flow.gap(13);
+  });
 
-  if (monthly.reviewer_name) {
-    sy += 13;
-    doc.text(`Aprovado pelo coordenador ${monthly.reviewer_name}`, margin, sy);
-  }
-
-  // Assinatura digital (rubrica do cadastro): a imagem acima é a assinatura, e
-  // esta linha registra autor e momento do aceite.
-  if (monthly.signature_method === "digital" && monthly.signed_at) {
-    sy += 12;
-    doc.text(
-      doc.splitTextToSize(
-        `Assinado eletronicamente por ${monthly.professional?.name ?? "profissional responsável"} em ${new Date(monthly.signed_at).toLocaleString("pt-BR")} — assinatura digitalizada registrada no TEAR.`,
-        pageWidth - margin * 2,
-      ),
-      margin,
-      sy,
-    );
-    sy += 12;
-  }
-
-  const monthlySig = getMonthlyDigitalSignature(monthly);
-  if (monthlySig) {
-    const rows = [
-      "Assinado digitalmente — ICP-Brasil (A1)",
-      `Titular: ${monthlySig.signer_name}${monthlySig.signer_cpf ? ` · CPF ${monthlySig.signer_cpf}` : ""}`,
-      `Emissor: ${monthlySig.certificate_issuer}`,
-      `Hash SHA-256: ${monthlySig.content_hash}`,
-      `Data/hora: ${new Date(monthlySig.signed_at).toLocaleString("pt-BR")}`,
-    ];
-    rows.forEach((r) => {
-      sy += 12;
-      doc.text(doc.splitTextToSize(r, pageWidth - margin * 2), margin, sy);
-    });
-  }
-
-  // Rodapé
-  const pageHeight = doc.internal.pageSize.getHeight();
-  doc.setDrawColor(220);
-  doc.line(margin, pageHeight - 40, pageWidth - margin, pageHeight - 40);
-  doc.setFontSize(8);
-  doc.setTextColor(120);
-  doc.text(
-    "Documento gerado pelo TEAR — Prontuário Inteligente para Clínicas de TEA.",
-    margin,
-    pageHeight - 24,
-  );
+  addFooters(doc, margin);
 
   const safePatient = monthly.patient?.name?.replace(/\s+/g, "_") ?? "paciente";
   const prefix =
@@ -499,15 +607,23 @@ export function exportFrequencyHistoryPDF(
       4: { cellWidth: "auto" },
       5: { cellWidth: "auto" },
     },
-    margin: { left: margin, right: margin },
+    margin: { left: margin, right: margin, top: CONTINUATION_TOP },
+    didDrawPage: (data) => {
+      if (data.pageNumber > 1) {
+        drawContinuationHeader(
+          doc,
+          margin,
+          `Histórico de Frequência  ·  ${patient?.name ?? "—"}  ·  ${refPeriod}`,
+        );
+      }
+    },
   });
 
-  let cursorY = (doc as unknown as { lastAutoTable: { finalY: number } })
-    .lastAutoTable.finalY;
+  let cursorY = lastTableY(doc);
 
   // Declaração legal + blocos de assinatura física — precisam de ~150pt.
   const needed = 150;
-  if (cursorY + needed > pageHeight - 40) {
+  if (cursorY + needed > pageHeight - FOOTER_RESERVE) {
     doc.addPage();
     cursorY = 80;
   }
@@ -542,16 +658,7 @@ export function exportFrequencyHistoryPDF(
     cursorY + 12,
   );
 
-  // Rodapé
-  doc.setDrawColor(220);
-  doc.line(margin, pageHeight - 40, pageWidth - margin, pageHeight - 40);
-  doc.setFontSize(8);
-  doc.setTextColor(120);
-  doc.text(
-    "Documento gerado pelo TEAR — Prontuário Inteligente para Clínicas de TEA.",
-    margin,
-    pageHeight - 24,
-  );
+  addFooters(doc, margin);
 
   const safeName = patient?.name?.replace(/\s+/g, "_") ?? "paciente";
   doc.save(`frequencia-${safeName}-${data.periodFileSuffix}.pdf`);
@@ -656,31 +763,45 @@ function buildDailyEvolutionPDF(
     margin: { left: margin, right: margin },
   });
 
-  let y =
-    (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
-      .finalY + 22;
+  const continuationLabel = [
+    "Evolução Diária",
+    patient?.name ?? "—",
+    formatDateBR(evo.session_date),
+  ].join("  ·  ");
+  const continuation = () =>
+    drawContinuationHeader(doc, margin, continuationLabel);
+
+  let y = lastTableY(doc) + 22;
 
   function ensureSpace(needed: number) {
-    if (y + needed > pageHeight - 60) {
+    if (y + needed > pageHeight - FOOTER_RESERVE) {
       doc.addPage();
-      y = 60;
+      y = CONTINUATION_TOP;
+      continuation();
     }
   }
 
+  // Seção com quebra linha a linha: um texto clínico longo continua na página
+  // seguinte em vez de ser cortado no pé da folha.
   function section(title: string, body: string) {
     const text = body.trim() || "—";
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    const lines = doc.splitTextToSize(text, contentWidth);
-    ensureSpace(20 + lines.length * 12);
+    const lines = doc.splitTextToSize(text, contentWidth) as unknown as string[];
+    // Título só entra se acompanhar ao menos duas linhas do corpo.
+    ensureSpace(20 + Math.min(lines.length, 2) * 12);
     doc.setTextColor(...BRAND_DARK);
     doc.text(title, margin, y);
     y += 14;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(40);
-    doc.text(lines, margin, y);
-    y += lines.length * 12 + 10;
+    lines.forEach((line) => {
+      ensureSpace(12);
+      doc.text(line, margin, y);
+      y += 12;
+    });
+    y += 10;
   }
 
   const skills = Array.isArray(evo.skills_worked)
@@ -734,11 +855,12 @@ function buildDailyEvolutionPDF(
         theme: "grid",
         headStyles: { fillColor: BRAND_ACCENT, textColor: 255, fontStyle: "bold" },
         styles: { fontSize: 9 },
-        margin: { left: margin, right: margin },
+        margin: { left: margin, right: margin, top: CONTINUATION_TOP },
+        didDrawPage: (data) => {
+          if (data.pageNumber > 1) continuation();
+        },
       });
-      y =
-        (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
-          .finalY + 16;
+      y = lastTableY(doc) + 16;
     }
     const pm = structured.prompting;
     const pmParts = [
@@ -767,7 +889,50 @@ function buildDailyEvolutionPDF(
   // A rubrica entra apenas em evolução assinada pelo profissional — rascunho
   // ou evolução em aberto nunca é emitida com a assinatura aplicada.
   const rubric = evo.professional_signature ? (signatureImage ?? null) : null;
-  ensureSpace(rubric ? 170 : 110);
+
+  // Quebra as linhas de metadado ANTES de reservar espaço: o bloco de
+  // assinatura é indivisível — nome, rubrica e dados do certificado precisam
+  // sair na mesma página para o documento ter valor probatório.
+  function wrapMeta(rows: (string | null)[]): string[] {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    return (rows.filter(Boolean) as string[]).flatMap(
+      (r) => doc.splitTextToSize(r, contentWidth) as unknown as string[],
+    );
+  }
+
+  function drawMetaLines(lines: string[]) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(90);
+    lines.forEach((line) => {
+      doc.text(line, margin, y);
+      y += 12;
+    });
+  }
+
+  const sigMeta = wrapMeta([
+    professional?.specialty ? specialtyLabels[professional.specialty] : null,
+    ...(sig
+      ? [
+          "Assinado digitalmente — ICP-Brasil (A1)",
+          sig.signer_cpf ? `CPF ${sig.signer_cpf}` : null,
+          `Emissor: ${sig.certificate_issuer}`,
+          `Certificado nº ${sig.certificate_serial}`,
+          `Algoritmo: ${sig.algorithm}`,
+          `Hash SHA-256: ${sig.content_hash}`,
+          `Data/hora: ${new Date(sig.signed_at).toLocaleString("pt-BR")}`,
+        ]
+      : evo.professional_signature
+        ? [
+            `Assinatura eletrônica${evo.signed_at ? ` em ${new Date(evo.signed_at).toLocaleString("pt-BR")}` : ""}`,
+          ]
+        : ["Documento ainda não assinado."]),
+  ]);
+
+  ensureSpace(
+    8 + (rubric ? SIGNATURE_MAX_H + 4 : 0) + 14 + sigMeta.length * 12 + 8,
+  );
   y += 8;
   if (rubric) y = drawSignatureImage(doc, rubric, margin, y);
   doc.setDrawColor(120);
@@ -775,88 +940,43 @@ function buildDailyEvolutionPDF(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(0);
-  doc.text(sig?.signer_name ?? professional?.name ?? "—", margin, y + 14);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(90);
-  let sy = y + 27;
-  if (professional?.specialty) {
-    doc.text(specialtyLabels[professional.specialty], margin, sy);
-    sy += 13;
-  }
-  if (sig) {
-    const rows = [
-      "Assinado digitalmente — ICP-Brasil (A1)",
-      sig.signer_cpf ? `CPF ${sig.signer_cpf}` : null,
-      `Emissor: ${sig.certificate_issuer}`,
-      `Certificado nº ${sig.certificate_serial}`,
-      `Algoritmo: ${sig.algorithm}`,
-      `Hash SHA-256: ${sig.content_hash}`,
-      `Data/hora: ${new Date(sig.signed_at).toLocaleString("pt-BR")}`,
-    ].filter(Boolean) as string[];
-    rows.forEach((r) => {
-      ensureSpace(13);
-      doc.text(doc.splitTextToSize(r, contentWidth), margin, sy);
-      sy += 12;
-    });
-  } else if (evo.professional_signature) {
-    doc.text(
-      `Assinatura eletrônica${evo.signed_at ? ` em ${new Date(evo.signed_at).toLocaleString("pt-BR")}` : ""}`,
-      margin,
-      sy,
-    );
-  } else {
-    doc.text("Documento ainda não assinado.", margin, sy);
-  }
+  y += 14;
+  doc.text(sig?.signer_name ?? professional?.name ?? "—", margin, y);
+  y += 13;
+  drawMetaLines(sigMeta);
 
   // Bloco de homologação do supervisor (evoluções de Aplicador ABA / AT).
   const supSig = getDigitalSignature({ digital_signature: evo.supervisor_signature });
   if (supSig || evo.validation_status) {
-    ensureSpace(110);
-    sy += 16;
+    const supMeta = wrapMeta(
+      supSig
+        ? [
+            "Homologado e assinado digitalmente — ICP-Brasil (A1)",
+            supSig.signer_cpf ? `CPF ${supSig.signer_cpf}` : null,
+            `Emissor: ${supSig.certificate_issuer}`,
+            `Hash SHA-256: ${supSig.content_hash}`,
+            `Data/hora: ${new Date(supSig.signed_at).toLocaleString("pt-BR")}`,
+          ]
+        : ["Pendente de validação técnica."],
+    );
+    ensureSpace(16 + 14 + 13 + supMeta.length * 12 + 8);
+    y += 16;
     doc.setDrawColor(120);
-    doc.line(margin, sy, margin + 260, sy);
-    sy += 14;
+    doc.line(margin, y, margin + 260, y);
+    y += 14;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(0);
     doc.text(
       `Homologação do supervisor: ${supSig?.signer_name ?? "—"}`,
       margin,
-      sy,
+      y,
     );
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(90);
-    sy += 13;
-    if (supSig) {
-      const rows = [
-        "Homologado e assinado digitalmente — ICP-Brasil (A1)",
-        supSig.signer_cpf ? `CPF ${supSig.signer_cpf}` : null,
-        `Emissor: ${supSig.certificate_issuer}`,
-        `Hash SHA-256: ${supSig.content_hash}`,
-        `Data/hora: ${new Date(supSig.signed_at).toLocaleString("pt-BR")}`,
-      ].filter(Boolean) as string[];
-      rows.forEach((r) => {
-        ensureSpace(13);
-        doc.text(doc.splitTextToSize(r, contentWidth), margin, sy);
-        sy += 12;
-      });
-    } else {
-      doc.text("Pendente de validação técnica.", margin, sy);
-    }
+    y += 13;
+    drawMetaLines(supMeta);
   }
 
-  // Rodapé
-  doc.setDrawColor(220);
-  doc.line(margin, pageHeight - 40, pageWidth - margin, pageHeight - 40);
-  doc.setFontSize(8);
-  doc.setTextColor(120);
-  doc.text(
-    "Documento gerado pelo TEAR — Prontuário Inteligente para Clínicas de TEA.",
-    margin,
-    pageHeight - 24,
-  );
+  addFooters(doc, margin);
 
   const file = `evolucao-diaria-${patient?.name?.replace(/\s+/g, "_") ?? "paciente"}-${evo.session_date}.pdf`;
   return { doc, file };
