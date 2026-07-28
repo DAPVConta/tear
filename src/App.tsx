@@ -11,6 +11,8 @@ import {
 import {
   Landing,
   Login,
+  ForgotPassword,
+  ResetPassword,
   Onboarding,
   Dashboard,
   PatientsList,
@@ -57,7 +59,13 @@ export default function App() {
 
         <Route element={<RedirectIfAuthed />}>
           <Route path="/login" element={<Login />} />
+          <Route path="/esqueci-senha" element={<ForgotPassword />} />
         </Route>
+
+        {/* Destino do link do e-mail de redefinição: fica FORA do
+            RedirectIfAuthed porque o próprio link autentica o usuário —
+            sob o guarda, ele seria jogado no dashboard sem trocar a senha. */}
+        <Route path="/redefinir-senha" element={<ResetPassword />} />
 
         <Route element={<RequireAuth />}>
           <Route path="/onboarding" element={<Onboarding />} />
