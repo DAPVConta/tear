@@ -53,6 +53,27 @@ function getUserClient(req: Request): SupabaseClient | null {
   });
 }
 
+// Rate limit por usuário (RPC check_rate_limit, migração 0038). Fail-open:
+// se a RPC falhar/não existir, loga e deixa passar — a função já exige
+// platform_admin; o limite barra loop/script acidental em ação sensível.
+async function withinRateLimit(
+  client: SupabaseClient,
+  action: string,
+  maxCalls: number,
+  windowSeconds: number,
+): Promise<boolean> {
+  const { data, error } = await client.rpc("check_rate_limit", {
+    p_action: action,
+    p_max_calls: maxCalls,
+    p_window_seconds: windowSeconds,
+  });
+  if (error) {
+    console.error(`rate-limit ${action}:`, error.message);
+    return true;
+  }
+  return data === true;
+}
+
 function getServiceClient(): SupabaseClient | null {
   const url = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -130,6 +151,16 @@ Deno.serve(async (req) => {
     return json(
       { error: "Apenas administradores da plataforma podem executar esta ação." },
       403,
+      req,
+    );
+  }
+
+  // Criação de usuário/reset de senha: 30 por hora cobre qualquer implantação
+  // real e barra automação descontrolada com credencial de platform_admin.
+  if (!(await withinRateLimit(userClient, "clinic-admin-user", 30, 3600))) {
+    return json(
+      { error: "Muitas operações em sequência. Tente novamente em alguns minutos." },
+      429,
       req,
     );
   }

@@ -816,6 +816,77 @@ Fase 2 restante: Asaas billing.
   - Habilitar **Email confirmation** em produção.
   - Considerar **MFA TOTP** para platform_admin/clinic_admin.
 
+## Estratégia de segurança e performance (padrões distribuídos)
+
+Avaliação padrão a padrão: o que a stack (Supabase/PostgREST/React Query) já
+cobre, o que o TEAR implementa por cima e o que é decisão consciente de não
+fazer. Reavaliar a cada incremento que adicione escrita concorrente, fila ou
+integração externa.
+
+- **CQRS** — adotado na forma leve ("CQRS-lite"), sem event sourcing:
+  escrita via tabelas com RLS + RPCs transacionais (`save_plan_with_goals`,
+  `redeem_clinic_invite`); leitura via read-models dedicados quando o shape
+  difere da tabela (RPCs `platform_clinics_overview`, `clinic_members_overview`,
+  motor `buildMonthlySummary` como projeção calculada). DECISÃO: não separar
+  bancos/streams de leitura — escala de clínica não justifica; manter o padrão
+  "leituras agregadas = RPC SECURITY DEFINER gated por papel".
+- **Idempotência** — resgate de convite é idempotente (membro ativo → no-op);
+  unique constraints (mensal por paciente+período, membro por clínica+usuário)
+  + upserts com `onConflict` são o backstop de duplo clique/retry do front
+  (React Query `retry: 1` só em query, mutações não fazem retry automático).
+  ClickSign tem guarda de aplicação (409 se envelope pendente). REGRA: toda
+  mutação nova precisa responder "o que acontece se rodar 2x?" — a resposta
+  deve ser constraint/on conflict/no-op, nunca "o front não deixa".
+- **Race condition** — checagens read-then-act do front NÃO são garantia;
+  garantia é server-side: anti-sobreposição de sessão via trigger
+  `enforce_evolution_no_overlap` com `pg_advisory_xact_lock` por paciente+data
+  (migração 0038); `redeem_clinic_invite` com `FOR UPDATE`; `used_quantity`
+  com incremento atômico (`set used = used + 1`, nunca read-modify-write).
+  ACEITO: `used_quantity` pode ultrapassar o autorizado sob corrida (o front
+  alerta guia esgotada mas não bloqueia) — auditoria/faturamento detecta.
+- **Dual write** — superfícies: Storage + coluna no banco (laudo, rubrica,
+  atestado) e ClickSign + jsonb `clicksign`. REGRA de ordem: efeito externo
+  primeiro, banco por último — arquivo órfão no Storage é o modo de falha
+  seguro (bucket privado, sem referência); linha apontando para arquivo
+  inexistente não. Para ClickSign, o "Verificar status" repõe estado perdido
+  (reconciliação por polling). DECISÃO: sem outbox pattern por ora — não há
+  fila de eventos; reavaliar quando houver webhook/Asaas.
+- **DLQ / poison message** — hoje NÃO há processamento assíncrono (sem filas,
+  sem webhooks; ClickSign é polling manual). REGRA para quando houver (webhook
+  ClickSign, billing Asaas fase 2): usar Supabase Queues (pgmq) com
+  `max_retries` + tabela de dead-letter; handler de webhook idempotente
+  (processar por id de evento com unique constraint) e nunca deixar mensagem
+  malformada travar a fila — capturar, gravar na DLQ, seguir.
+- **Rate limit** — o Supabase só limita endpoints do Auth (login, reset — e o
+  reset já trata 429 na UI); PostgREST e Edge Functions não têm limite por
+  usuário nativo. TEAR: RPC `check_rate_limit` (janela fixa por ação:usuário,
+  migração 0038, tabela sem acesso direto pela API) aplicada nas Edge Functions
+  (claude-analysis 20/h, extract-laudo 15/h somando provedores, clicksign
+  request 30/h, clinic-admin-user 30/h) e no `redeem_clinic_invite` (10/10min).
+  Fail-open nas Functions (limite protege custo, não confidencialidade).
+  REGRA: toda Edge Function nova que gaste dinheiro (LLM, assinatura, e-mail)
+  nasce com `withinRateLimit`.
+- **Timing attack** — senha/sessão são do Supabase Auth (bcrypt, comparação
+  segura — não reimplementar). Superfície própria: código de convite (busca por
+  igualdade em índice único — sinal de timing desprezível; o risco real era
+  enumeração dos códigos legados de 8 hex, agora barrada pelo rate limit do
+  resgate; códigos novos têm 16 hex). Mensagens de erro uniformes ("Convite
+  inválido ou expirado", "se existir uma conta…") para não vazar existência.
+  REGRA: nunca comparar segredo com `=` em SQL/JS próprio; se um dia houver
+  token próprio (API key de integração), armazenar hash e comparar digest.
+- **Poison message (entrada hostil)** — nas Functions: limite de corpo
+  (64KB–14MB conforme função), parse defensivo de JSON, limites de contagem
+  (MAX_GOALS) e resposta genérica ao cliente com detalhe só no log. No front:
+  busca sanitizada contra injeção PostgREST. REGRA: toda entrada que atravessa
+  um parser (JSON, base64, PDF) tem limite de tamanho ANTES do parse.
+- **Cache stampede** — React Query já deduplica queries idênticas concorrentes
+  por cliente (staleTime 30s default; listas frias 30–50min); não há cache
+  compartilhado server-side (sem Redis/CDN de API) — logo não existe chave
+  quente cuja expiração derrube o banco. Dashboard agrega por tenant (dezenas
+  de usuários, não milhares). DECISÃO: não introduzir camada de cache; se um
+  agregado ficar caro, materializar via RPC/matview com refresh agendado
+  (pg_cron) em vez de cache com TTL.
+
 ### Agentes por incremento
 backend, frontend, ux, ui, code-review. Cada peça passa por review antes do PR.
 

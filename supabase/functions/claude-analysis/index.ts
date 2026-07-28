@@ -44,7 +44,28 @@ async function getAuthedUser(req: Request) {
   });
   const { data, error } = await client.auth.getUser();
   if (error || !data.user) return null;
-  return data.user;
+  return { user: data.user, client };
+}
+
+// Rate limit por usuário (RPC check_rate_limit, migração 0038). Fail-open:
+// se a RPC falhar/não existir, loga e deixa passar — a função já exige JWT e
+// o limite protege custo, não confidencialidade.
+async function withinRateLimit(
+  client: ReturnType<typeof createClient>,
+  action: string,
+  maxCalls: number,
+  windowSeconds: number,
+): Promise<boolean> {
+  const { data, error } = await client.rpc("check_rate_limit", {
+    p_action: action,
+    p_max_calls: maxCalls,
+    p_window_seconds: windowSeconds,
+  });
+  if (error) {
+    console.error(`rate-limit ${action}:`, error.message);
+    return true;
+  }
+  return data === true;
 }
 
 type Goal = {
@@ -114,9 +135,18 @@ Deno.serve(async (req: Request) => {
   }
 
   // Defesa em profundidade: exige sessão válida mesmo se verify_jwt cair.
-  const user = await getAuthedUser(req);
-  if (!user) {
+  const authed = await getAuthedUser(req);
+  if (!authed) {
     return json({ error: "Não autenticado." }, 401);
+  }
+
+  // Custo de LLM por clique: 20 gerações por usuário por hora é folga para uso
+  // clínico legítimo e barra script/loop acidental.
+  if (!(await withinRateLimit(authed.client, "claude-analysis", 20, 3600))) {
+    return json(
+      { error: "Limite de gerações com IA atingido. Tente novamente em alguns minutos." },
+      429,
+    );
   }
 
   const apiKey = Deno.env.get("CLAUDE_KEY");
