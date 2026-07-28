@@ -13,14 +13,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/providers/AuthProvider";
-import { useClinic } from "@/providers/ClinicProvider";
 import { initials } from "@/lib/utils";
+import { ClinicSwitcher } from "./ClinicSwitcher";
 import { useCommandPalette } from "./CommandPalette";
 
 export function Topbar({ onOpenMobile }: { onOpenMobile: () => void }) {
   const navigate = useNavigate();
   const { profile, user, signOut } = useAuth();
-  const { clinic } = useClinic();
   const { open: openPalette } = useCommandPalette();
 
   const displayName = profile?.name || user?.email || "Usuário";
@@ -42,15 +41,8 @@ export function Topbar({ onOpenMobile }: { onOpenMobile: () => void }) {
         <Menu className="h-5 w-5" />
       </Button>
 
-      {/* Clínica atual (multi-tenant) */}
-      <div className="hidden items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-semibold shadow-soft sm:flex">
-        <span className="grid h-6 w-6 place-items-center rounded-md bg-brand-gradient text-[10px] font-bold text-white">
-          {initials(clinic?.name, "C")}
-        </span>
-        <span className="max-w-[12rem] truncate">
-          {clinic?.name ?? "Minha Clínica"}
-        </span>
-      </div>
+      {/* Clínica atual (multi-tenant) — seletor quando há mais de um vínculo */}
+      <ClinicSwitcher />
 
       <button
         type="button"
