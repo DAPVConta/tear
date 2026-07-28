@@ -672,6 +672,38 @@ operadora; restrição editar/excluir só pelo criador.
       "Reset Password" pode seguir com `{{ .ConfirmationURL }}` — é ele que
       carrega o `redirect_to` enviado pelo app.
 
+37. [FEITO — Tenant ativo correto + seletor de clínica] Sem migração.
+    - **Bug corrigido**: a query do `ClinicProvider` lia `clinic_members` sem
+      `.eq("user_id", ...)`, confiando na RLS para recortar. Mas
+      `clinic_members_select` é `is_clinic_member(clinic_id) OR
+      is_platform_admin()` — devolve TODOS os membros das clínicas do usuário
+      e, para platform_admin, a tabela inteira. Com `order(joined_at) limit 1`
+      o vínculo "ativo" acabava sendo o de outra pessoa (papel errado no front)
+      ou, no caso do platform_admin, o da clínica mais antiga da plataforma —
+      o app inteiro (topbar, dashboard, listagens) operava no tenant errado.
+      Verificado em produção: o titular da clínica "New Person"
+      (platform_admin) via e usava os dados da "Clínica DAPV".
+    - A RLS nunca vazou nada: o recorte por tenant continuou íntegro; o erro
+      era o front escolher mal entre as linhas que a RLS legitimamente entrega.
+      Para membros comuns o efeito era inflação de papel só na UI (mutação
+      seguia barrada por `is_clinic_admin`, que checa `auth.uid()`).
+    - O provider passou a carregar TODOS os vínculos ativos do usuário
+      (`memberships`) e a expor `switchClinic`. O tenant ativo é o escolhido,
+      com fallback para o primeiro vínculo; a escolha mora em
+      `tear:active-clinic:<userId>` (localStorage, só o id da clínica) e é
+      sempre validada contra os vínculos vindos do banco.
+    - **`ClinicSwitcher`** no topbar: com um vínculo é apenas o rótulo (não
+      oferecer menu que não leva a lugar nenhum); com dois ou mais vira
+      dropdown com marca, nome e papel por clínica. Trocar descarta os caches
+      (`removeQueries` preservando `current-clinic` — as keys de detalhe são
+      indexadas só pelo id da linha) e devolve ao dashboard, porque a tela
+      atual pode apontar para registro de outro tenant. No celular fica só a
+      marca + chevron.
+    - NOTA: platform_admin sem nenhum vínculo agora cai no `/onboarding`
+      (antes herdava uma clínica alheia). As rotas `/clinicas` e
+      `/super-admin` ficam sob `RequireClinic`, então esse admin não alcança o
+      módulo de clínicas — revisar o guard se o caso aparecer.
+
 Todas as correções da tabela public.corrections foram resolvidas.
 
 ## Gestão de Membros
