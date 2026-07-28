@@ -189,29 +189,53 @@ function lastTableY(doc: jsPDF): number {
 const SIGNATURE_MAX_W = 170;
 const SIGNATURE_MAX_H = 46;
 
-// Desenha a rubrica acima da linha de assinatura preservando a proporção e
-// devolve o y da linha. Imagem inválida nunca impede a emissão do documento.
-function drawSignatureImage(
+// Calcula o tamanho da rubrica preservando a proporção, dentro do limite da
+// linha de assinatura. Imagem inválida devolve null e nunca impede a emissão.
+function fitSignature(
   doc: jsPDF,
   dataUrl: string,
-  x: number,
-  topY: number,
-): number {
+): { w: number; h: number; format: "PNG" | "JPEG" } | null {
   try {
     const props = doc.getImageProperties(dataUrl);
     const ratio = props.height / props.width;
-    if (!Number.isFinite(ratio) || ratio <= 0) return topY;
+    if (!Number.isFinite(ratio) || ratio <= 0) return null;
     let w = SIGNATURE_MAX_W;
     let h = w * ratio;
     if (h > SIGNATURE_MAX_H) {
       h = SIGNATURE_MAX_H;
       w = h / ratio;
     }
-    doc.addImage(dataUrl, props.fileType === "PNG" ? "PNG" : "JPEG", x, topY, w, h);
-    return topY + h + 4;
+    return { w, h, format: props.fileType === "PNG" ? "PNG" : "JPEG" };
   } catch {
-    return topY;
+    return null;
   }
+}
+
+// Desenha a rubrica a partir de topY e devolve o y onde a linha de assinatura
+// deve ser traçada (fluxo de documento, quando o bloco cresce com o conteúdo).
+function drawSignatureImage(
+  doc: jsPDF,
+  dataUrl: string,
+  x: number,
+  topY: number,
+): number {
+  const fit = fitSignature(doc, dataUrl);
+  if (!fit) return topY;
+  doc.addImage(dataUrl, fit.format, x, topY, fit.w, fit.h);
+  return topY + fit.h + 4;
+}
+
+// Encosta a rubrica logo acima de uma linha de assinatura já posicionada
+// (layout de página fixa, como as vias impressas da devolutiva).
+function drawSignatureImageAbove(
+  doc: jsPDF,
+  dataUrl: string,
+  x: number,
+  lineY: number,
+): void {
+  const fit = fitSignature(doc, dataUrl);
+  if (!fit) return;
+  doc.addImage(dataUrl, fit.format, x, lineY - fit.h - 4, fit.w, fit.h);
 }
 
 export function exportMonthlyEvolutionPDF(
@@ -450,6 +474,9 @@ function ageFromBirthBR(iso: string | null | undefined): string {
 export function exportFrequencyHistoryPDF(
   data: FrequencyReportData,
   clinicName: string,
+  // Rubrica do profissional. A elegibilidade é decidida por quem chama (só há
+  // rubrica quando a evolução de origem já foi assinada ou aprovada).
+  signatureImage?: string | null,
 ): void {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -639,9 +666,13 @@ export function exportFrequencyHistoryPDF(
   doc.text(declaration, margin, cursorY);
   cursorY += declaration.length * 12 + 40;
 
-  // Duas assinaturas lado a lado
+  // Duas assinaturas lado a lado — a do profissional pode receber a rubrica;
+  // a do acompanhante é sempre coletada à mão na via impressa.
   const half = contentWidth / 2;
   const gap = 24;
+  if (signatureImage) {
+    drawSignatureImageAbove(doc, signatureImage, margin, cursorY);
+  }
   doc.setDrawColor(120);
   doc.line(margin, cursorY, margin + half - gap, cursorY);
   doc.line(margin + half, cursorY, pageWidth - margin, cursorY);
@@ -678,6 +709,8 @@ function buildDailyEvolutionPDF(
   // Rubrica digitalizada do profissional; só é aplicada quando a evolução já
   // está assinada (ver bloco de assinatura).
   signatureImage?: string | null,
+  // Rubrica do supervisor; só entra quando a homologação técnica já ocorreu.
+  supervisorSignatureImage?: string | null,
 ) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -948,6 +981,8 @@ function buildDailyEvolutionPDF(
   // Bloco de homologação do supervisor (evoluções de Aplicador ABA / AT).
   const supSig = getDigitalSignature({ digital_signature: evo.supervisor_signature });
   if (supSig || evo.validation_status) {
+    // A rubrica do supervisor entra apenas com a homologação concluída.
+    const supRubric = supSig ? (supervisorSignatureImage ?? null) : null;
     const supMeta = wrapMeta(
       supSig
         ? [
@@ -959,8 +994,16 @@ function buildDailyEvolutionPDF(
           ]
         : ["Pendente de validação técnica."],
     );
-    ensureSpace(16 + 14 + 13 + supMeta.length * 12 + 8);
+    ensureSpace(
+      16 +
+        (supRubric ? SIGNATURE_MAX_H + 4 : 0) +
+        14 +
+        13 +
+        supMeta.length * 12 +
+        8,
+    );
     y += 16;
+    if (supRubric) y = drawSignatureImage(doc, supRubric, margin, y);
     doc.setDrawColor(120);
     doc.line(margin, y, margin + 260, y);
     y += 14;
@@ -1020,12 +1063,16 @@ export function exportParentFeedbackPDF(
     "name" | "specialty" | "council_type" | "council_number" | "council_state"
   > | null,
   clinicName: string,
+  // Rubrica digitalizada do profissional; entra apenas na devolutiva de uma
+  // evolução já assinada — documento em aberto nunca sai assinado.
+  signatureImage?: string | null,
 ) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 40;
   const contentWidth = pageWidth - margin * 2;
+  const rubric = evo.professional_signature ? (signatureImage ?? null) : null;
   const fb = getParentFeedback(evo) ?? {
     previous_activities: "",
     next_activities: "",
@@ -1100,8 +1147,10 @@ export function exportParentFeedbackPDF(
     section("Atividades do próximo plano", fb.next_activities);
     section("Orientação para casa", fb.home_guidance);
 
-    // Assinaturas
+    // Assinaturas — a do profissional (rubrica, quando a evolução já está
+    // assinada) e a do responsável, coletada à mão na via impressa.
     const sy = pageHeight - 130;
+    if (rubric) drawSignatureImageAbove(doc, rubric, margin, sy);
     doc.setDrawColor(120);
     doc.line(margin, sy, margin + 230, sy);
     doc.setFont("helvetica", "bold");
@@ -1164,6 +1213,9 @@ export function exportMedicalDocumentPDF(
     "name" | "specialty" | "council_type" | "council_number" | "council_state"
   > | null,
   clinicName: string,
+  // Rubrica digitalizada do profissional; entra apenas quando a evolução que
+  // originou o documento já está assinada.
+  signatureImage?: string | null,
 ) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -1258,6 +1310,8 @@ export function exportMedicalDocumentPDF(
     professional?.council_state,
   ].filter(Boolean);
   const sigY = pageHeight - 120;
+  const rubric = evo.professional_signature ? (signatureImage ?? null) : null;
+  if (rubric) drawSignatureImageAbove(doc, rubric, margin, sigY);
   doc.setDrawColor(120);
   doc.line(margin, sigY, margin + 280, sigY);
   doc.setFontSize(10);
