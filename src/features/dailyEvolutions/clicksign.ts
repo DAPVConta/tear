@@ -82,12 +82,30 @@ export function useRequestClickSignSignature() {
         ).catch(() => null);
       }
 
+      // Mesma regra para o supervisor: a rubrica dele só entra no documento se
+      // a homologação técnica já tiver sido registrada.
+      let supervisorSignatureImage: string | null = null;
+      if (evolution.supervisor_signature && evolution.supervisor_id) {
+        const { data: supervisor } = await supabase
+          .from("professionals")
+          .select("signature_path")
+          .eq("id", evolution.supervisor_id)
+          .eq("clinic_id", clinic.id)
+          .maybeSingle();
+        if (supervisor?.signature_path) {
+          supervisorSignatureImage = await fetchSignatureDataUrl(
+            supervisor.signature_path,
+          ).catch(() => null);
+        }
+      }
+
       const { filename, contentBase64 } = renderDailyEvolutionPDFBase64(
         evolution,
         patient ?? null,
         professional ?? null,
         clinic.trade_name || clinic.name || "Clínica",
         signatureImage,
+        supervisorSignatureImage,
       );
 
       const data = await invokeEdge<{ clicksign?: ClickSignEnvelope }>(

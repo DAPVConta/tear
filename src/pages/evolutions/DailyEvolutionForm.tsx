@@ -394,6 +394,13 @@ export default function DailyEvolutionForm() {
   const { data: signatureImage } = useProfessionalSignatureImage(
     pdfProfessional?.signature_path,
   );
+  // Rubrica do supervisor, para o bloco de homologação técnica.
+  const { data: pdfSupervisor } = useProfessional(
+    existing?.supervisor_id ?? undefined,
+  );
+  const { data: supervisorSignatureImage } = useProfessionalSignatureImage(
+    pdfSupervisor?.signature_path,
+  );
 
   async function handleExportPdf() {
     if (!existing) return;
@@ -404,6 +411,7 @@ export default function DailyEvolutionForm() {
       pdfProfessional ?? null,
       clinic?.trade_name || clinic?.name || "Clínica",
       signatureImage ?? null,
+      supervisorSignatureImage ?? null,
     );
   }
 
@@ -415,6 +423,7 @@ export default function DailyEvolutionForm() {
       pdfPatient ?? null,
       pdfProfessional ?? null,
       clinic?.trade_name || clinic?.name || "Clínica",
+      signatureImage ?? null,
     );
   }
 
@@ -428,6 +437,7 @@ export default function DailyEvolutionForm() {
       pdfPatient ?? null,
       pdfProfessional ?? null,
       clinic?.trade_name || clinic?.name || "Clínica",
+      signatureImage ?? null,
     );
   }
 
@@ -460,6 +470,7 @@ export default function DailyEvolutionForm() {
         pdfPatient ?? null,
         pdfProfessional ?? null,
         clinic?.trade_name || clinic?.name || "Clínica",
+        signatureImage ?? null,
       );
       toast.success("Laudo emitido — validade atualizada no cadastro do paciente", {
         description: `Nova validade: ${validity.split("-").reverse().join("/")}`,

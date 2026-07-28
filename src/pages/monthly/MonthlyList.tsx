@@ -85,13 +85,23 @@ export default function MonthlyList() {
   const rows = data?.rows ?? [];
   const eligibleToSign = rows.filter(canSignMonthly).length;
 
+  // Rubrica do profissional para os PDFs. Best-effort: falha no download da
+  // imagem nunca impede a emissão do documento.
+  async function loadRubric(m: MonthlyRow): Promise<string | null> {
+    if (!m.professional?.signature_path) return null;
+    return fetchSignatureDataUrl(m.professional.signature_path).catch(() => null);
+  }
+
   async function onExportFrequency(m: MonthlyRow) {
     if (!clinic?.id) return;
     setFreqLoadingId(m.id);
     try {
       const report = await fetchFrequencyReportData(clinic.id, m);
+      // Só relatório já assinado/aprovado sai com a rubrica aplicada.
+      const rubric =
+        m.workflow_status === "assinada" || m.approved ? await loadRubric(m) : null;
       const { exportFrequencyHistoryPDF } = await import("@/lib/pdf");
-      exportFrequencyHistoryPDF(report, clinic.name ?? "Clínica");
+      exportFrequencyHistoryPDF(report, clinic.name ?? "Clínica", rubric);
     } catch (e) {
       toast.error("Não foi possível gerar o histórico de frequência", {
         description: e instanceof Error ? e.message : undefined,
@@ -106,11 +116,7 @@ export default function MonthlyList() {
   async function onDownloadSigned(m: MonthlyRow) {
     setSignedLoadingId(m.id);
     try {
-      const signatureImage = m.professional?.signature_path
-        ? await fetchSignatureDataUrl(m.professional.signature_path).catch(
-            () => null,
-          )
-        : null;
+      const signatureImage = await loadRubric(m);
       const { exportMonthlyEvolutionPDF } = await import("@/lib/pdf");
       exportMonthlyEvolutionPDF(m, clinic?.name ?? "Clínica", signatureImage);
     } catch (e) {

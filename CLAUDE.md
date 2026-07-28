@@ -636,7 +636,22 @@ operadora; restrição editar/excluir só pelo criador.
     - PDF: além da rubrica, a forma digital imprime "Assinado eletronicamente
       por [nome] em [data/hora]"; a forma certificado mantém o bloco
       ICP-Brasil (titular/CPF/emissor/hash).
-    - PENDENTE: aplicar a migração 0037 no projeto Supabase.
+    - Aplicado no projeto: migração 0037 rodada e release em produção.
+
+36. [FEITO — Rubrica em todos os relatórios] Conclui o DEFER do #33: a
+    assinatura digitalizada do profissional passa a valer em todo documento
+    emitido, sempre com a mesma regra — documento em aberto NUNCA sai com a
+    rubrica aplicada.
+    - Devolutiva para os Pais: rubrica nas duas vias, quando a evolução está
+      assinada (`professional_signature`).
+    - Receita / atestado / laudo médico: mesma regra (evolução assinada).
+    - Histórico de frequência: rubrica quando a evolução mensal de origem já
+      está assinada ou aprovada (gate no chamador, que conhece o status).
+    - Homologação técnica do supervisor (evolução diária, PDF e envio à
+      ClickSign): rubrica do supervisor quando `supervisor_signature` existe.
+    - `lib/pdf`: `fitSignature` extraído; `drawSignatureImage` (fluxo do
+      documento) e `drawSignatureImageAbove` (encosta a rubrica acima de uma
+      linha já posicionada, para layouts de página fixa).
 
 36. [FEITO — Recuperação de senha] Fluxo completo de "esqueci minha senha",
     sem migração (usa o Supabase Auth).
