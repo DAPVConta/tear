@@ -859,13 +859,14 @@ integração externa.
   malformada travar a fila — capturar, gravar na DLQ, seguir.
 - **Rate limit** — o Supabase só limita endpoints do Auth (login, reset — e o
   reset já trata 429 na UI); PostgREST e Edge Functions não têm limite por
-  usuário nativo. TEAR: RPC `check_rate_limit` (janela fixa por ação:usuário,
-  migração 0038, tabela sem acesso direto pela API) aplicada nas Edge Functions
-  (claude-analysis 20/h, extract-laudo 15/h somando provedores, clicksign
-  request 30/h, clinic-admin-user 30/h) e no `redeem_clinic_invite` (10/10min).
-  Fail-open nas Functions (limite protege custo, não confidencialidade).
-  REGRA: toda Edge Function nova que gaste dinheiro (LLM, assinatura, e-mail)
-  nasce com `withinRateLimit`.
+  usuário nativo. DECISÃO DO DONO: NÃO limitar uso/custo — o usuário pode
+  chamar as funções (IA, ClickSign, admin) quantas vezes precisar; nenhuma
+  Edge Function tem limite de chamadas. Rate limit no TEAR é ferramenta de
+  SEGURANÇA apenas: RPC `check_rate_limit` (janela fixa por ação:usuário,
+  migração 0038, tabela sem acesso direto pela API), hoje usada só no
+  `redeem_clinic_invite` (10 tentativas/10min — anti-brute-force de código).
+  REGRA: aplicar `check_rate_limit` somente onde há segredo adivinhável
+  (códigos, tokens); nunca sobre uso legítimo de funcionalidade.
 - **Timing attack** — senha/sessão são do Supabase Auth (bcrypt, comparação
   segura — não reimplementar). Superfície própria: código de convite (busca por
   igualdade em índice único — sinal de timing desprezível; o risco real era

@@ -70,27 +70,6 @@ function getUserClient(req: Request): SupabaseClient | null {
   });
 }
 
-// Rate limit por usuário (RPC check_rate_limit, migração 0038). Fail-open:
-// se a RPC falhar/não existir, loga e deixa passar — a função já exige JWT e
-// o limite protege custo/abuso, não confidencialidade.
-async function withinRateLimit(
-  client: SupabaseClient,
-  action: string,
-  maxCalls: number,
-  windowSeconds: number,
-): Promise<boolean> {
-  const { data, error } = await client.rpc("check_rate_limit", {
-    p_action: action,
-    p_max_calls: maxCalls,
-    p_window_seconds: windowSeconds,
-  });
-  if (error) {
-    console.error(`rate-limit ${action}:`, error.message);
-    return true;
-  }
-  return data === true;
-}
-
 // --- Cliente mínimo da API v3 da ClickSign (JSON:API) ---------------------
 type JsonApiResource = {
   id: string;
@@ -246,14 +225,6 @@ Deno.serve(async (req: Request) => {
         return json(
           { error: "filename, contentBase64 e signer (nome/e-mail) são obrigatórios." },
           400,
-        );
-      }
-      // Criar envelope tem custo por documento na ClickSign: 30/h por usuário.
-      // (status/download ficam fora do limite — são polling barato.)
-      if (!(await withinRateLimit(db, "clicksign-request", 30, 3600))) {
-        return json(
-          { error: "Muitas solicitações de assinatura. Tente novamente em alguns minutos." },
-          429,
         );
       }
       if (current?.status === "pending") {

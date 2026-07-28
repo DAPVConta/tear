@@ -60,28 +60,6 @@ function userClient(req: Request) {
   });
 }
 
-// Rate limit por usuário (RPC check_rate_limit, migração 0038). Fail-open:
-// se a RPC falhar/não existir, loga e deixa passar — a função já exige JWT e
-// o limite protege custo, não confidencialidade. Mesma chave "extract-laudo"
-// da função Claude: o limite vale para a soma dos dois provedores.
-async function withinRateLimit(
-  client: ReturnType<typeof createClient>,
-  action: string,
-  maxCalls: number,
-  windowSeconds: number,
-): Promise<boolean> {
-  const { data, error } = await client.rpc("check_rate_limit", {
-    p_action: action,
-    p_max_calls: maxCalls,
-    p_window_seconds: windowSeconds,
-  });
-  if (error) {
-    console.error(`rate-limit ${action}:`, error.message);
-    return true;
-  }
-  return data === true;
-}
-
 type PageImage = { base64?: string; mediaType?: string };
 
 type Payload = {
@@ -242,14 +220,6 @@ Deno.serve(async (req: Request) => {
   if (!client) return json({ error: "Não autenticado." }, 401);
   const { data: auth, error: authErr } = await client.auth.getUser();
   if (authErr || !auth.user) return json({ error: "Não autenticado." }, 401);
-
-  // Leitura de laudo é cara (vision/PDF): 15 por usuário por hora.
-  if (!(await withinRateLimit(client, "extract-laudo", 15, 3600))) {
-    return json(
-      { error: "Limite de leituras com IA atingido. Tente novamente em alguns minutos." },
-      429,
-    );
-  }
 
   let payload: Payload;
   try {
