@@ -664,13 +664,17 @@ operadora; restrição editar/excluir só pelo criador.
       (Pedir link → Conferir e-mail → Nova senha). Confirmação neutra ("se
       existir uma conta…") para não revelar e-mails cadastrados, reenvio com
       contagem de 60s e tratamento do erro 429.
-    - PENDENTE no painel Supabase (não acessível pela API/MCP):
-      Authentication → URL Configuration → **Redirect URLs** precisa listar
-      `https://<domínio-de-produção>/redefinir-senha` (e
-      `http://localhost:5173/redefinir-senha` para desenvolvimento); sem isso
-      o Supabase devolve ao Site URL e o link não valida. O template
-      "Reset Password" pode seguir com `{{ .ConfirmationURL }}` — é ele que
-      carrega o `redirect_to` enviado pelo app.
+    - Painel Supabase (não acessível pela API/MCP): Authentication → URL
+      Configuration → **Redirect URLs** precisa listar
+      `https://www.apptear.com/redefinir-senha`,
+      `https://apptear.com/redefinir-senha` e
+      `http://localhost:5173/redefinir-senha`; sem isso o Supabase devolve ao
+      Site URL e o link não valida. Cadastrado pelo dono do projeto em
+      28/07/2026. O template "Reset Password" segue com
+      `{{ .ConfirmationURL }}` — é ele que carrega o `redirect_to` enviado
+      pelo app. Domínio canônico em produção é o **www** (apptear.com
+      responde 308 para www.apptear.com), e o `redirectTo` sai de
+      `window.location.origin`.
 
 Todas as correções da tabela public.corrections foram resolvidas.
 
