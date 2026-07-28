@@ -704,6 +704,31 @@ operadora; restrição editar/excluir só pelo criador.
       `/super-admin` ficam sob `RequireClinic`, então esse admin não alcança o
       módulo de clínicas — revisar o guard se o caso aparecer.
 
+38. [FEITO — Quebra de página nos PDFs] Correção do conteúdo cortado no pé da
+    página nos relatórios emitidos (`lib/pdf.ts`), sem migração.
+    - **Causa**: os geradores escreviam blocos de texto com
+      `doc.text(linhas, x, y)` num `y` que só crescia — o jsPDF não quebra
+      página sozinho, então tudo que passava do fim da folha era desenhado fora
+      da área imprimível e sumia. No caso reportado (evolução mensal assinada),
+      10 linhas da "Análise profissional" foram perdidas.
+    - **Motor de fluxo** (`createFlow`): escreve LINHA A LINHA e abre página
+      nova quando a próxima não cabe acima da faixa do rodapé
+      (`FOOTER_RESERVE`). Um bloco maior que a página continua na seguinte em
+      vez de ser cortado. `heading()` evita título órfão (só entra se couber
+      com ~2 linhas do corpo).
+    - **Blocos indivisíveis**: assinatura e homologação têm as linhas quebradas
+      ANTES da reserva de espaço, então rubrica + nome + dados do certificado
+      saem sempre na mesma página (antes a reserva era um valor fixo, menor que
+      o bloco com metadados ICP-Brasil).
+    - **Páginas de continuação**: cabeçalho reduzido (documento · paciente ·
+      período) e rodapé em TODAS as páginas, com "Página X de Y" — inclusive
+      nas criadas pelo autoTable (via `didDrawPage` + `margin.top`).
+    - Aplicado em: evolução mensal/por período, evolução diária (seções
+      clínicas longas) e histórico de frequência.
+    - DEFER: devolutiva aos pais e documentos médicos (receita/atestado/laudo)
+      ainda escrevem o corpo em `y` fixo — só quebram se o texto passar do
+      bloco de assinatura, situação não observada até agora.
+
 Todas as correções da tabela public.corrections foram resolvidas.
 
 ## Gestão de Membros
