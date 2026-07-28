@@ -6,6 +6,8 @@ import { lazy } from "react";
 const factories = {
   "/": () => import("@/pages/Landing"),
   "/login": () => import("@/pages/auth/Login"),
+  "/esqueci-senha": () => import("@/pages/auth/ForgotPassword"),
+  "/redefinir-senha": () => import("@/pages/auth/ResetPassword"),
   "/onboarding": () => import("@/pages/Onboarding"),
   "/dashboard": () => import("@/pages/Dashboard"),
   "/pacientes": () => import("@/pages/patients/PatientsList"),
@@ -36,6 +38,8 @@ type PageKey = keyof typeof factories;
 
 export const Landing = lazy(factories["/"]);
 export const Login = lazy(factories["/login"]);
+export const ForgotPassword = lazy(factories["/esqueci-senha"]);
+export const ResetPassword = lazy(factories["/redefinir-senha"]);
 export const Onboarding = lazy(factories["/onboarding"]);
 export const Dashboard = lazy(factories["/dashboard"]);
 export const PatientsList = lazy(factories["/pacientes"]);

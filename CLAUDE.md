@@ -638,6 +638,40 @@ operadora; restrição editar/excluir só pelo criador.
       ICP-Brasil (titular/CPF/emissor/hash).
     - PENDENTE: aplicar a migração 0037 no projeto Supabase.
 
+36. [FEITO — Recuperação de senha] Fluxo completo de "esqueci minha senha",
+    sem migração (usa o Supabase Auth).
+    - **Rotas**: `/esqueci-senha` (pedir o link, sob `RedirectIfAuthed`) e
+      `/redefinir-senha` (criar a nova senha). A segunda fica FORA do
+      `RedirectIfAuthed` de propósito: o link do e-mail já autentica o usuário
+      e o guarda o jogaria no dashboard sem trocar a senha.
+    - **Link do e-mail**: `resetPasswordForEmail(email, { redirectTo })` com
+      `redirectTo = ${origin}/redefinir-senha` (`lib/authRecovery`). O
+      supabase-js consome o token do fragmento da URL (`detectSessionInUrl`),
+      cria a sessão de recuperação e a página troca a senha com
+      `updateUser({ password })`; em seguida faz signOut e devolve ao login.
+    - `lib/authRecovery` é importado por `lib/supabase` ANTES do
+      `createClient` porque guarda o retrato dos parâmetros de retorno na URL
+      (`error`, `error_code`, `type`) — o client os apaga ao processar. Só
+      campos de diagnóstico entram no retrato; nunca o token. Link expirado ou
+      já usado vira tela "Link não validado" com atalho para pedir outro.
+    - **Regra de senha** (`lib/password`): mínimo de 8 caracteres com letra e
+      número (o mínimo do Supabase é 6), medidor de força nas cores da marca e
+      confirmação obrigatória. `PasswordInput` (mostrar/ocultar) também passou
+      a ser usado no login.
+    - **UI** (skill frontend-design): `AuthLayout` extraído do login — as três
+      telas de acesso compartilham o painel da marca; elemento-assinatura é o
+      trilho `RecoverySteps`, em que as barras coloridas TEAR viram as etapas
+      (Pedir link → Conferir e-mail → Nova senha). Confirmação neutra ("se
+      existir uma conta…") para não revelar e-mails cadastrados, reenvio com
+      contagem de 60s e tratamento do erro 429.
+    - PENDENTE no painel Supabase (não acessível pela API/MCP):
+      Authentication → URL Configuration → **Redirect URLs** precisa listar
+      `https://<domínio-de-produção>/redefinir-senha` (e
+      `http://localhost:5173/redefinir-senha` para desenvolvimento); sem isso
+      o Supabase devolve ao Site URL e o link não valida. O template
+      "Reset Password" pode seguir com `{{ .ConfirmationURL }}` — é ele que
+      carrega o `redirect_to` enviado pelo app.
+
 Todas as correções da tabela public.corrections foram resolvidas.
 
 ## Gestão de Membros

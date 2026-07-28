@@ -1,6 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { authStorage, purgeLegacyPersistentSession } from "@/lib/authStorage";
+// Importado ANTES do createClient: o módulo guarda, no seu corpo, o retrato
+// dos parâmetros de retorno do Auth na URL (link de redefinição de senha) —
+// que o client apaga ao processá-los. Ver lib/authRecovery.
+import "@/lib/authRecovery";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
