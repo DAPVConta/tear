@@ -123,12 +123,13 @@ Inclusão · Tecnologia · Humanização · Organização · Ética · Inovaçã
 
 ## Infra / Conexões
 
-- **Supabase:** projeto `tear`, ref `kfjsyeopooxipnnxcdkz`
-  (`https://kfjsyeopooxipnnxcdkz.supabase.co`), org `lhrercddcglaxvykbgen`,
-  região `sa-east-1`, Postgres 17.
-- **Vercel:** projeto `tear` (`prj_cAesVXf9FRrq101iZ6lFjCYMUvii`), time
-  `dapvconta's projects`.
-- **GitHub:** usuário `DAPVConta`.
+- **Supabase:** projeto `tear`, ref `bopavktijwmykpsophgb`
+  (`https://bopavktijwmykpsophgb.supabase.co`), org `rwukwbqqcmfuavgljarp`,
+  região `sa-east-1`, Postgres 17. O ref também vive em `supabase/config.toml`
+  (`project_id`) — trocar de projeto exige atualizar os dois.
+- **Vercel:** projeto `tear` (`prj_0krk3ANxE9QfpmgWvXoQpwCjd8RZ`), time `tear`
+  (slug `tear3`, `team_p9DeXYhA1dlLVwfs65lUO0dH`).
+- **GitHub:** repositório `DAPVConta/tear` (remote `origin`).
 
 ## Integrações automáticas (investigar sempre)
 

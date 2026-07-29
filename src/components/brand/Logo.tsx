@@ -1,14 +1,17 @@
 import { cn } from "@/lib/utils";
 
 // Ativos oficiais da marca TEAR (Supabase Storage, bucket público `Logo`).
+// A base vem de VITE_SUPABASE_URL para que trocar de projeto Supabase não exija
+// caçar o ref hardcoded aqui (o mesmo vale para o favicon em index.html, que
+// usa %VITE_SUPABASE_URL%).
+const brandAsset = (file: string) =>
+  `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/Logo/${file}`;
+
 // Logo = lockup completo (ícone + wordmark); mark = ícone quadrado (favicon).
 // `white` = versão monocromática branca para fundos escuros (ex.: login).
-const BRAND_LOGO_URL =
-  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_logo_redim.png";
-const BRAND_LOGO_WHITE_URL =
-  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_logo_branco2.png";
-const BRAND_MARK_URL =
-  "https://kfjsyeopooxipnnxcdkz.supabase.co/storage/v1/object/public/Logo/tear_favicon1.png";
+const BRAND_LOGO_URL = brandAsset("tear_logo_redim.png");
+const BRAND_LOGO_WHITE_URL = brandAsset("tear_logo_branco2.png");
+const BRAND_MARK_URL = brandAsset("tear_favicon1.png");
 
 // Ícone quadrado da marca. Quando `src` é fornecido, renderiza a logo
 // customizada do tenant; caso contrário, usa o ícone oficial TEAR.
