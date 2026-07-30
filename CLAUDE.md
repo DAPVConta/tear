@@ -123,12 +123,23 @@ Inclusão · Tecnologia · Humanização · Organização · Ética · Inovaçã
 
 ## Infra / Conexões
 
-- **Supabase:** projeto `tear`, ref `kfjsyeopooxipnnxcdkz`
-  (`https://kfjsyeopooxipnnxcdkz.supabase.co`), org `lhrercddcglaxvykbgen`,
-  região `sa-east-1`, Postgres 17.
-- **Vercel:** projeto `tear` (`prj_cAesVXf9FRrq101iZ6lFjCYMUvii`), time
-  `dapvconta's projects`.
-- **GitHub:** usuário `DAPVConta`.
+- **Supabase:** projeto `tear`, ref `bopavktijwmykpsophgb`
+  (`https://bopavktijwmykpsophgb.supabase.co`), org `rwukwbqqcmfuavgljarp`,
+  região `sa-east-1`, Postgres 17. O ref também vive em `supabase/config.toml`
+  (`project_id`) — trocar de projeto exige atualizar os dois.
+- **Vercel:** hoje existem DOIS projetos chamados `tear` — confira em qual está
+  publicando antes de mexer em variável de ambiente ou domínio:
+  - Time `tear` (slug `tear3`, `team_p9DeXYhA1dlLVwfs65lUO0dH`) → projeto
+    `prj_0krk3ANxE9QfpmgWvXoQpwCjd8RZ`, domínios `tear-tear3.vercel.app` /
+    `tear-sable.vercel.app`. É o projeto atual.
+  - Time `dapvconta's projects` (`team_iz6oy66jXagknpZGJ0jRlI0R`) → projeto
+    `prj_cAesVXf9FRrq101iZ6lFjCYMUvii`, que é o ligado ao GitHub deste
+    repositório: todo push/PR em `DAPVConta/tear` dispara build ALI (é dele o
+    comentário de preview do bot da Vercel nos PRs).
+- **GitHub:** repositório `DAPVConta/tear` (remote `origin`).
+- **Atenção às variáveis de ambiente:** `VITE_SUPABASE_URL` precisa apontar para
+  o projeto Supabase atual em CADA projeto Vercel que estiver no ar — a logo, o
+  favicon e todo o acesso a dados seguem essa variável.
 
 ## Integrações automáticas (investigar sempre)
 
